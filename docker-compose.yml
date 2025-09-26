@@ -1,0 +1,110 @@
+version: '3.8'
+
+services:
+  mysql:
+    image: mysql:8.0
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_DATABASE: kafka_gov
+      MYSQL_USER: user
+      MYSQL_PASSWORD: password
+    volumes:
+      - mysql_data:/var/lib/mysql
+    ports:
+      - "3306:3306"
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-prootpassword"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks:
+      - kafka-network
+
+  minio:
+    image: minio/minio:RELEASE.2024-09-13T20-26-02Z
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin123
+      MINIO_BROWSER_REDIRECT_URL: http://localhost:9001
+    volumes:
+      - minio_data:/data
+    ports:
+      - "9000:9000"  # MinIO API
+      - "9001:9001"  # MinIO Console
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+      start_period: 30s
+    networks:
+      - kafka-network
+    restart: unless-stopped
+
+  # 마이그레이션 전용 서비스
+  migration:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      - DATABASE_URL=mysql+aiomysql://user:password@mysql:3306/kafka_gov
+      - DB_HOST=mysql
+      - DB_USER=user
+      - DB_PASSWORD=password
+    depends_on:
+      mysql:
+        condition: service_healthy
+    command: ["sh", "-c", "chmod +x ./scripts/migrate.sh && ./scripts/migrate.sh"]
+    networks:
+      - kafka-network
+    restart: "no"  # 한 번만 실행
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=mysql+aiomysql://user:password@mysql:3306/kafka_gov
+      - APP_DEBUG=true
+      - APP_LOG_LEVEL=INFO
+      - SECRET_KEY=dev-secret-please-change-8c7f89bd5e434f6e9cfea5c1d2ab3d51
+      - JWT_ALGORITHM=HS256
+      - JWT_EXPIRE_MINUTES=30
+      # Kafka 설정
+      - KAFKA_BOOTSTRAP_SERVERS=kafka1:19092,kafka2:29092,kafka3:39092
+      - KAFKA_GROUP_ID=kafkaflow-backoffice-market
+      # MinIO 설정
+      - MINIO_ENDPOINT=minio:9000
+      - MINIO_ACCESS_KEY=minioadmin
+      - MINIO_SECRET_KEY=minioadmin123
+      - MINIO_SECURE=false
+    depends_on:
+      mysql:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+      migration:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - kafka-network
+    restart: unless-stopped
+    volumes:
+      - ./logs:/app/logs
+
+volumes:
+  mysql_data:
+  minio_data:
+
+networks:
+  kafka-network:
+    driver: bridge

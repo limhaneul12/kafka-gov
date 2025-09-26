@@ -1,0 +1,50 @@
+# Core FastAPI dependencies
+fastapi
+uvicorn
+pydantic
+pydantic-settings
+pydantic[email]
+email-validator
+
+# Database
+sqlalchemy
+alembic
+asyncpg
+aiomysql
+pymysql
+
+# HTTP Client & Utils
+httpx
+python-multipart
+authlib
+
+# Kafka (existing dependencies)
+confluent-kafka
+confluent-kafka[avro,schemaregistry]
+confluent-kafka[schemaregistry]
+aiokafka
+aiokafka[lz4]
+kafka-python-ng
+kafka-python
+
+# Data processing (existing dependencies)
+requests
+pandas
+numpy
+pyyaml
+aiohttp
+cachetools
+websocket
+websockets
+websocket-client
+setuptools
+minio
+
+# Authentication & Security
+argon2-cffi
+pyjwt
+python-jose[cryptography]
+orjson
+dependency-injector
+
+# Development tools are managed via [tool.uv.dependency-groups] in pyproject.toml
