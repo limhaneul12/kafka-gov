@@ -19,6 +19,7 @@ from ..domain.repositories.interfaces import (
     ITopicRepository,
 )
 from ..domain.services import TopicPlannerService
+from .policy_integration import TopicPolicyAdapter
 
 
 class TopicBatchDryRunUseCase:

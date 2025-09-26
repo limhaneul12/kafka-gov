@@ -62,15 +62,14 @@ class TopicPolicyAdapter:
         """TopicSpec을 PolicyTarget으로 변환"""
         config_dict = {}
 
-        # 기본 설정값들을 dict로 변환
-        if topic_spec.partitions is not None:
-            config_dict["partitions"] = topic_spec.partitions
-        if topic_spec.replication_factor is not None:
-            config_dict["replication.factor"] = topic_spec.replication_factor
-
-        # 추가 설정이 있다면 병합
+        # TopicConfig에서 설정값들을 dict로 변환
         if topic_spec.config:
-            config_dict.update(topic_spec.config)
+            config_dict["partitions"] = topic_spec.config.partitions
+            config_dict["replication.factor"] = topic_spec.config.replication_factor
+            
+            # Kafka 설정으로 변환하여 병합
+            kafka_config = topic_spec.config.to_kafka_config()
+            config_dict.update(kafka_config)
 
         return {
             "name": topic_spec.name,

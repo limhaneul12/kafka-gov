@@ -91,7 +91,7 @@ class ConfluentSchemaRegistryAdapter(ISchemaRegistryRepository):
                 subject=spec.subject,
                 mode=spec.compatibility,
                 is_compatible=is_compatible,
-                issues=tuple(),  # Confluent 클라이언트는 상세 이슈를 제공하지 않음
+                issues=(),  # Confluent 클라이언트는 상세 이슈를 제공하지 않음
             )
 
         except SchemaRegistryError as e:

@@ -24,6 +24,14 @@ class SharedContainer(containers.DeclarativeContainer):
     # Schema Registry 설정 (settings에서 가져옴)
     schema_registry_config = providers.Callable(lambda s: s.schema_registry.client_config, settings)
 
+    # Object Storage 설정 (settings에서 가져옴)
+    storage_endpoint = providers.Callable(lambda s: s.storage.endpoint_url.replace('http://', '').replace('https://', ''), settings)
+    storage_access_key = providers.Callable(lambda s: s.storage.access_key, settings)
+    storage_secret_key = providers.Callable(lambda s: s.storage.secret_key, settings)
+    storage_bucket_name = providers.Callable(lambda s: s.storage.bucket_name, settings)
+    storage_use_ssl = providers.Callable(lambda s: s.storage.use_ssl, settings)
+    storage_base_url = providers.Callable(lambda s: s.storage.endpoint_url, settings)
+
 
 class InfrastructureContainer(containers.DeclarativeContainer):
     """인프라스트럭처 컨테이너 - 외부 시스템 연결"""
@@ -43,6 +51,9 @@ class InfrastructureContainer(containers.DeclarativeContainer):
     
     # Schema Registry Client (외부에서 주입)
     schema_registry_client = providers.Dependency()
+    
+    # MinIO Client (외부에서 주입)
+    minio_client = providers.Dependency()
 
 
 # 전역 컨테이너 인스턴스들

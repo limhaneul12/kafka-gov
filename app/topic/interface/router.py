@@ -21,17 +21,14 @@ from ..container import (
     get_dry_run_use_case,
     get_plan_use_case,
 )
-from ..domain.models import (
-    TopicAction as DomainTopicAction,
-    TopicBatch,
-    TopicConfig as DomainTopicConfig,
-    TopicMetadata as DomainTopicMetadata,
-    TopicPlan,
-    TopicSpec as DomainTopicSpec,
+
+# Domain models import 제거 (adapters.py에서 처리)
+from .adapters import (
+    safe_convert_plan_to_response,
+    safe_convert_request_to_batch,
 )
 from .schema import (
     ChangeId,
-    PolicyViolation as ResponseViolation,
     TopicBatchApplyResponse,
     TopicBatchDryRunResponse,
     TopicBatchRequest,
@@ -44,93 +41,10 @@ from .schema import (
 router = APIRouter(prefix="/v1/topics", tags=["topics"])
 
 
-def convert_request_to_batch(request: TopicBatchRequest) -> TopicBatch:
-    """요청 DTO를 도메인 배치로 변환"""
-
-    def convert_item_to_spec(item) -> DomainTopicSpec:
-        """개별 아이템을 도메인 명세로 변환"""
-        # 설정 변환
-        domain_config = (
-            DomainTopicConfig(
-                partitions=item.config.partitions,
-                replication_factor=item.config.replication_factor,
-                cleanup_policy=item.config.cleanup_policy,
-                compression_type=item.config.compression_type,
-                retention_ms=item.config.retention_ms,
-                min_insync_replicas=item.config.min_insync_replicas,
-                max_message_bytes=item.config.max_message_bytes,
-                segment_ms=item.config.segment_ms,
-            )
-            if item.config
-            else None
-        )
-
-        # 메타데이터 변환
-        domain_metadata = (
-            DomainTopicMetadata(
-                owner=item.metadata.owner,
-                sla=item.metadata.sla,
-                doc=item.metadata.doc,
-                tags=tuple(item.metadata.tags),
-            )
-            if item.metadata
-            else None
-        )
-
-        return DomainTopicSpec(
-            name=item.name,
-            action=DomainTopicAction(item.action.value),
-            config=domain_config,
-            metadata=domain_metadata,
-            reason=item.reason,
-        )
-
-    # 리스트 컴프리헨션으로 변환
-    specs = tuple(convert_item_to_spec(item) for item in request.items)
-
-    return TopicBatch(
-        change_id=request.change_id,
-        env=request.env,
-        specs=specs,
-    )
+# TypeAdapter 기반 변환 함수는 adapters.py로 이동됨
 
 
-def convert_plan_to_response(
-    plan: TopicPlan, request: TopicBatchRequest
-) -> TopicBatchDryRunResponse:
-    """도메인 계획을 응답 DTO로 변환"""
-
-    # 계획 아이템 변환
-    plan_items: list[ResponsePlanItem] = [
-        ResponsePlanItem(
-            name=item.name,
-            action=item.action.value,
-            diff=item.diff,
-            current_config=item.current_config,
-            target_config=item.target_config,
-        )
-        for item in plan.items
-    ]
-
-    # 위반 사항 변환
-    violations: list[ResponseViolation] = [
-        ResponseViolation(
-            name=v.name,
-            rule=v.rule,
-            message=v.message,
-            severity=v.severity,
-            field=v.field,
-        )
-        for v in plan.violations
-    ]
-
-    return TopicBatchDryRunResponse(
-        env=request.env,
-        change_id=request.change_id,
-        plan=plan_items,
-        violations=violations,
-        summary=plan.summary(),
-    )
+# TypeAdapter 기반 변환 함수는 adapters.py로 이동됨
 
 
 @router.post(
@@ -147,14 +61,14 @@ async def topic_batch_dry_run(
 ) -> TopicBatchDryRunResponse:
     """토픽 배치 Dry-Run"""
     try:
-        # 요청을 도메인 모델로 변환
-        batch = convert_request_to_batch(request)
+        # 요청을 도메인 모델로 변환 (TypeAdapter 사용)
+        batch = safe_convert_request_to_batch(request)
 
         # 유스케이스 실행
         plan = await dry_run_use_case.execute(batch, current_user)
 
-        # 응답 변환
-        return convert_plan_to_response(plan, request)
+        # 응답 변환 (TypeAdapter 사용)
+        return safe_convert_plan_to_response(plan, request)
 
     except ValueError as e:
         raise HTTPException(
@@ -182,8 +96,8 @@ async def topic_batch_apply(
 ) -> TopicBatchApplyResponse:
     """토픽 배치 Apply"""
     try:
-        # 요청을 도메인 모델로 변환
-        batch = convert_request_to_batch(request)
+        # 요청을 도메인 모델로 변환 (TypeAdapter 사용)
+        batch = safe_convert_request_to_batch(request)
 
         # 유스케이스 실행
         result = await apply_use_case.execute(batch, current_user)

@@ -190,7 +190,7 @@ class TopicBatchRequest(BaseModel):
         },
     )
 
-    kind: PlanAction = "TopicBatch"
+    kind: str = "TopicBatch"
     env: Environment
     change_id: ChangeId
     items: Annotated[

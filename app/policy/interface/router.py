@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import JSONResponse
 
-from ...shared.interface.auth import get_current_user
+from ...shared.auth import get_current_user
+from ..application.performance_utils import optimize_violation_memory_usage
 from ..container import policy_use_case_factory
 from ..domain import Environment, PolicySeverity, ResourceType
 from .dto import (
@@ -31,7 +32,7 @@ router = APIRouter(prefix="/v1/policies", tags=["policies"])
 )
 async def evaluate_policies(
     request: PolicyEvaluationRequest,
-    current_user: dict[str, Any] = Depends(get_current_user),
+    current_user: Annotated[dict[str, Any], Depends(get_current_user)],
 ) -> PolicyEvaluationResponse:
     """정책 평가 API"""
     try:
@@ -45,7 +46,8 @@ async def evaluate_policies(
             metadata=request.metadata,
         )
 
-        # 위반 사항을 DTO로 변환
+        # 위반 사항 메모리 최적화 및 DTO로 변환
+        optimized_violations = optimize_violation_memory_usage(violations)
         violation_responses = [
             PolicyViolationResponse(
                 resource_type=v.resource_type,
@@ -57,7 +59,7 @@ async def evaluate_policies(
                 current_value=v.current_value,
                 expected_value=v.expected_value,
             )
-            for v in violations
+            for v in optimized_violations
         ]
 
         # 심각도별 요약
@@ -90,7 +92,7 @@ async def get_validation_summary(
     environment: Environment,
     resource_type: ResourceType,
     targets: list[dict[str, Any]],
-    current_user: dict[str, Any] = Depends(get_current_user),
+    current_user: Annotated[dict[str, Any], Depends(get_current_user)],
 ) -> ValidationSummaryResponse:
     """검증 요약 API"""
     try:
@@ -139,7 +141,7 @@ async def get_validation_summary(
     description="등록된 모든 정책 집합을 조회합니다.",
 )
 async def list_policies(
-    current_user: dict[str, Any] = Depends(get_current_user),
+    current_user: Annotated[dict[str, Any], Depends(get_current_user)],
 ) -> PolicyListResponse:
     """정책 목록 조회 API"""
     try:
@@ -191,7 +193,7 @@ async def list_policies(
 async def get_policy_set(
     environment: Environment,
     resource_type: ResourceType,
-    current_user: dict[str, Any] = Depends(get_current_user),
+    current_user: Annotated[dict[str, Any], Depends(get_current_user)],
 ) -> PolicySetResponse:
     """특정 정책 집합 조회 API"""
     try:
@@ -234,7 +236,7 @@ async def get_policy_set(
     description="시스템 기본 정책을 초기화합니다.",
 )
 async def initialize_default_policies(
-    current_user: dict[str, Any] = Depends(get_current_user),
+    current_user: Annotated[dict[str, Any], Depends(get_current_user)],
 ) -> JSONResponse:
     """기본 정책 초기화 API"""
     try:

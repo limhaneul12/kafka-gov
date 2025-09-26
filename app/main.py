@@ -23,9 +23,9 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         print("✅ Policy 기본 정책이 초기화되었습니다.")
     except Exception as e:
         print(f"⚠️ Policy 초기화 중 오류 발생: {e}")
-    
+
     yield
-    
+
     # 종료 시 정리 작업 (필요시)
 
 
@@ -33,11 +33,20 @@ def create_app() -> FastAPI:
     """FastAPI 애플리케이션 생성"""
     app = FastAPI(
         title="Kafka Governance API",
-        description="Kafka 토픽과 스키마 배치 관리 및 거버넌스 API",
-        version="1.0.0",
+        description="Kafka Topic / Schema Registry 관리용 API",
+        version="0.1.0",
+        docs_url="/swagger",  # Swagger 경로 변경 (기본은 /docs)
+        redoc_url="/redoc",  # ReDoc 비활성화
         lifespan=lifespan,
+        swagger_ui_parameters={
+            "defaultModelsExpandDepth": -1,  # 모델 섹션 기본 접기
+            "defaultModelRendering": "example",  # Example 뷰 기본
+            "displayRequestDuration": True,  # 요청-응답 시간 표시
+            "docExpansion": "none",  # 전체 접기
+            "syntaxHighlight.theme": "obsidian",  # 다크 테마
+            "persistAuthorization": True,  # Authorize 토큰 유지
+        },
     )
-    
     # CORS 설정
     app.add_middleware(
         CORSMiddleware,
@@ -46,22 +55,22 @@ def create_app() -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
-    
+
     # 라우터 등록
     app.include_router(topic_router, prefix="/api")
-    app.include_router(schema_router, prefix="/api") 
+    app.include_router(schema_router, prefix="/api")
     app.include_router(policy_router, prefix="/api")
-    
+
     @app.get("/")
     async def root() -> dict[str, str]:
         """루트 엔드포인트"""
         return {"message": "Kafka Governance API", "version": "1.0.0"}
-    
+
     @app.get("/health")
     async def health_check() -> dict[str, str]:
         """헬스 체크 엔드포인트"""
         return {"status": "healthy"}
-    
+
     return app
 
 

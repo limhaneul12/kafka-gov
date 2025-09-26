@@ -23,26 +23,22 @@ from .domain import (
 from .interface import router as policy_router
 
 __all__ = [
-    # Domain
     "ConfigurationRule",
+    "DefaultPolicyFactory",
     "Environment",
-    "IPolicyRepository", 
+    "IPolicyRepository",
     "NamingRule",
     "PolicyContext",
     "PolicyEngine",
+    "PolicyEvaluationService",
+    "PolicyManagementService",
     "PolicyRule",
     "PolicySet",
     "PolicySeverity",
     "PolicyTarget",
     "PolicyViolation",
     "ResourceType",
-    # Application
-    "DefaultPolicyFactory",
-    "PolicyEvaluationService",
-    "PolicyManagementService",
-    # Container
     "policy_container",
-    "policy_use_case_factory",
-    # Interface
     "policy_router",
+    "policy_use_case_factory",
 ]

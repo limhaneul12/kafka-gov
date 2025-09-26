@@ -2,12 +2,18 @@
 
 from __future__ import annotations
 
-from typing import Annotated, Any
+from typing import Annotated
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
 from fastapi.responses import JSONResponse
 
 from ...shared.auth import get_current_user
+from ..application.use_cases import (
+    SchemaBatchApplyUseCase,
+    SchemaBatchDryRunUseCase,
+    SchemaPlanUseCase,
+    SchemaUploadUseCase,
+)
 from ..container import (
     get_schema_apply_use_case,
     get_schema_dry_run_use_case,
@@ -15,29 +21,18 @@ from ..container import (
     get_schema_upload_use_case,
 )
 from ..domain.models import (
-    CompatibilityMode as DomainCompatibilityMode,
-    Environment as DomainEnvironment,
     SchemaApplyResult as DomainSchemaApplyResult,
-    SchemaBatch as DomainSchemaBatch,
-    SchemaMetadata as DomainSchemaMetadata,
     SchemaPlan as DomainSchemaPlan,
-    SchemaReference as DomainSchemaReference,
-    SchemaSource as DomainSchemaSource,
-    SchemaSourceType as DomainSchemaSourceType,
-    SchemaSpec as DomainSchemaSpec,
-    SchemaType as DomainSchemaType,
-    SubjectStrategy as DomainSubjectStrategy,
+)
+from .adapters import (
+    safe_convert_apply_result_to_response,
+    safe_convert_plan_to_response,
+    safe_convert_request_to_batch,
 )
 from .schema import (
-    PolicyViolation,
-    SchemaArtifact,
     SchemaBatchApplyResponse,
     SchemaBatchDryRunResponse,
     SchemaBatchRequest,
-    SchemaCompatibilityIssue,
-    SchemaCompatibilityReport,
-    SchemaImpactRecord,
-    SchemaPlanItem,
     SchemaUploadResponse,
 )
 from .types.enums import Environment
@@ -46,151 +41,13 @@ from .types.type_hints import ChangeId
 router = APIRouter(prefix="/v1/schemas", tags=["schemas"])
 
 
-def convert_request_to_batch(request: SchemaBatchRequest) -> DomainSchemaBatch:
-    """인터페이스 요청 DTO를 도메인 배치로 변환"""
-
-    def convert_item(item) -> DomainSchemaSpec:
-        metadata = (
-            DomainSchemaMetadata(
-                owner=item.metadata.owner,
-                doc=item.metadata.doc,
-                tags=tuple(item.metadata.tags),
-                description=item.metadata.description,
-            )
-            if item.metadata
-            else None
-        )
-
-        references = tuple(
-            DomainSchemaReference(name=ref.name, subject=ref.subject, version=ref.version)
-            for ref in item.references
-        )
-
-        source = (
-            DomainSchemaSource(
-                type=DomainSchemaSourceType(item.source.type.value),
-                inline=item.source.inline,
-                file=item.source.file,
-                yaml=item.source.yaml,
-            )
-            if item.source
-            else None
-        )
-
-        compatibility_value = (
-            item.compatibility.value if item.compatibility else DomainCompatibilityMode.NONE.value
-        )
-
-        return DomainSchemaSpec(
-            subject=item.subject,
-            schema_type=DomainSchemaType(item.type.value),
-            compatibility=DomainCompatibilityMode(compatibility_value),
-            schema=item.schema,
-            source=source,
-            schema_hash=item.schema_hash,
-            references=references,
-            metadata=metadata,
-            reason=item.reason,
-            dry_run_only=item.dry_run_only,
-        )
-
-    specs = tuple(convert_item(item) for item in request.items)
-
-    return DomainSchemaBatch(
-        change_id=request.change_id,
-        env=DomainEnvironment(request.env.value),
-        subject_strategy=DomainSubjectStrategy(request.subject_strategy.value),
-        specs=specs,
-    )
+# TypeAdapter 기반 변환 함수는 adapters.py로 이동됨
 
 
-def convert_plan_to_response(plan: DomainSchemaPlan) -> SchemaBatchDryRunResponse:
-    """도메인 계획을 응답 DTO로 변환"""
-
-    plan_items = [
-        SchemaPlanItem(
-            subject=item.subject,
-            action=item.action.value,
-            current_version=item.current_version,
-            target_version=item.target_version,
-            diff=item.diff,
-        )
-        for item in plan.items
-    ]
-
-    violations = [
-        PolicyViolation(
-            subject=v.subject,
-            rule=v.rule,
-            message=v.message,
-            severity=v.severity,
-            field=v.field,
-        )
-        for v in plan.violations
-    ]
-
-    compatibility_reports = [
-        SchemaCompatibilityReport(
-            subject=report.subject,
-            mode=report.mode.value if hasattr(report.mode, "value") else report.mode,
-            is_compatible=report.is_compatible,
-            issues=[
-                SchemaCompatibilityIssue(
-                    path=issue.path,
-                    message=issue.message,
-                    type=getattr(
-                        issue, "issue_type", issue.type if hasattr(issue, "type") else "unknown"
-                    ),
-                )
-                for issue in report.issues
-            ],
-        )
-        for report in plan.compatibility_reports
-    ]
-
-    impacts = [
-        SchemaImpactRecord(
-            subject=impact.subject,
-            topics=list(impact.topics),
-            consumers=list(impact.consumers),
-        )
-        for impact in plan.impacts
-    ]
-
-    return SchemaBatchDryRunResponse(
-        env=Environment(plan.env.value),
-        change_id=plan.change_id,
-        plan=plan_items,
-        violations=violations,
-        compatibility=compatibility_reports,
-        impacts=impacts,
-        summary=plan.summary(),
-    )
+# TypeAdapter 기반 변환 함수는 adapters.py로 이동됨
 
 
-def convert_apply_result_to_response(result: DomainSchemaApplyResult) -> SchemaBatchApplyResponse:
-    """도메인 적용 결과를 응답 DTO로 변환"""
-
-    artifacts = [
-        SchemaArtifact(
-            subject=artifact.subject,
-            version=artifact.version,
-            storage_url=artifact.storage_url,
-            checksum=artifact.checksum,
-        )
-        for artifact in result.artifacts
-    ]
-
-    return SchemaBatchApplyResponse(
-        env=Environment(result.env.value),
-        change_id=result.change_id,
-        registered=list(result.registered),
-        skipped=list(result.skipped),
-        failed=[entry.copy() for entry in result.failed],
-        audit_id=result.audit_id,
-        artifacts=artifacts,
-        summary=result.summary(),
-    )
+# TypeAdapter 기반 변환 함수는 adapters.py로 이동됨
 
 
 @router.post(
@@ -202,15 +59,15 @@ def convert_apply_result_to_response(result: DomainSchemaApplyResult) -> SchemaB
 )
 async def schema_batch_dry_run(
     request: SchemaBatchRequest,
-    dry_run_use_case: Annotated[Any, Depends(get_schema_dry_run_use_case)],
+    dry_run_use_case: Annotated[SchemaBatchDryRunUseCase, Depends(get_schema_dry_run_use_case)],
     current_user: Annotated[str, Depends(get_current_user)],
 ) -> SchemaBatchDryRunResponse:
     """스키마 배치 Dry-Run 실행"""
     try:
-        batch = convert_request_to_batch(request)
+        batch = safe_convert_request_to_batch(request)
         plan = await dry_run_use_case.execute(batch, current_user)
         if isinstance(plan, DomainSchemaPlan):
-            return convert_plan_to_response(plan)
+            return safe_convert_plan_to_response(plan)
         return SchemaBatchDryRunResponse.model_validate(plan)
     except NotImplementedError as exc:  # pragma: no cover - 초기 스텁 행동
         raise HTTPException(
@@ -240,15 +97,15 @@ async def schema_batch_dry_run(
 )
 async def schema_batch_apply(
     request: SchemaBatchRequest,
-    apply_use_case: Annotated[Any, Depends(get_schema_apply_use_case)],
+    apply_use_case: Annotated[SchemaBatchApplyUseCase, Depends(get_schema_apply_use_case)],
     current_user: Annotated[str, Depends(get_current_user)],
 ) -> SchemaBatchApplyResponse:
     """스키마 배치 Apply 실행"""
     try:
-        batch = convert_request_to_batch(request)
+        batch = safe_convert_request_to_batch(request)
         result = await apply_use_case.execute(batch, current_user)
         if isinstance(result, DomainSchemaApplyResult):
-            return convert_apply_result_to_response(result)
+            return safe_convert_apply_result_to_response(result)
         return SchemaBatchApplyResponse.model_validate(result)
     except NotImplementedError as exc:  # pragma: no cover - 초기 스텁 행동
         raise HTTPException(
@@ -280,7 +137,7 @@ async def upload_schemas(
     env: Annotated[Environment, Form(..., description="업로드 대상 환경")],
     change_id: Annotated[ChangeId, Form(..., description="변경 ID")],
     files: Annotated[list[UploadFile], File(..., description="업로드할 스키마 파일 목록")],
-    upload_use_case: Annotated[Any, Depends(get_schema_upload_use_case)],
+    upload_use_case: Annotated[SchemaUploadUseCase, Depends(get_schema_upload_use_case)],
     current_user: Annotated[str, Depends(get_current_user)],
 ) -> SchemaUploadResponse:
     """스키마 파일 업로드"""
@@ -328,7 +185,7 @@ async def upload_schemas(
 )
 async def get_schema_plan(
     change_id: ChangeId,
-    plan_use_case: Annotated[Any, Depends(get_schema_plan_use_case)],
+    plan_use_case: Annotated[SchemaPlanUseCase, Depends(get_schema_plan_use_case)],
 ) -> SchemaBatchDryRunResponse:
     """스키마 배치 계획 조회"""
     try:
@@ -336,7 +193,7 @@ async def get_schema_plan(
         if result is None:
             raise ValueError("plan not found")
         if isinstance(result, DomainSchemaPlan):
-            return convert_plan_to_response(result)
+            return safe_convert_plan_to_response(result)
         return SchemaBatchDryRunResponse.model_validate(result)
     except NotImplementedError as exc:  # pragma: no cover
         raise HTTPException(

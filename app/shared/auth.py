@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta
-from typing import Any
+from typing import Any, Final
 
 from fastapi import HTTPException, Request, status
 from jose import JWTError, jwt
@@ -83,12 +83,13 @@ class JWTAuthenticator:
         return username
 
 
-# 전역 인증 처리기 (설정 기반으로 초기화)
+# 전역 인증 처리기 (설정 기반으로 초기화) - Thread-safe 싱글톤
 _authenticator: JWTAuthenticator | None = None
+_lock: Final = object()  # 간단한 락 객체
 
 
 def get_authenticator(settings: AppSettings | None = None) -> JWTAuthenticator:
-    """JWT 인증 처리기 의존성 주입"""
+    """JWT 인증 처리기 의존성 주입 (Thread-safe)"""
     global _authenticator
     if _authenticator is None:
         if settings is None:

@@ -48,6 +48,14 @@ class DatabaseManager:
             pool_recycle=3600,  # 1시간
             pool_size=10,
             max_overflow=20,
+            # 성능 최적화 설정
+            pool_timeout=30,  # 연결 대기 시간
+            pool_reset_on_return="commit",  # 트랜잭션 정리
+            connect_args={
+                "charset": "utf8mb4",
+                "use_unicode": True,
+                "autocommit": False,
+            },
         )
 
         self._session_factory = async_sessionmaker(

@@ -133,19 +133,19 @@ class NamingRule(PolicyRule):
         
         # 환경별 금지 접두사 검사
         if context.environment == Environment.PROD:
-            for prefix in self.forbidden_prefixes:
-                if name.startswith(prefix):
-                    violations.append(
-                        PolicyViolation(
-                            resource_type=context.resource_type,
-                            resource_name=name,
-                            rule_id="naming.forbidden_prefix",
-                            message=f"Prefix '{prefix}' is forbidden in {context.environment.value}",
-                            severity=PolicySeverity.ERROR,
-                            field="name",
-                            current_value=name,
-                        )
-                    )
+            violations.extend([
+                PolicyViolation(
+                    resource_type=context.resource_type,
+                    resource_name=name,
+                    rule_id="naming.forbidden_prefix",
+                    message=f"Prefix '{prefix}' is forbidden in {context.environment.value}",
+                    severity=PolicySeverity.ERROR,
+                    field="name",
+                    current_value=name,
+                )
+                for prefix in self.forbidden_prefixes
+                if name.startswith(prefix)
+            ])
         return violations
     
     def _extract_name(self, target: PolicyTarget, resource_type: ResourceType) -> str:

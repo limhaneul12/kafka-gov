@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from ..application.policy_integration import TopicPolicyAdapter
 from .models import (
     PlanAction,
     TopicBatch,
@@ -12,7 +13,6 @@ from .models import (
     TopicPlanItem,
     TopicSpec,
 )
-from ..application.policy_integration import TopicPolicyAdapter
 from .repositories.interfaces import ITopicRepository
 
 

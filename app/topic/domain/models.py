@@ -2,13 +2,13 @@
 
 from __future__ import annotations
 
-import json
+import hashlib
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, TypeAlias
+from typing import TypeAlias
 
-from ...policy import PolicyViolation, PolicySeverity
-from ...shared.domain.value_objects import BaseValueObject
+from ...policy import PolicySeverity, PolicyViolation
+
 
 class Environment(str, Enum):
     """환경 타입"""

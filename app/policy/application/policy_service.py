@@ -3,7 +3,10 @@
 from __future__ import annotations
 
 from collections.abc import Iterable
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from ..domain.models import PolicySet
 
 from ..domain import (
     Environment,
@@ -131,7 +134,7 @@ class PolicyManagementService:
         self,
         environment: Environment,
         resource_type: ResourceType,
-        policy_set: Any,  # PolicySet - 순환 참조 방지
+        policy_set: PolicySet,
     ) -> None:
         """정책 집합 업데이트"""
         # 저장소에 저장
@@ -152,6 +155,6 @@ class PolicyManagementService:
         self,
         environment: Environment,
         resource_type: ResourceType,
-    ) -> Any | None:  # PolicySet | None
+    ) -> PolicySet | None:
         """현재 활성화된 정책 집합 조회"""
         return self._policy_engine.get_policy_set(environment, resource_type)

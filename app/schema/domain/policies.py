@@ -36,16 +36,16 @@ class NamingPolicy:
 
         if spec.environment == Environment.PROD:
             prefix = spec.subject.split(".")[1] if "." in spec.subject else spec.subject
-            for forbidden in self.forbidden_prod_prefixes:
-                if spec.subject.startswith(forbidden):
-                    violations.extend(
-                        PolicyViolation(
-                            subject=spec.subject,
-                            rule="schema.naming.forbidden_prefix",
-                            message=f"Prefix '{forbidden}' is forbidden in prod",
-                            field="subject",
-                        )
-                    )
+            violations.extend([
+                PolicyViolation(
+                    subject=spec.subject,
+                    rule="schema.naming.forbidden_prefix",
+                    message=f"Prefix '{forbidden}' is forbidden in prod",
+                    field="subject",
+                )
+                for forbidden in self.forbidden_prod_prefixes
+                if spec.subject.startswith(forbidden)
+            ])
             if prefix == "tmp":
                 violations.append(
                     PolicyViolation(

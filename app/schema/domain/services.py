@@ -50,7 +50,7 @@ class SchemaPlannerService:
             items=tuple(plan_items),
             violations=tuple(violations),
             compatibility_reports=tuple(compatibility_reports),
-            impacts=tuple(),
+            impacts=(),
         )
 
     def _create_plan_item(
