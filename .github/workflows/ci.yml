@@ -25,7 +25,7 @@ jobs:
 
       - name: Sync dependencies (runtime + dev)
         run: |
-          uv sync --group dev --frozen
+          uv sync --group dev
 
       - name: Code formatting and linting
         run: |
