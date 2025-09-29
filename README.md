@@ -1,9 +1,5 @@
 <div align="center">
-  <!-- 로고 이미지를 static/logo.png에 저장 후 아래 주석을 해제하세요 -->
-  <img src="https://raw.githubusercontent.com/limhaneul12/kafka-gov/images/logo.png" alt="Kafka Gov Logo" width="400"/>
-  
-  <!-- 임시: 텍스트 로고 -->
-  <h1>🛡️ Kafka Gov</h1>
+  <img src="https://raw.githubusercontent.com/limhaneul12/kafka-gov/main/image/logo.png" alt="Kafka Gov Logo" width="400"/>
   
   **🛡️ Enterprise-grade Kafka Topic & Schema Registry Governance Platform**
   
@@ -80,7 +76,7 @@ app/
 
 1. **Clone the repository**
    ```bash
-   git clone https://github.com/your-org/kafka-gov.git
+   git clone https://github.com/limhaneul12/kafka-gov.git
    cd kafka-gov
    ```
 
@@ -275,7 +271,7 @@ We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) f
 
 1. **Fork and clone**
    ```bash
-   git clone https://github.com/your-username/kafka-gov.git
+   git clone https://github.com/limhaneul12/kafka-gov.git
    cd kafka-gov
    ```
 
@@ -302,8 +298,8 @@ We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) f
 
 ## 💬 Community
 
-- **Issues**: [GitHub Issues](https://github.com/your-org/kafka-gov/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/your-org/kafka-gov/discussions)
+- **Issues**: [GitHub Issues](https://github.com/limhaneul12/kafka-gov/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/limhaneul12/kafka-gov/discussions)
 - **Security**: [Security Policy](SECURITY.md)
 
 ## 📄 License
