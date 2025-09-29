@@ -44,8 +44,11 @@ jobs:
 
       - name: Run tests with coverage
         run: |
+          # Clean Python cache to avoid import conflicts
+          find . -type d -name "__pycache__" -exec rm -rf {} + || true
+          find . -name "*.pyc" -delete || true
           uv run pytest --cov=app --cov-report=xml --cov-report=term-missing
-
+          
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v3
         if: success()
