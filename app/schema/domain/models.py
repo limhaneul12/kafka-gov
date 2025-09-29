@@ -9,7 +9,7 @@ from enum import Enum
 from typing import TypeAlias
 
 
-class Environment(str, Enum):
+class DomainEnvironment(str, Enum):
     """배포 환경"""
 
     DEV = "dev"
@@ -17,7 +17,7 @@ class Environment(str, Enum):
     PROD = "prod"
 
 
-class SchemaType(str, Enum):
+class DomainSchemaType(str, Enum):
     """Schema Registry 지원 스키마 타입"""
 
     AVRO = "AVRO"
@@ -25,7 +25,7 @@ class SchemaType(str, Enum):
     PROTOBUF = "PROTOBUF"
 
 
-class CompatibilityMode(str, Enum):
+class DomainCompatibilityMode(str, Enum):
     """스키마 호환성 모드"""
 
     NONE = "NONE"
@@ -37,7 +37,7 @@ class CompatibilityMode(str, Enum):
     FULL_TRANSITIVE = "FULL_TRANSITIVE"
 
 
-class SubjectStrategy(str, Enum):
+class DomainSubjectStrategy(str, Enum):
     """스키마 주제 전략"""
 
     TOPIC_NAME = "TopicNameStrategy"
@@ -45,7 +45,7 @@ class SubjectStrategy(str, Enum):
     TOPIC_RECORD_NAME = "TopicRecordNameStrategy"
 
 
-class SchemaSourceType(str, Enum):
+class DomainSchemaSourceType(str, Enum):
     """스키마 소스 타입"""
 
     INLINE = "inline"
@@ -53,7 +53,7 @@ class SchemaSourceType(str, Enum):
     YAML = "yaml"
 
 
-class PlanAction(str, Enum):
+class DomainPlanAction(str, Enum):
     """배치 계획 액션"""
 
     REGISTER = "REGISTER"
@@ -74,7 +74,7 @@ Actor: TypeAlias = str
 
 
 @dataclass(slots=True, frozen=True)
-class SchemaMetadata:
+class DomainSchemaMetadata:
     """스키마 메타데이터 값 객체"""
 
     owner: str
@@ -88,7 +88,7 @@ class SchemaMetadata:
 
 
 @dataclass(slots=True, frozen=True)
-class SchemaReference:
+class DomainSchemaReference:
     """스키마 참조 정보"""
 
     name: str
@@ -105,26 +105,26 @@ class SchemaReference:
 
 
 @dataclass(slots=True, frozen=True)
-class SchemaSource:
+class DomainSchemaSource:
     """스키마 소스 정의"""
 
-    type: SchemaSourceType
+    type: DomainSchemaSourceType
     inline: SchemaDefinition | None = None
     file: FileReference | None = None
     yaml: SchemaYamlText | None = None
 
     def __post_init__(self) -> None:
-        if self.type is SchemaSourceType.INLINE:
+        if self.type is DomainSchemaSourceType.INLINE:
             if not self.inline:
                 raise ValueError("inline source requires inline content")
             if self.file or self.yaml:
                 raise ValueError("inline source cannot include file or yaml data")
-        elif self.type is SchemaSourceType.FILE:
+        elif self.type is DomainSchemaSourceType.FILE:
             if not self.file:
                 raise ValueError("file source requires file reference")
             if self.inline or self.yaml:
                 raise ValueError("file source cannot include inline or yaml data")
-        elif self.type is SchemaSourceType.YAML:
+        elif self.type is DomainSchemaSourceType.YAML:
             if not self.yaml:
                 raise ValueError("yaml source requires yaml content")
             if self.inline or self.file:
@@ -132,17 +132,17 @@ class SchemaSource:
 
 
 @dataclass(slots=True, frozen=True)
-class SchemaSpec:
+class DomainSchemaSpec:
     """스키마 등록 명세"""
 
     subject: SubjectName
-    schema_type: SchemaType
-    compatibility: CompatibilityMode
+    schema_type: DomainSchemaType
+    compatibility: DomainCompatibilityMode
     schema: SchemaDefinition | None = None
-    source: SchemaSource | None = None
+    source: DomainSchemaSource | None = None
     schema_hash: SchemaHash | None = None
-    references: tuple[SchemaReference, ...] = ()
-    metadata: SchemaMetadata | None = None
+    references: tuple[DomainSchemaReference, ...] = ()
+    metadata: DomainSchemaMetadata | None = None
     reason: ReasonText | None = None
     dry_run_only: bool = False
 
@@ -153,14 +153,14 @@ class SchemaSpec:
         if not (self.schema or self.source):
             raise ValueError("schema spec must provide schema or source")
 
-        if self.schema and self.source and self.source.type is not SchemaSourceType.INLINE:
+        if self.schema and self.source and self.source.type is not DomainSchemaSourceType.INLINE:
             raise ValueError("schema literal is only allowed when source is inline or omitted")
 
     @property
-    def environment(self) -> Environment:
+    def environment(self) -> DomainEnvironment:
         """subject 접두사로부터 환경을 추론"""
         env_prefix = self.subject.split(".")[0]
-        return Environment(env_prefix)
+        return DomainEnvironment(env_prefix)
 
     def fingerprint(self) -> SchemaHash:
         """스키마 명세 지문 생성"""
@@ -179,13 +179,13 @@ class SchemaSpec:
 
 
 @dataclass(slots=True, frozen=True)
-class SchemaBatch:
+class DomainSchemaBatch:
     """스키마 배치 엔티티"""
 
     change_id: ChangeId
-    env: Environment
-    subject_strategy: SubjectStrategy
-    specs: tuple[SchemaSpec, ...]
+    env: DomainEnvironment
+    subject_strategy: DomainSubjectStrategy
+    specs: tuple[DomainSchemaSpec, ...]
 
     def __post_init__(self) -> None:
         if not self.change_id:
@@ -212,7 +212,7 @@ class SchemaBatch:
 
 
 @dataclass(slots=True, frozen=True)
-class PolicyViolation:
+class DomainPolicyViolation:
     """정책 위반 정보"""
 
     subject: SubjectName
@@ -227,7 +227,7 @@ class PolicyViolation:
 
 
 @dataclass(slots=True, frozen=True)
-class SchemaCompatibilityIssue:
+class DomainSchemaCompatibilityIssue:
     """호환성 위반 상세"""
 
     path: str
@@ -236,17 +236,17 @@ class SchemaCompatibilityIssue:
 
 
 @dataclass(slots=True, frozen=True)
-class SchemaCompatibilityReport:
+class DomainSchemaCompatibilityReport:
     """호환성 검증 결과"""
 
     subject: SubjectName
-    mode: CompatibilityMode
+    mode: DomainCompatibilityMode
     is_compatible: bool
-    issues: tuple[SchemaCompatibilityIssue, ...] = ()
+    issues: tuple[DomainSchemaCompatibilityIssue, ...] = ()
 
 
 @dataclass(slots=True, frozen=True)
-class SchemaImpactRecord:
+class DomainSchemaImpactRecord:
     """스키마 영향도 정보"""
 
     subject: SubjectName
@@ -255,44 +255,44 @@ class SchemaImpactRecord:
 
 
 @dataclass(slots=True, frozen=True)
-class SchemaPlanItem:
+class DomainSchemaPlanItem:
     """스키마 배치 계획 항목"""
 
     subject: SubjectName
-    action: PlanAction
+    action: DomainPlanAction
     current_version: int | None
     target_version: int | None
     diff: dict[str, object]
 
 
 @dataclass(slots=True, frozen=True)
-class SchemaPlan:
+class DomainSchemaPlan:
     """스키마 배치 계획"""
 
     change_id: ChangeId
-    env: Environment
-    items: tuple[SchemaPlanItem, ...]
-    violations: tuple[PolicyViolation, ...] = ()
-    compatibility_reports: tuple[SchemaCompatibilityReport, ...] = ()
-    impacts: tuple[SchemaImpactRecord, ...] = ()
+    env: DomainEnvironment
+    items: tuple[DomainSchemaPlanItem, ...]
+    violations: tuple[DomainPolicyViolation, ...] = ()
+    compatibility_reports: tuple[DomainSchemaCompatibilityReport, ...] = ()
+    impacts: tuple[DomainSchemaImpactRecord, ...] = ()
 
     def summary(self) -> dict[str, int]:
         """계획 요약 정보"""
-        action_counts: dict[PlanAction, int] = {
-            PlanAction.REGISTER: 0,
-            PlanAction.UPDATE: 0,
-            PlanAction.DELETE: 0,
-            PlanAction.NONE: 0,
+        action_counts: dict[DomainPlanAction, int] = {
+            DomainPlanAction.REGISTER: 0,
+            DomainPlanAction.UPDATE: 0,
+            DomainPlanAction.DELETE: 0,
+            DomainPlanAction.NONE: 0,
         }
         for item in self.items:
             action_counts[item.action] = action_counts.get(item.action, 0) + 1
 
         return {
             "total_items": len(self.items),
-            "register_count": action_counts[PlanAction.REGISTER],
-            "update_count": action_counts[PlanAction.UPDATE],
-            "delete_count": action_counts[PlanAction.DELETE],
-            "none_count": action_counts[PlanAction.NONE],
+            "register_count": action_counts[DomainPlanAction.REGISTER],
+            "update_count": action_counts[DomainPlanAction.UPDATE],
+            "delete_count": action_counts[DomainPlanAction.DELETE],
+            "none_count": action_counts[DomainPlanAction.NONE],
             "violation_count": len(self.violations),
             "incompatible_count": sum(
                 1 for report in self.compatibility_reports if not report.is_compatible
@@ -306,21 +306,21 @@ class SchemaPlan:
         )
 
     @property
-    def error_violations(self) -> tuple[PolicyViolation, ...]:
+    def error_violations(self) -> tuple[DomainPolicyViolation, ...]:
         return tuple(v for v in self.violations if v.is_error)
 
 
 @dataclass(slots=True, frozen=True)
-class SchemaApplyResult:
+class DomainSchemaApplyResult:
     """스키마 배치 적용 결과"""
 
     change_id: ChangeId
-    env: Environment
+    env: DomainEnvironment
     registered: tuple[SubjectName, ...]
     skipped: tuple[SubjectName, ...]
     failed: tuple[dict[str, str], ...]
     audit_id: str
-    artifacts: tuple[SchemaArtifact, ...] = ()
+    artifacts: tuple[DomainSchemaArtifact, ...] = ()
 
     def summary(self) -> dict[str, int]:
         return {
@@ -332,7 +332,7 @@ class SchemaApplyResult:
 
 
 @dataclass(slots=True, frozen=True)
-class SchemaArtifact:
+class DomainSchemaArtifact:
     """저장된 스키마 아티팩트"""
 
     subject: SubjectName
@@ -348,11 +348,11 @@ class SchemaArtifact:
 
 
 @dataclass(slots=True, frozen=True)
-class SchemaUploadResult:
+class DomainSchemaUploadResult:
     """스키마 업로드 결과"""
 
     upload_id: str
-    artifacts: tuple[SchemaArtifact, ...]
+    artifacts: tuple[DomainSchemaArtifact, ...]
 
     def summary(self) -> dict[str, int]:
         counts = {

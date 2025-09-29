@@ -3,13 +3,13 @@
 from __future__ import annotations
 
 from ...policy import (
-    Environment,
+    DomainEnvironment,
+    DomainPolicyViolation,
+    DomainResourceType,
     PolicyEvaluationService,
     PolicyTarget,
-    PolicyViolation,
-    ResourceType,
 )
-from ..domain.models import TopicSpec
+from ..domain.models import DomainTopicSpec
 
 
 class TopicPolicyAdapter:
@@ -20,10 +20,10 @@ class TopicPolicyAdapter:
 
     async def validate_topic_specs(
         self,
-        environment: Environment,
-        topic_specs: list[TopicSpec],
+        environment: DomainEnvironment,
+        topic_specs: list[DomainTopicSpec],
         actor: str,
-    ) -> list[PolicyViolation]:
+    ) -> list[DomainPolicyViolation]:
         """Topic 스펙들을 정책으로 검증
 
         Args:
@@ -40,17 +40,17 @@ class TopicPolicyAdapter:
         # 정책 평가 실행
         return await self._policy_service.evaluate_batch(
             environment=environment,
-            resource_type=ResourceType.TOPIC,
+            resource_type=DomainResourceType.TOPIC,
             targets=policy_targets,
             actor=actor,
         )
 
     async def validate_single_topic(
         self,
-        environment: Environment,
-        topic_spec: TopicSpec,
+        environment: DomainEnvironment,
+        topic_spec: DomainTopicSpec,
         actor: str,
-    ) -> list[PolicyViolation]:
+    ) -> list[DomainPolicyViolation]:
         """단일 토픽 스펙 검증"""
         return await self.validate_topic_specs(
             environment=environment,
@@ -58,15 +58,16 @@ class TopicPolicyAdapter:
             actor=actor,
         )
 
-    def _convert_topic_spec_to_policy_target(self, topic_spec: TopicSpec) -> PolicyTarget:
+    def _convert_topic_spec_to_policy_target(self, topic_spec: DomainTopicSpec) -> PolicyTarget:
         """TopicSpec을 PolicyTarget으로 변환"""
-        config_dict = {}
+        config_dict: dict[str, str] = {}
 
         # TopicConfig에서 설정값들을 dict로 변환
         if topic_spec.config:
-            config_dict["partitions"] = topic_spec.config.partitions
-            config_dict["replication.factor"] = topic_spec.config.replication_factor
-            
+            # 숫자 속성은 문자열로 정규화해 일관된 타입 유지
+            config_dict["partitions"] = str(topic_spec.config.partitions)
+            config_dict["replication.factor"] = str(topic_spec.config.replication_factor)
+
             # Kafka 설정으로 변환하여 병합
             kafka_config = topic_spec.config.to_kafka_config()
             config_dict.update(kafka_config)
@@ -84,11 +85,6 @@ class TopicPolicyAdapter:
             else {},
         }
 
-    def has_blocking_violations(self, violations: list[PolicyViolation]) -> bool:
+    def has_blocking_violations(self, violations: list[DomainPolicyViolation]) -> bool:
         """차단 수준의 위반이 있는지 확인"""
         return self._policy_service.has_blocking_violations(violations)
-
-
-def create_topic_policy_adapter(policy_service: PolicyEvaluationService) -> TopicPolicyAdapter:
-    """TopicPolicyAdapter 팩토리 함수"""
-    return TopicPolicyAdapter(policy_service)

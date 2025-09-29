@@ -6,7 +6,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from ..domain import Environment, PolicySeverity, ResourceType
+from ..domain import DomainEnvironment, DomainPolicySeverity, DomainResourceType
 
 
 class PolicyViolationResponse(BaseModel):
@@ -18,11 +18,11 @@ class PolicyViolationResponse(BaseModel):
         str_min_length=1,
     )
 
-    resource_type: ResourceType
+    resource_type: DomainResourceType
     resource_name: str = Field(..., min_length=1)
     rule_id: str = Field(..., min_length=1)
     message: str = Field(..., min_length=1)
-    severity: PolicySeverity
+    severity: DomainPolicySeverity
     field: str | None = None
     current_value: Any = None
     expected_value: Any = None
@@ -36,8 +36,8 @@ class PolicyEvaluationRequest(BaseModel):
         str_strip_whitespace=True,
     )
 
-    environment: Environment
-    resource_type: ResourceType
+    environment: DomainEnvironment
+    resource_type: DomainResourceType
     targets: list[dict[str, Any]] = Field(..., min_length=1)
     actor: str = Field(..., min_length=1)
     metadata: dict[str, Any] | None = None
@@ -48,8 +48,8 @@ class PolicyEvaluationResponse(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    environment: Environment
-    resource_type: ResourceType
+    environment: DomainEnvironment
+    resource_type: DomainResourceType
     total_targets: int = Field(..., ge=0)
     violations: list[PolicyViolationResponse]
     has_blocking_violations: bool
@@ -71,8 +71,8 @@ class PolicySetResponse(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    environment: Environment
-    resource_type: ResourceType
+    environment: DomainEnvironment
+    resource_type: DomainResourceType
     rules: list[PolicyRuleResponse]
     created_at: str | None = None
     updated_at: str | None = None
@@ -83,7 +83,7 @@ class PolicyListResponse(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    environments: list[Environment]
+    environments: list[DomainEnvironment]
     policy_sets: list[PolicySetResponse]
 
 

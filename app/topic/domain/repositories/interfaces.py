@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import Any
+from typing import Any, TypedDict
 
-from ..models import ChangeId, TopicApplyResult, TopicName, TopicPlan, TopicSpec
+from ..models import ChangeId, DomainTopicApplyResult, DomainTopicPlan, DomainTopicSpec, TopicName
 
 
 class ITopicRepository(ABC):
@@ -17,7 +17,9 @@ class ITopicRepository(ABC):
         ...
 
     @abstractmethod
-    async def create_topics(self, specs: list[TopicSpec]) -> dict[TopicName, Exception | None]:
+    async def create_topics(
+        self, specs: list[DomainTopicSpec]
+    ) -> dict[TopicName, Exception | None]:
         """토픽 생성"""
         ...
 
@@ -46,21 +48,43 @@ class ITopicRepository(ABC):
         ...
 
 
+class PlanMeta(TypedDict):
+    """토픽 계획 메타 정보 타입
+
+    - status: 계획 상태 (pending/applied/failed)
+    - created_at: 계획 생성 시각 (ISO8601 문자열)
+    - applied_at: 계획 적용 시각 (ISO8601 문자열) 또는 없음
+    """
+
+    status: str
+    created_at: str
+    applied_at: str | None
+
+
 class ITopicMetadataRepository(ABC):
     """토픽 메타데이터 리포지토리 인터페이스"""
 
     @abstractmethod
-    async def save_plan(self, plan: TopicPlan, created_by: str) -> None:
+    async def save_plan(self, plan: DomainTopicPlan, created_by: str) -> None:
         """계획 저장"""
         ...
 
     @abstractmethod
-    async def get_plan(self, change_id: ChangeId) -> TopicPlan | None:
+    async def get_plan(self, change_id: ChangeId) -> DomainTopicPlan | None:
         """계획 조회"""
         ...
 
     @abstractmethod
-    async def save_apply_result(self, result: TopicApplyResult, applied_by: str) -> None:
+    async def get_plan_meta(self, change_id: ChangeId) -> PlanMeta | None:
+        """계획 메타 정보 조회 (상태/타임스탬프)
+
+        Returns:
+            PlanMeta dict 또는 None
+        """
+        ...
+
+    @abstractmethod
+    async def save_apply_result(self, result: DomainTopicApplyResult, applied_by: str) -> None:
         """적용 결과 저장"""
         ...
 

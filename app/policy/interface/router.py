@@ -10,7 +10,7 @@ from fastapi.responses import JSONResponse
 from ...shared.auth import get_current_user
 from ..application.performance_utils import optimize_violation_memory_usage
 from ..container import policy_use_case_factory
-from ..domain import Environment, PolicySeverity, ResourceType
+from ..domain import DomainEnvironment, DomainPolicySeverity, DomainResourceType
 from .dto import (
     PolicyEvaluationRequest,
     PolicyEvaluationResponse,
@@ -89,8 +89,8 @@ async def evaluate_policies(
     description="특정 환경과 리소스 타입에 대한 정책 검증 요약을 반환합니다.",
 )
 async def get_validation_summary(
-    environment: Environment,
-    resource_type: ResourceType,
+    environment: DomainEnvironment,
+    resource_type: DomainResourceType,
     targets: list[dict[str, Any]],
     current_user: Annotated[dict[str, Any], Depends(get_current_user)],
 ) -> ValidationSummaryResponse:
@@ -106,9 +106,11 @@ async def get_validation_summary(
         )
 
         blocking_count = sum(
-            1 for v in violations if v.severity in (PolicySeverity.ERROR, PolicySeverity.CRITICAL)
+            1
+            for v in violations
+            if v.severity in (DomainPolicySeverity.ERROR, DomainPolicySeverity.CRITICAL)
         )
-        warning_count = sum(1 for v in violations if v.severity == PolicySeverity.WARNING)
+        warning_count = sum(1 for v in violations if v.severity == DomainPolicySeverity.WARNING)
 
         can_proceed = blocking_count == 0
 
@@ -191,8 +193,8 @@ async def list_policies(
     description="특정 환경과 리소스 타입의 정책 집합을 조회합니다.",
 )
 async def get_policy_set(
-    environment: Environment,
-    resource_type: ResourceType,
+    environment: DomainEnvironment,
+    resource_type: DomainResourceType,
     current_user: Annotated[dict[str, Any], Depends(get_current_user)],
 ) -> PolicySetResponse:
     """특정 정책 집합 조회 API"""

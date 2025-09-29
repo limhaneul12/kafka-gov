@@ -2,12 +2,16 @@
 
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import logging
+from datetime import timedelta
+from io import BytesIO
 from typing import Any
 from urllib.parse import urljoin
 
 from minio import Minio
+from minio.deleteobjects import DeleteObject
 from minio.error import S3Error
 
 from ...domain.repositories.interfaces import IObjectStorageRepository
@@ -59,12 +63,13 @@ class MinIOObjectStorageAdapter(IObjectStorageRepository):
             )
 
             # 객체 업로드
-            self.client.put_object(
+            await asyncio.to_thread(
+                self.client.put_object,
                 bucket_name=self.bucket_name,
                 object_name=key,
-                data=data,
+                data=BytesIO(data),
                 length=len(data),
-                metadata=object_metadata,
+                metadata=dict(object_metadata),  # dict로 변환
             )
 
             # 접근 URL 생성
@@ -80,11 +85,17 @@ class MinIOObjectStorageAdapter(IObjectStorageRepository):
     async def get_object(self, key: str) -> bytes:
         """객체 조회"""
         try:
-            response = self.client.get_object(self.bucket_name, key)
-            data = response.read()
-            response.close()
-            response.release_conn()
-            return data
+
+            def _get() -> bytes:
+                response = self.client.get_object(self.bucket_name, key)
+                try:
+                    data = response.read()
+                    return data
+                finally:
+                    response.close()
+                    response.release_conn()
+
+            return await asyncio.to_thread(_get)
         except S3Error as e:
             logger.error(f"Failed to get object {key}: {e}")
             raise RuntimeError(f"Object retrieval failed: {e}") from e
@@ -92,7 +103,7 @@ class MinIOObjectStorageAdapter(IObjectStorageRepository):
     async def delete_object(self, key: str) -> None:
         """단일 객체 삭제"""
         try:
-            self.client.remove_object(self.bucket_name, key)
+            await asyncio.to_thread(self.client.remove_object, self.bucket_name, key)
             logger.info(f"Object deleted: {key}")
         except S3Error as e:
             logger.error(f"Failed to delete object {key}: {e}")
@@ -101,18 +112,21 @@ class MinIOObjectStorageAdapter(IObjectStorageRepository):
     async def delete_prefix(self, prefix: str) -> None:
         """접두사로 객체들 일괄 삭제"""
         try:
-            # 접두사에 해당하는 객체 목록 조회
-            objects = self.client.list_objects(self.bucket_name, prefix=prefix, recursive=True)
+            # 접두사에 해당하는 객체 목록 조회 및 이름 수집
+            def _list_names() -> list[str]:
+                objects = self.client.list_objects(self.bucket_name, prefix=prefix, recursive=True)
+                return [obj.object_name for obj in objects if obj.object_name is not None]
 
-            # 객체 이름 수집
-            object_names = [obj.object_name for obj in objects]
+            object_names = await asyncio.to_thread(_list_names)
 
             if object_names:
                 # 일괄 삭제
-                errors = self.client.remove_objects(self.bucket_name, list(object_names))
+                def _remove_many() -> list[Any]:
+                    delete_list = [DeleteObject(name) for name in object_names]
+                    errors_iter = self.client.remove_objects(self.bucket_name, delete_list)
+                    return list(errors_iter)
 
-                # 에러 확인
-                error_list = list(errors)
+                error_list = await asyncio.to_thread(_remove_many)
                 if error_list:
                     logger.error(f"Failed to delete some objects: {error_list}")
                     raise RuntimeError(f"Partial deletion failed: {error_list}")
@@ -128,17 +142,20 @@ class MinIOObjectStorageAdapter(IObjectStorageRepository):
     async def list_objects(self, prefix: str | None = None) -> list[dict[str, Any]]:
         """객체 목록 조회"""
         try:
-            objects = self.client.list_objects(self.bucket_name, prefix=prefix, recursive=True)
 
-            return [
-                {
-                    "key": obj.object_name,
-                    "size": obj.size,
-                    "last_modified": obj.last_modified,
-                    "etag": obj.etag,
-                }
-                for obj in objects
-            ]
+            def _list() -> list[dict[str, Any]]:
+                objects = self.client.list_objects(self.bucket_name, prefix=prefix, recursive=True)
+                return [
+                    {
+                        "key": obj.object_name,
+                        "size": obj.size,
+                        "last_modified": obj.last_modified,
+                        "etag": obj.etag,
+                    }
+                    for obj in objects
+                ]
+
+            return await asyncio.to_thread(_list)
 
         except S3Error as e:
             logger.error(f"Failed to list objects: {e}")
@@ -148,7 +165,7 @@ class MinIOObjectStorageAdapter(IObjectStorageRepository):
         """사전 서명된 URL 생성 (다운로드용)"""
         try:
             url = self.client.presigned_get_object(
-                self.bucket_name, key, expires=expires_in_seconds
+                self.bucket_name, key, expires=timedelta(seconds=expires_in_seconds)
             )
             return url
         except S3Error as e:
@@ -157,10 +174,7 @@ class MinIOObjectStorageAdapter(IObjectStorageRepository):
 
 
 def create_minio_client(
-    endpoint: str,
-    access_key: str,
-    secret_key: str,
-    secure: bool = False,
+    endpoint: str, access_key: str, secret_key: str, secure: bool = False
 ) -> Minio:
     """MinIO 클라이언트 생성"""
     return Minio(
@@ -172,9 +186,7 @@ def create_minio_client(
 
 
 def create_minio_storage_adapter(
-    client: Minio,
-    bucket_name: str,
-    base_url: str | None = None,
+    client: Minio, bucket_name: str, base_url: str | None = None
 ) -> MinIOObjectStorageAdapter:
     """MinIO Storage 어댑터 생성"""
     return MinIOObjectStorageAdapter(

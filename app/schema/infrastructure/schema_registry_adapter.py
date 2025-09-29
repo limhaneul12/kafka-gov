@@ -6,13 +6,13 @@ import logging
 from collections.abc import Iterable
 from typing import Any
 
-from confluent_kafka.schema_registry import AsyncSchemaRegistryClient
+from confluent_kafka.schema_registry import AsyncSchemaRegistryClient, Schema
 from confluent_kafka.schema_registry.error import SchemaRegistryError
 
 from ..domain.models import (
-    SchemaCompatibilityIssue,
-    SchemaCompatibilityReport,
-    SchemaSpec,
+    DomainSchemaCompatibilityIssue,
+    DomainSchemaCompatibilityReport,
+    DomainSchemaSpec,
     SubjectName,
 )
 from ..domain.repositories.interfaces import ISchemaRegistryRepository
@@ -44,25 +44,27 @@ class ConfluentSchemaRegistryAdapter(ISchemaRegistryRepository):
                     # 최신 버전 조회
                     latest_version = await self.client.get_latest_version(subject)
 
-                    result[subject] = {
-                        "version": latest_version.version,
-                        "schema_id": latest_version.schema_id,
-                        "schema": latest_version.schema.schema_str,
-                        "schema_type": latest_version.schema.schema_type,
-                        "references": [
-                            {
-                                "name": ref.name,
-                                "subject": ref.subject,
-                                "version": ref.version,
-                            }
-                            for ref in (latest_version.references or [])
-                        ],
-                        "hash": self._calculate_schema_hash(latest_version.schema.schema_str),
-                    }
+                    if latest_version and latest_version.schema:
+                        result[subject] = {
+                            "version": latest_version.version,
+                            "schema_id": latest_version.schema_id,
+                            "schema": latest_version.schema.schema_str,
+                            "schema_type": latest_version.schema.schema_type,
+                            "references": [
+                                {
+                                    "name": ref.name,
+                                    "subject": ref.subject,
+                                    "version": ref.version,
+                                }
+                                for ref in (getattr(latest_version, "references", None) or [])
+                            ],
+                            "hash": self._calculate_schema_hash(
+                                latest_version.schema.schema_str or ""
+                            ),
+                        }
                 except SchemaRegistryError as e:
                     logger.warning(f"Failed to get schema for subject {subject}: {e}")
                     continue
-
             return result
 
         except SchemaRegistryError as e:
@@ -71,23 +73,28 @@ class ConfluentSchemaRegistryAdapter(ISchemaRegistryRepository):
 
     async def check_compatibility(
         self,
-        spec: SchemaSpec,
+        spec: DomainSchemaSpec,
         references: list[dict[str, Any]] | None = None,
-    ) -> SchemaCompatibilityReport:
+    ) -> DomainSchemaCompatibilityReport:
         """호환성 검증"""
         try:
             # 스키마 정의 추출
             schema_str = self._extract_schema_string(spec)
 
-            # 호환성 검증 실행
-            is_compatible = await self.client.test_compatibility(
-                subject_name=spec.subject,
-                schema=schema_str,
+            # Schema 객체 생성
+            schema_obj = Schema(
+                schema_str=schema_str,
                 schema_type=spec.schema_type.value,
                 references=references or [],
             )
 
-            return SchemaCompatibilityReport(
+            # 호환성 검증 실행
+            is_compatible = await self.client.test_compatibility(
+                subject_name=spec.subject,
+                schema=schema_obj,
+            )
+
+            return DomainSchemaCompatibilityReport(
                 subject=spec.subject,
                 mode=spec.compatibility,
                 is_compatible=is_compatible,
@@ -98,13 +105,13 @@ class ConfluentSchemaRegistryAdapter(ISchemaRegistryRepository):
             logger.warning(f"Compatibility check failed for {spec.subject}: {e}")
 
             # 에러를 호환성 이슈로 변환
-            issue = SchemaCompatibilityIssue(
+            issue = DomainSchemaCompatibilityIssue(
                 path="$",
                 message=str(e),
                 issue_type="SCHEMA_REGISTRY_ERROR",
             )
 
-            return SchemaCompatibilityReport(
+            return DomainSchemaCompatibilityReport(
                 subject=spec.subject,
                 mode=spec.compatibility,
                 is_compatible=False,
@@ -112,10 +119,10 @@ class ConfluentSchemaRegistryAdapter(ISchemaRegistryRepository):
             )
 
     async def check_compatibility_batch(
-        self, specs: list[SchemaSpec]
-    ) -> dict[SubjectName, SchemaCompatibilityReport]:
+        self, specs: list[DomainSchemaSpec]
+    ) -> dict[SubjectName, DomainSchemaCompatibilityReport]:
         """배치 호환성 검증 (성능 최적화)"""
-        results: dict[SubjectName, SchemaCompatibilityReport] = {}
+        results: dict[SubjectName, DomainSchemaCompatibilityReport] = {}
 
         for spec in specs:
             report = await self.check_compatibility(spec)
@@ -125,7 +132,7 @@ class ConfluentSchemaRegistryAdapter(ISchemaRegistryRepository):
 
     async def register_schema(
         self,
-        spec: SchemaSpec,
+        spec: DomainSchemaSpec,
         compatibility: bool = True,
     ) -> int:
         """스키마 등록 후 버전 반환"""
@@ -142,21 +149,30 @@ class ConfluentSchemaRegistryAdapter(ISchemaRegistryRepository):
                 for ref in spec.references
             ]
 
+            # Schema 객체 생성
+            schema_obj = Schema(
+                schema_str=schema_str,
+                schema_type=spec.schema_type.value,
+                references=references if references else [],
+            )
+
             # 스키마 등록
             schema_id = await self.client.register_schema(
                 subject_name=spec.subject,
-                schema=schema_str,
-                schema_type=spec.schema_type.value,
-                references=references if references else None,
+                schema=schema_obj,
             )
 
             # 등록된 버전 조회
             latest_version = await self.client.get_latest_version(spec.subject)
 
-            logger.info(
-                f"Schema registered: {spec.subject} v{latest_version.version} (ID: {schema_id})"
-            )
-            return latest_version.version
+            if latest_version and latest_version.version is not None:
+                logger.info(
+                    f"Schema registered: {spec.subject} v{latest_version.version} (ID: {schema_id})"
+                )
+                return latest_version.version
+            else:
+                logger.warning(f"Could not retrieve version for registered schema {spec.subject}")
+                return 1  # 기본값으로 1 반환
 
         except SchemaRegistryError as e:
             logger.error(f"Failed to register schema {spec.subject}: {e}")
@@ -173,7 +189,7 @@ class ConfluentSchemaRegistryAdapter(ISchemaRegistryRepository):
             logger.error(f"Failed to delete subject {subject}: {e}")
             raise RuntimeError(f"Subject deletion failed: {e}") from e
 
-    def _extract_schema_string(self, spec: SchemaSpec) -> str:
+    def _extract_schema_string(self, spec: DomainSchemaSpec) -> str:
         """스키마 명세에서 스키마 문자열 추출"""
         if spec.schema:
             return spec.schema

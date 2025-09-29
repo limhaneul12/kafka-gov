@@ -10,11 +10,17 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.schema.domain.models import (
     ChangeId,
-    Environment,
-    SchemaApplyResult,
-    SchemaArtifact,
-    SchemaPlan,
-    SchemaPlanItem,
+    DomainCompatibilityMode,
+    DomainEnvironment,
+    DomainPlanAction,
+    DomainPolicyViolation,
+    DomainSchemaApplyResult,
+    DomainSchemaArtifact,
+    DomainSchemaCompatibilityIssue,
+    DomainSchemaCompatibilityReport,
+    DomainSchemaImpactRecord,
+    DomainSchemaPlan,
+    DomainSchemaPlanItem,
 )
 from app.schema.domain.repositories.interfaces import ISchemaMetadataRepository
 from app.schema.infrastructure.models import (
@@ -32,7 +38,7 @@ class MySQLSchemaMetadataRepository(ISchemaMetadataRepository):
     def __init__(self, session: AsyncSession) -> None:
         self.session = session
 
-    async def save_plan(self, plan: SchemaPlan, created_by: str) -> None:
+    async def save_plan(self, plan: DomainSchemaPlan, created_by: str) -> None:
         """계획 저장"""
         try:
             # SchemaPlan 도메인 객체를 JSON으로 직렬화
@@ -102,7 +108,7 @@ class MySQLSchemaMetadataRepository(ISchemaMetadataRepository):
             logger.error(f"Failed to save schema plan {plan.change_id}: {e}")
             raise
 
-    async def get_plan(self, change_id: ChangeId) -> SchemaPlan | None:
+    async def get_plan(self, change_id: ChangeId) -> DomainSchemaPlan | None:
         """계획 조회"""
         try:
             stmt = select(SchemaPlanModel).where(SchemaPlanModel.change_id == change_id)
@@ -116,12 +122,11 @@ class MySQLSchemaMetadataRepository(ISchemaMetadataRepository):
             plan_data = plan_model.plan_data
 
             # 계획 아이템 역직렬화
-            from app.schema.domain.models import PlanAction
 
             items = [
-                SchemaPlanItem(
+                DomainSchemaPlanItem(
                     subject=item["subject"],
-                    action=PlanAction(item["action"]),
+                    action=DomainPlanAction(item["action"]),
                     current_version=item["current_version"],
                     target_version=item["target_version"],
                     diff=item["diff"],
@@ -130,10 +135,8 @@ class MySQLSchemaMetadataRepository(ISchemaMetadataRepository):
             ]
 
             # 정책 위반 역직렬화
-            from app.schema.domain.models import PolicyViolation
-
             violations = [
-                PolicyViolation(
+                DomainPolicyViolation(
                     subject=v["subject"],
                     rule=v["rule"],
                     message=v["message"],
@@ -143,20 +146,13 @@ class MySQLSchemaMetadataRepository(ISchemaMetadataRepository):
                 for v in plan_data["violations"]
             ]
 
-            # 호환성 보고서 역직렬화
-            from app.schema.domain.models import (
-                CompatibilityMode,
-                SchemaCompatibilityIssue,
-                SchemaCompatibilityReport,
-            )
-
             compatibility_reports = [
-                SchemaCompatibilityReport(
+                DomainSchemaCompatibilityReport(
                     subject=report["subject"],
-                    mode=CompatibilityMode(report["mode"]),
+                    mode=DomainCompatibilityMode(report["mode"]),
                     is_compatible=report["is_compatible"],
                     issues=tuple(
-                        SchemaCompatibilityIssue(
+                        DomainSchemaCompatibilityIssue(
                             path=issue["path"],
                             message=issue["message"],
                             issue_type=issue["issue_type"],
@@ -168,10 +164,8 @@ class MySQLSchemaMetadataRepository(ISchemaMetadataRepository):
             ]
 
             # 영향도 정보 역직렬화
-            from app.schema.domain.models import SchemaImpactRecord
-
             impacts = [
-                SchemaImpactRecord(
+                DomainSchemaImpactRecord(
                     subject=impact["subject"],
                     topics=tuple(impact["topics"]),
                     consumers=tuple(impact["consumers"]),
@@ -180,9 +174,9 @@ class MySQLSchemaMetadataRepository(ISchemaMetadataRepository):
             ]
 
             # Environment enum으로 변환
-            env = Environment(plan_data["env"])
+            env = DomainEnvironment(plan_data["env"])
 
-            return SchemaPlan(
+            return DomainSchemaPlan(
                 change_id=plan_data["change_id"],
                 env=env,
                 items=tuple(items),
@@ -195,7 +189,7 @@ class MySQLSchemaMetadataRepository(ISchemaMetadataRepository):
             logger.error(f"Failed to get schema plan {change_id}: {e}")
             raise
 
-    async def save_apply_result(self, result: SchemaApplyResult, applied_by: str) -> None:
+    async def save_apply_result(self, result: DomainSchemaApplyResult, applied_by: str) -> None:
         """적용 결과 저장"""
         try:
             # SchemaApplyResult 도메인 객체를 JSON으로 직렬화
@@ -244,7 +238,7 @@ class MySQLSchemaMetadataRepository(ISchemaMetadataRepository):
             logger.error(f"Failed to save schema apply result {result.change_id}: {e}")
             raise
 
-    async def record_artifact(self, artifact: SchemaArtifact, change_id: ChangeId) -> None:
+    async def record_artifact(self, artifact: DomainSchemaArtifact, change_id: ChangeId) -> None:
         """아티팩트 기록"""
         try:
             artifact_model = SchemaArtifactModel(

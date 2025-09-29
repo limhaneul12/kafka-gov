@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta
-from typing import Any, Final
+import datetime
+from typing import Any, Final, cast
 
 from fastapi import HTTPException, Request, status
 from jose import JWTError, jwt
@@ -20,23 +20,28 @@ class JWTAuthenticator:
     def create_access_token(self, data: dict[str, Any]) -> str:
         """액세스 토큰 생성"""
         to_encode = data.copy()
-        expire = datetime.now(datetime.UTC) + timedelta(minutes=self.settings.security.jwt_expire_minutes)
+        expire = datetime.datetime.now(datetime.UTC) + datetime.timedelta(
+            minutes=self.settings.security.jwt_expire_minutes
+        )
         to_encode.update({"exp": expire})
-        
+
         encoded_jwt = jwt.encode(
-            to_encode, 
-            self.settings.security.jwt_secret_key, 
-            algorithm=self.settings.security.jwt_algorithm
+            to_encode,
+            self.settings.security.jwt_secret_key,
+            algorithm=self.settings.security.jwt_algorithm,
         )
         return encoded_jwt
 
     def verify_token(self, token: str) -> dict[str, Any]:
         """토큰 검증 및 페이로드 반환"""
         try:
-            payload = jwt.decode(
-                token, 
-                self.settings.security.jwt_secret_key, 
-                algorithms=[self.settings.security.jwt_algorithm]
+            payload = cast(
+                dict[str, Any],
+                jwt.decode(
+                    token,
+                    self.settings.security.jwt_secret_key,
+                    algorithms=[self.settings.security.jwt_algorithm],
+                ),
             )
             return payload
         except JWTError as e:
@@ -72,7 +77,7 @@ class JWTAuthenticator:
         # 토큰 검증 및 사용자 정보 추출
         payload = self.verify_token(token)
         username = payload.get("sub")
-        
+
         if username is None:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,

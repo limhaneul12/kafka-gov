@@ -7,10 +7,10 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 
 from .models import (
-    CompatibilityMode,
-    Environment,
-    PolicyViolation,
-    SchemaSpec,
+    DomainCompatibilityMode,
+    DomainEnvironment,
+    DomainPolicyViolation,
+    DomainSchemaSpec,
 )
 
 
@@ -21,12 +21,12 @@ class NamingPolicy:
     pattern: str = r"^((dev|stg|prod)\.)[a-z0-9._-]+(-key|-value)?$"
     forbidden_prod_prefixes: tuple[str, ...] = ("tmp.", "test.")
 
-    def validate(self, spec: SchemaSpec) -> list[PolicyViolation]:
-        violations: list[PolicyViolation] = []
+    def validate(self, spec: DomainSchemaSpec) -> list[DomainPolicyViolation]:
+        violations: list[DomainPolicyViolation] = []
 
         if not re.match(self.pattern, spec.subject):
             violations.append(
-                PolicyViolation(
+                DomainPolicyViolation(
                     subject=spec.subject,
                     rule="schema.naming.pattern",
                     message=f"Subject '{spec.subject}' does not match pattern '{self.pattern}'",
@@ -34,21 +34,23 @@ class NamingPolicy:
                 )
             )
 
-        if spec.environment == Environment.PROD:
+        if spec.environment == DomainEnvironment.PROD:
             prefix = spec.subject.split(".")[1] if "." in spec.subject else spec.subject
-            violations.extend([
-                PolicyViolation(
-                    subject=spec.subject,
-                    rule="schema.naming.forbidden_prefix",
-                    message=f"Prefix '{forbidden}' is forbidden in prod",
-                    field="subject",
-                )
-                for forbidden in self.forbidden_prod_prefixes
-                if spec.subject.startswith(forbidden)
-            ])
+            violations.extend(
+                [
+                    DomainPolicyViolation(
+                        subject=spec.subject,
+                        rule="schema.naming.forbidden_prefix",
+                        message=f"Prefix '{forbidden}' is forbidden in prod",
+                        field="subject",
+                    )
+                    for forbidden in self.forbidden_prod_prefixes
+                    if spec.subject.startswith(forbidden)
+                ]
+            )
             if prefix == "tmp":
                 violations.append(
-                    PolicyViolation(
+                    DomainPolicyViolation(
                         subject=spec.subject,
                         rule="schema.naming.forbidden_prefix",
                         message="'tmp' prefix is forbidden in prod",
@@ -63,14 +65,14 @@ class NamingPolicy:
 class CompatibilityPolicy:
     """환경별 호환성 정책"""
 
-    def validate(self, spec: SchemaSpec) -> list[PolicyViolation]:
+    def validate(self, spec: DomainSchemaSpec) -> list[DomainPolicyViolation]:
         expected_modes = self._expected_modes(spec.environment)
         if spec.compatibility in expected_modes:
             return []
 
         expected_str = ",".join(mode.value for mode in expected_modes)
         return [
-            PolicyViolation(
+            DomainPolicyViolation(
                 subject=spec.subject,
                 rule="schema.compatibility.mode",
                 message=(
@@ -81,20 +83,20 @@ class CompatibilityPolicy:
             )
         ]
 
-    def _expected_modes(self, env: Environment) -> tuple[CompatibilityMode, ...]:
-        if env == Environment.PROD:
-            return (CompatibilityMode.FULL, CompatibilityMode.FULL_TRANSITIVE)
-        if env == Environment.STG:
+    def _expected_modes(self, env: DomainEnvironment) -> tuple[DomainCompatibilityMode, ...]:
+        if env == DomainEnvironment.PROD:
+            return (DomainCompatibilityMode.FULL, DomainCompatibilityMode.FULL_TRANSITIVE)
+        if env == DomainEnvironment.STG:
             return (
-                CompatibilityMode.BACKWARD,
-                CompatibilityMode.BACKWARD_TRANSITIVE,
-                CompatibilityMode.FULL,
-                CompatibilityMode.FULL_TRANSITIVE,
+                DomainCompatibilityMode.BACKWARD,
+                DomainCompatibilityMode.BACKWARD_TRANSITIVE,
+                DomainCompatibilityMode.FULL,
+                DomainCompatibilityMode.FULL_TRANSITIVE,
             )
         return (
-            CompatibilityMode.BACKWARD,
-            CompatibilityMode.BACKWARD_TRANSITIVE,
-            CompatibilityMode.NONE,
+            DomainCompatibilityMode.BACKWARD,
+            DomainCompatibilityMode.BACKWARD_TRANSITIVE,
+            DomainCompatibilityMode.NONE,
         )
 
 
@@ -104,12 +106,12 @@ class MetadataPolicy:
 
     require_owner: bool = True
 
-    def validate(self, spec: SchemaSpec) -> list[PolicyViolation]:
+    def validate(self, spec: DomainSchemaSpec) -> list[DomainPolicyViolation]:
         if not self.require_owner:
             return []
         if spec.metadata is None or not spec.metadata.owner:
             return [
-                PolicyViolation(
+                DomainPolicyViolation(
                     subject=spec.subject,
                     rule="schema.metadata.owner",
                     message="Schema metadata owner is required",
@@ -132,8 +134,8 @@ class SchemaPolicyEngine:
         self.compatibility_policy = compatibility_policy or CompatibilityPolicy()
         self.metadata_policy = metadata_policy or MetadataPolicy()
 
-    def validate_batch(self, specs: Iterable[SchemaSpec]) -> list[PolicyViolation]:
-        violations: list[PolicyViolation] = []
+    def validate_batch(self, specs: Iterable[DomainSchemaSpec]) -> list[DomainPolicyViolation]:
+        violations: list[DomainPolicyViolation] = []
         for spec in specs:
             violations.extend(self.naming_policy.validate(spec))
             violations.extend(self.compatibility_policy.validate(spec))

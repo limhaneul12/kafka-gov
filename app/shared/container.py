@@ -25,7 +25,9 @@ class SharedContainer(containers.DeclarativeContainer):
     schema_registry_config = providers.Callable(lambda s: s.schema_registry.client_config, settings)
 
     # Object Storage 설정 (settings에서 가져옴)
-    storage_endpoint = providers.Callable(lambda s: s.storage.endpoint_url.replace('http://', '').replace('https://', ''), settings)
+    storage_endpoint = providers.Callable(
+        lambda s: s.storage.endpoint_url.replace("http://", "").replace("https://", ""), settings
+    )
     storage_access_key = providers.Callable(lambda s: s.storage.access_key, settings)
     storage_secret_key = providers.Callable(lambda s: s.storage.secret_key, settings)
     storage_bucket_name = providers.Callable(lambda s: s.storage.bucket_name, settings)
@@ -48,12 +50,22 @@ class InfrastructureContainer(containers.DeclarativeContainer):
 
     # Kafka AdminClient (외부에서 주입)
     kafka_admin_client = providers.Dependency()
-    
+
     # Schema Registry Client (외부에서 주입)
     schema_registry_client = providers.Dependency()
-    
-    # MinIO Client (외부에서 주입)
-    minio_client = providers.Dependency()
+
+    # MinIO Client (팩토리 함수 사용)
+    minio_client = providers.Factory(
+        providers.Callable(
+            lambda: __import__(
+                "app.schema.infrastructure.storage.minio_adapter", fromlist=["create_minio_client"]
+            ).create_minio_client
+        ),
+        endpoint=config.storage_endpoint,
+        access_key=config.storage_access_key,
+        secret_key=config.storage_secret_key,
+        secure=config.storage_use_ssl,
+    )
 
 
 # 전역 컨테이너 인스턴스들

@@ -311,6 +311,31 @@ class TopicBatchDryRunResponse(BaseModel):
     summary: dict[str, int] = Field(default_factory=dict)
 
 
+class KafkaCoreMetadata(BaseModel):
+    """Kafka 핵심 메타데이터 (검증용 Pydantic 모델)
+
+    - partition_count: 파티션 개수
+    - leader_replicas: 리더 복제본 브로커 ID 목록
+    - created_at: 생성 시각(문자열)
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+        frozen=True,
+        json_schema_extra={
+            "example": {
+                "partition_count": 12,
+                "leader_replicas": [1, 2, 3],
+                "created_at": "2025-09-25T10:00:00Z",
+            }
+        },
+    )
+
+    partition_count: PartitionCount
+    leader_replicas: list[int] = Field(default_factory=list)
+    created_at: StrictStr | None = None
+
+
 class TopicBatchApplyResponse(BaseModel):
     """토픽 배치 Apply 응답"""
 
@@ -377,7 +402,7 @@ class TopicDetailResponse(BaseModel):
     name: TopicName
     config: TopicConfig
     metadata: TopicMetadata | None = None
-    kafka_metadata: dict[str, Any] = Field(default_factory=dict)
+    kafka_metadata: KafkaCoreMetadata | None = None
 
 
 class TopicPlanResponse(BaseModel):

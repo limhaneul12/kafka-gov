@@ -7,7 +7,6 @@ from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.shared.database import get_db_session
 from app.topic.domain.models import ChangeId, TopicName
 from app.topic.domain.repositories.interfaces import IAuditRepository
 from app.topic.infrastructure.models import AuditLogModel
@@ -54,10 +53,3 @@ class MySQLAuditRepository(IAuditRepository):
         except Exception as e:
             logger.error(f"Failed to create audit log: {e}")
             raise
-
-
-# 의존성 주입용 팩토리 함수
-async def get_mysql_audit_repository() -> MySQLAuditRepository:
-    """MySQL 감사 리포지토리 팩토리"""
-    async with get_db_session() as session:
-        return MySQLAuditRepository(session)

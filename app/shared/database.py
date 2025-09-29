@@ -7,7 +7,12 @@ from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
 from sqlalchemy import MetaData
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from sqlalchemy.ext.asyncio import (
+    AsyncEngine,
+    AsyncSession,
+    async_sessionmaker,
+    create_async_engine,
+)
 from sqlalchemy.orm import DeclarativeBase
 
 logger = logging.getLogger(__name__)
@@ -15,7 +20,7 @@ logger = logging.getLogger(__name__)
 
 class Base(DeclarativeBase):
     """SQLAlchemy Base 클래스"""
-    
+
     metadata = MetaData(
         naming_convention={
             "ix": "ix_%(column_0_label)s",
@@ -33,8 +38,8 @@ class DatabaseManager:
     def __init__(self, database_url: str, echo: bool = False) -> None:
         self.database_url = database_url
         self.echo = echo
-        self._engine = None
-        self._session_factory = None
+        self._engine: AsyncEngine | None = None
+        self._session_factory: async_sessionmaker[AsyncSession] | None = None
 
     async def initialize(self) -> None:
         """데이터베이스 연결 초기화"""
@@ -80,15 +85,15 @@ class DatabaseManager:
         if self._session_factory is None:
             raise RuntimeError("Database not initialized. Call initialize() first.")
 
-        async with self._session_factory() as session:
-            try:
-                yield session
-                await session.commit()
-            except Exception:
-                await session.rollback()
-                raise
-            finally:
-                await session.close()
+        session = self._session_factory()
+        try:
+            yield session
+            await session.commit()
+        except Exception:
+            await session.rollback()
+            raise
+        finally:
+            await session.close()
 
     async def create_tables(self) -> None:
         """테이블 생성"""

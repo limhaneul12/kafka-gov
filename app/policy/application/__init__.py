@@ -5,6 +5,6 @@ from .policy_service import PolicyEvaluationService, PolicyManagementService
 
 __all__ = [
     "DefaultPolicyFactory",
-    "PolicyEvaluationService", 
+    "PolicyEvaluationService",
     "PolicyManagementService",
 ]

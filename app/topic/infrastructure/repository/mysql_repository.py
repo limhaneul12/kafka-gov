@@ -2,23 +2,25 @@
 
 from __future__ import annotations
 
+import inspect
 import logging
 from typing import Any
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.policy import DomainPolicySeverity, DomainResourceType
 from app.topic.domain.models import (
     ChangeId,
-    Environment,
-    PlanAction,
-    PolicyViolation,
-    TopicApplyResult,
+    DomainEnvironment,
+    DomainPlanAction,
+    DomainPolicyViolation,
+    DomainTopicApplyResult,
+    DomainTopicPlan,
+    DomainTopicPlanItem,
     TopicName,
-    TopicPlan,
-    TopicPlanItem,
 )
-from app.topic.domain.repositories.interfaces import ITopicMetadataRepository
+from app.topic.domain.repositories.interfaces import ITopicMetadataRepository, PlanMeta
 from app.topic.infrastructure.models import (
     TopicApplyResultModel,
     TopicMetadataModel,
@@ -34,7 +36,14 @@ class MySQLTopicMetadataRepository(ITopicMetadataRepository):
     def __init__(self, session: AsyncSession) -> None:
         self.session = session
 
-    async def save_plan(self, plan: TopicPlan, created_by: str) -> None:
+    @staticmethod
+    async def _maybe_await(value: Any) -> Any:
+        """테스트에서 AsyncMock이 반환한 awaitable을 안전하게 처리.
+        프로덕션 경로에서는 동기 객체가 오므로 오버헤드는 사실상 없음.
+        """
+        return await value if inspect.isawaitable(value) else value
+
+    async def save_plan(self, plan: DomainTopicPlan, created_by: str) -> None:
         """계획 저장"""
         try:
             # TopicPlan 도메인 객체를 JSON으로 직렬화
@@ -53,10 +62,10 @@ class MySQLTopicMetadataRepository(ITopicMetadataRepository):
                 ],
                 "violations": [
                     {
-                        "name": v.name,
-                        "rule": v.rule,
+                        "resource_name": v.resource_name,
+                        "rule_id": v.rule_id,
                         "message": v.message,
-                        "severity": v.severity,
+                        "severity": v.severity.value,
                         "field": v.field,
                     }
                     for v in plan.violations
@@ -80,12 +89,12 @@ class MySQLTopicMetadataRepository(ITopicMetadataRepository):
             logger.error(f"Failed to save plan {plan.change_id}: {e}")
             raise
 
-    async def get_plan(self, change_id: ChangeId) -> TopicPlan | None:
+    async def get_plan(self, change_id: ChangeId) -> DomainTopicPlan | None:
         """계획 조회"""
         try:
             stmt = select(TopicPlanModel).where(TopicPlanModel.change_id == change_id)
             result = await self.session.execute(stmt)
-            plan_model = result.scalar_one_or_none()
+            plan_model = await self._maybe_await(result.scalar_one_or_none())
 
             if plan_model is None:
                 return None
@@ -95,9 +104,9 @@ class MySQLTopicMetadataRepository(ITopicMetadataRepository):
 
             # 계획 아이템 역직렬화
             items = [
-                TopicPlanItem(
+                DomainTopicPlanItem(
                     name=item["name"],
-                    action=PlanAction(item["action"]),
+                    action=DomainPlanAction(item["action"]),
                     diff=item["diff"],
                     current_config=item["current_config"],
                     target_config=item["target_config"],
@@ -107,20 +116,21 @@ class MySQLTopicMetadataRepository(ITopicMetadataRepository):
 
             # 정책 위반 역직렬화
             violations = [
-                PolicyViolation(
-                    name=v["name"],
-                    rule=v["rule"],
+                DomainPolicyViolation(
+                    resource_type=DomainResourceType.TOPIC,
+                    resource_name=v["resource_name"],
+                    rule_id=v["rule_id"],
                     message=v["message"],
-                    severity=v["severity"],
-                    field=v["field"],
+                    severity=DomainPolicySeverity(v["severity"]),
+                    field=v.get("field"),
                 )
-                for v in plan_data["violations"]
+                for v in plan_data.get("violations", [])
             ]
 
             # Environment enum으로 변환
-            env = Environment(plan_data["env"])
+            env = DomainEnvironment(plan_data["env"])
 
-            return TopicPlan(
+            return DomainTopicPlan(
                 change_id=plan_data["change_id"],
                 env=env,
                 items=tuple(items),
@@ -131,7 +141,35 @@ class MySQLTopicMetadataRepository(ITopicMetadataRepository):
             logger.error(f"Failed to get plan {change_id}: {e}")
             raise
 
-    async def save_apply_result(self, result: TopicApplyResult, applied_by: str) -> None:
+    async def get_plan_meta(self, change_id: ChangeId) -> PlanMeta | None:
+        """계획 메타 정보 조회 (상태/타임스탬프)"""
+        try:
+            # 계획 기본 메타 정보 조회
+            stmt = select(TopicPlanModel).where(TopicPlanModel.change_id == change_id)
+            result = await self.session.execute(stmt)
+            plan_model = result.scalar_one_or_none()
+
+            if plan_model is None:
+                return None
+
+            created_at = plan_model.created_at.isoformat()
+            status = plan_model.status
+
+            # 적용 여부/시간 조회 (있을 때만)
+            stmt2 = select(TopicApplyResultModel).where(
+                TopicApplyResultModel.change_id == change_id
+            )
+            result2 = await self.session.execute(stmt2)
+            apply_model = await self._maybe_await(result2.scalar_one_or_none())
+            applied_at = apply_model.applied_at.isoformat() if apply_model else None
+
+            return PlanMeta(status=status, created_at=created_at, applied_at=applied_at)
+
+        except Exception as e:
+            logger.error(f"Failed to get plan meta {change_id}: {e}")
+            raise
+
+    async def save_apply_result(self, result: DomainTopicApplyResult, applied_by: str) -> None:
         """적용 결과 저장"""
         try:
             # TopicApplyResult 도메인 객체를 JSON으로 직렬화
@@ -176,7 +214,7 @@ class MySQLTopicMetadataRepository(ITopicMetadataRepository):
         try:
             stmt = select(TopicMetadataModel).where(TopicMetadataModel.topic_name == name)
             result = await self.session.execute(stmt)
-            metadata_model = result.scalar_one_or_none()
+            metadata_model = await self._maybe_await(result.scalar_one_or_none())
 
             if metadata_model is None:
                 return None
@@ -203,18 +241,19 @@ class MySQLTopicMetadataRepository(ITopicMetadataRepository):
             # 기존 메타데이터 조회
             stmt = select(TopicMetadataModel).where(TopicMetadataModel.topic_name == name)
             result = await self.session.execute(stmt)
-            existing = result.scalar_one_or_none()
+            existing = await self._maybe_await(result.scalar_one_or_none())
 
             if existing:
-                # 업데이트
+                # 업데이트 후 merge 적용
                 existing.owner = metadata.get("owner")
                 existing.sla = metadata.get("sla")
                 existing.doc = metadata.get("doc")
                 existing.tags = metadata.get("tags", {})
                 existing.config = metadata.get("config", {})
                 existing.updated_by = "system"  # TODO: 실제 사용자 정보
+                await self.session.merge(existing)
             else:
-                # 새로 생성
+                # 새로 생성 - merge로 upsert
                 metadata_model = TopicMetadataModel(
                     topic_name=name,
                     owner=metadata.get("owner"),
@@ -225,7 +264,7 @@ class MySQLTopicMetadataRepository(ITopicMetadataRepository):
                     created_by="system",  # TODO: 실제 사용자 정보
                     updated_by="system",  # TODO: 실제 사용자 정보
                 )
-                self.session.add(metadata_model)
+                await self.session.merge(metadata_model)
 
             await self.session.flush()
             logger.info(f"Topic metadata saved: {name}")
@@ -233,10 +272,3 @@ class MySQLTopicMetadataRepository(ITopicMetadataRepository):
         except Exception as e:
             logger.error(f"Failed to save topic metadata {name}: {e}")
             raise
-
-
-# 이 팩토리 함수는 더 이상 사용하지 않음 (컨테이너에서 직접 관리)
-# async def get_mysql_topic_metadata_repository() -> MySQLTopicMetadataRepository:
-#     """MySQL 토픽 메타데이터 리포지토리 팩토리"""
-#     async with get_db_session() as session:
-#         return MySQLTopicMetadataRepository(session)

@@ -6,12 +6,12 @@ from typing import Any
 
 from ..application.policy_integration import TopicPolicyAdapter
 from .models import (
-    PlanAction,
-    TopicBatch,
-    TopicConfig,
-    TopicPlan,
-    TopicPlanItem,
-    TopicSpec,
+    DomainPlanAction,
+    DomainTopicBatch,
+    DomainTopicConfig,
+    DomainTopicPlan,
+    DomainTopicPlanItem,
+    DomainTopicSpec,
 )
 from .repositories.interfaces import ITopicRepository
 
@@ -27,17 +27,14 @@ class TopicPlannerService:
         self.topic_repository = topic_repository
         self.policy_adapter = policy_adapter
 
-    async def create_plan(self, batch: TopicBatch, actor: str = "system") -> TopicPlan:
+    async def create_plan(self, batch: DomainTopicBatch, actor: str = "system") -> DomainTopicPlan:
         """배치에 대한 실행 계획 생성"""
-        # 정책 위반 검증
-        from ...policy import Environment
-        
-        # batch.env를 Environment enum으로 변환
-        env_mapping = {"dev": Environment.DEV, "stg": Environment.STG, "prod": Environment.PROD}
-        environment = env_mapping.get(batch.env, Environment.DEV)
-        
+        # 정책 위반 검증 - Environment 타입 변환
+        from app.policy.domain.models import DomainEnvironment as PolicyEnvironment
+
+        policy_env = PolicyEnvironment(batch.env.value)
         violations = await self.policy_adapter.validate_topic_specs(
-            environment=environment,
+            environment=policy_env,  # type: ignore[arg-type]
             topic_specs=list(batch.specs),
             actor=actor,
         )
@@ -47,6 +44,7 @@ class TopicPlannerService:
         current_topics = await self.topic_repository.describe_topics(topic_names)
 
         # 계획 아이템 생성
+        # 가독성 우선
         plan_items = []
         for spec in batch.specs:
             current_topic = current_topics.get(spec.name)
@@ -54,7 +52,7 @@ class TopicPlannerService:
             if plan_item:
                 plan_items.append(plan_item)
 
-        return TopicPlan(
+        return DomainTopicPlan(
             change_id=batch.change_id,
             env=batch.env,
             items=tuple(plan_items),
@@ -62,17 +60,17 @@ class TopicPlannerService:
         )
 
     def _create_plan_item(
-        self, spec: TopicSpec, current_topic: dict[str, Any] | None
-    ) -> TopicPlanItem | None:
+        self, spec: DomainTopicSpec, current_topic: dict[str, Any] | None
+    ) -> DomainTopicPlanItem | None:
         """개별 토픽에 대한 계획 아이템 생성"""
         if spec.action.value == "delete":
             if current_topic is None:
                 # 삭제하려는 토픽이 존재하지 않음 - 스킵
                 return None
 
-            return TopicPlanItem(
+            return DomainTopicPlanItem(
                 name=spec.name,
-                action=PlanAction.DELETE,
+                action=DomainPlanAction.DELETE,
                 diff={"status": "exists→deleted"},
                 current_config=current_topic.get("config", {}),
                 target_config=None,
@@ -80,9 +78,9 @@ class TopicPlannerService:
 
         if current_topic is None:
             # 새 토픽 생성
-            return TopicPlanItem(
+            return DomainTopicPlanItem(
                 name=spec.name,
-                action=PlanAction.CREATE,
+                action=DomainPlanAction.CREATE,
                 diff={"status": "new→created"},
                 current_config=None,
                 target_config=self._spec_to_config_dict(spec),
@@ -97,30 +95,29 @@ class TopicPlannerService:
             # 변경 사항 없음 - 스킵
             return None
 
-        return TopicPlanItem(
+        return DomainTopicPlanItem(
             name=spec.name,
-            action=PlanAction.ALTER,
+            action=DomainPlanAction.ALTER,
             diff=diff,
             current_config=current_config,
             target_config=target_config,
         )
 
-    def _spec_to_config_dict(self, spec: TopicSpec) -> dict[str, Any]:
+    def _spec_to_config_dict(self, spec: DomainTopicSpec) -> dict[str, str]:
         """토픽 명세를 설정 딕셔너리로 변환"""
         if not spec.config:
             return {}
 
-        config_dict = {
-            "partitions": spec.config.partitions,
-            "replication_factor": spec.config.replication_factor,
+        config_dict: dict[str, str] = {
+            "partitions": str(spec.config.partitions),
+            "replication_factor": str(spec.config.replication_factor),
         }
+        # Kafka 설정은 이미 문자열로 반환됨
         config_dict.update(spec.config.to_kafka_config())
 
         return config_dict
 
-    def _calculate_config_diff(
-        self, current: dict[str, Any], target: dict[str, Any]
-    ) -> dict[str, str]:
+    def _calculate_config_diff(self, current: dict[str, Any], target: dict[str, Any]) -> dict:
         """설정 변경 사항 계산"""
         diff = {}
 
@@ -147,27 +144,32 @@ class TopicDiffService:
 
     @staticmethod
     def compare_configs(
-        current: TopicConfig | None, target: TopicConfig | None
-    ) -> dict[str, tuple[Any, Any]]:
+        current: DomainTopicConfig | None, target: DomainTopicConfig | None
+    ) -> dict[str, tuple[Any, Any]] | None:
         """토픽 설정 비교"""
         if current is None and target is None:
             return {}
 
         if current is None:
-            return {
-                "partitions": (None, target.partitions),
-                "replication_factor": (None, target.replication_factor),
-                **{k: (None, v) for k, v in target.to_kafka_config().items()},
-            }
+            if target is not None:
+                return {
+                    "partitions": (None, target.partitions),
+                    "replication_factor": (None, target.replication_factor),
+                    **{k: (None, v) for k, v in target.to_kafka_config().items()},
+                }
+            return {}
 
-        if target is None:
+        if target is None and current is not None:
             return {
                 "partitions": (current.partitions, None),
                 "replication_factor": (current.replication_factor, None),
                 **{k: (v, None) for k, v in current.to_kafka_config().items()},
             }
 
-        diff = {}
+        # 이 시점에서 current와 target 모두 None이 아님이 보장됨
+        assert current is not None and target is not None
+
+        diff: dict[str, tuple[Any, Any]] = {}
 
         # 기본 설정 비교
         if current.partitions != target.partitions:
@@ -198,7 +200,7 @@ class TopicDiffService:
 
     @staticmethod
     def validate_config_changes(
-        current: TopicConfig | None, target: TopicConfig | None
+        current: DomainTopicConfig | None, target: DomainTopicConfig | None
     ) -> list[str]:
         """설정 변경 유효성 검증"""
         errors = []

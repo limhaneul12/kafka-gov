@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 
-from .models import Environment, PolicySet, ResourceType
+from .models import DomainEnvironment, DomainPolicySet, DomainResourceType
 
 
 class IPolicyRepository(ABC):
@@ -12,17 +12,17 @@ class IPolicyRepository(ABC):
 
     @abstractmethod
     async def get_policy_set(
-        self, environment: Environment, resource_type: ResourceType
-    ) -> PolicySet | None:
+        self, environment: DomainEnvironment, resource_type: DomainResourceType
+    ) -> DomainPolicySet | None:
         """정책 집합 조회"""
 
     @abstractmethod
-    async def save_policy_set(self, policy_set: PolicySet) -> None:
+    async def save_policy_set(self, policy_set: DomainPolicySet) -> None:
         """정책 집합 저장"""
 
     @abstractmethod
     async def delete_policy_set(
-        self, environment: Environment, resource_type: ResourceType
+        self, environment: DomainEnvironment, resource_type: DomainResourceType
     ) -> bool:
         """정책 집합 삭제
 
@@ -31,9 +31,9 @@ class IPolicyRepository(ABC):
         """
 
     @abstractmethod
-    async def list_environments(self) -> list[Environment]:
+    async def list_environments(self) -> list[DomainEnvironment]:
         """등록된 환경 목록"""
 
     @abstractmethod
-    async def list_resource_types(self, environment: Environment) -> list[ResourceType]:
+    async def list_resource_types(self, environment: DomainEnvironment) -> list[DomainResourceType]:
         """환경별 리소스 타입 목록"""

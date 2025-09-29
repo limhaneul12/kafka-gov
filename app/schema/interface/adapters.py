@@ -5,24 +5,25 @@ from __future__ import annotations
 from pydantic import TypeAdapter, ValidationError
 
 from ..domain.models import (
-    CompatibilityMode as DomainCompatibilityMode,
-    Environment as DomainEnvironment,
-    SchemaApplyResult as DomainSchemaApplyResult,
-    SchemaBatch as DomainSchemaBatch,
-    SchemaMetadata as DomainSchemaMetadata,
-    SchemaPlan as DomainSchemaPlan,
-    SchemaReference as DomainSchemaReference,
-    SchemaSource as DomainSchemaSource,
-    SchemaSourceType as DomainSchemaSourceType,
-    SchemaSpec as DomainSchemaSpec,
-    SchemaType as DomainSchemaType,
-    SubjectStrategy as DomainSubjectStrategy,
+    DomainCompatibilityMode,
+    DomainEnvironment,
+    DomainSchemaApplyResult,
+    DomainSchemaBatch,
+    DomainSchemaMetadata,
+    DomainSchemaPlan,
+    DomainSchemaReference,
+    DomainSchemaSource,
+    DomainSchemaSourceType,
+    DomainSchemaSpec,
+    DomainSchemaType,
+    DomainSubjectStrategy,
 )
 from .schema import (
     PolicyViolation,
     SchemaArtifact,
     SchemaBatchApplyResponse,
     SchemaBatchDryRunResponse,
+    SchemaBatchItem,
     SchemaBatchRequest,
     SchemaCompatibilityIssue,
     SchemaCompatibilityReport,
@@ -34,27 +35,29 @@ from .types.enums import Environment
 
 class SchemaTypeAdapters:
     """Schema 모듈 TypeAdapter 컬렉션"""
-    
+
     # Domain 모델 어댑터들
-    schema_spec_adapter = TypeAdapter[DomainSchemaSpec]
-    schema_metadata_adapter = TypeAdapter[DomainSchemaMetadata]
-    schema_reference_adapter = TypeAdapter[DomainSchemaReference]
-    schema_source_adapter = TypeAdapter[DomainSchemaSource]
-    schema_batch_adapter = TypeAdapter[DomainSchemaBatch]
-    
+    schema_spec_adapter: TypeAdapter[DomainSchemaSpec] = TypeAdapter(DomainSchemaSpec)
+    schema_metadata_adapter: TypeAdapter[DomainSchemaMetadata] = TypeAdapter(DomainSchemaMetadata)
+    schema_reference_adapter: TypeAdapter[DomainSchemaReference] = TypeAdapter(
+        DomainSchemaReference
+    )
+    schema_source_adapter: TypeAdapter[DomainSchemaSource] = TypeAdapter(DomainSchemaSource)
+    schema_batch_adapter: TypeAdapter[DomainSchemaBatch] = TypeAdapter(DomainSchemaBatch)
+
     # Interface 모델 어댑터들
-    schema_batch_request_adapter = TypeAdapter[SchemaBatchRequest]
-    
+    schema_batch_request_adapter: TypeAdapter[SchemaBatchRequest] = TypeAdapter(SchemaBatchRequest)
+
     @classmethod
-    def convert_item_to_spec(cls, item) -> DomainSchemaSpec:
-        """SchemaBatchRequest의 item을 DomainSchemaSpec으로 안전하게 변환
-        
+    def convert_item_to_spec(cls, item: SchemaBatchItem) -> DomainSchemaSpec:
+        """SchemaBatchRequest의 item(SchemaBatchItem)을 DomainSchemaSpec으로 안전하게 변환
+
         Args:
-            item: 변환할 스키마 아이템
-            
+            item: 변환할 스키마 아이템 (인터페이스 레이어 모델)
+
         Returns:
             변환된 DomainSchemaSpec
-            
+
         Raises:
             ValidationError: 변환 중 검증 실패 시
         """
@@ -72,11 +75,13 @@ class SchemaTypeAdapters:
 
             # 참조 변환
             references = tuple(
-                cls.schema_reference_adapter.validate_python({
-                    "name": ref.name,
-                    "subject": ref.subject,
-                    "version": ref.version,
-                })
+                cls.schema_reference_adapter.validate_python(
+                    {
+                        "name": ref.name,
+                        "subject": ref.subject,
+                        "version": ref.version,
+                    }
+                )
                 for ref in item.references
             )
 
@@ -93,7 +98,8 @@ class SchemaTypeAdapters:
 
             # 호환성 모드 처리
             compatibility_value = (
-                item.compatibility.value if item.compatibility 
+                item.compatibility.value
+                if item.compatibility
                 else DomainCompatibilityMode.NONE.value
             )
 
@@ -102,7 +108,7 @@ class SchemaTypeAdapters:
                 "subject": item.subject,
                 "schema_type": DomainSchemaType(item.type.value),
                 "compatibility": DomainCompatibilityMode(compatibility_value),
-                "schema": item.schema,
+                "schema": item.schema_text,
                 "source": domain_source,
                 "schema_hash": item.schema_hash,
                 "references": references,
@@ -110,29 +116,29 @@ class SchemaTypeAdapters:
                 "reason": item.reason,
                 "dry_run_only": item.dry_run_only,
             }
-            
+
             return cls.schema_spec_adapter.validate_python(spec_data)
-            
+
         except ValidationError as e:
             raise ValueError(f"Failed to convert schema item to SchemaSpec: {e}") from e
 
     @classmethod
     def convert_request_to_batch(cls, request: SchemaBatchRequest) -> DomainSchemaBatch:
         """SchemaBatchRequest를 DomainSchemaBatch로 안전하게 변환
-        
+
         Args:
             request: 변환할 SchemaBatchRequest
-            
+
         Returns:
             변환된 DomainSchemaBatch
-            
+
         Raises:
             ValidationError: 변환 중 검증 실패 시
         """
         try:
             # 각 아이템을 SchemaSpec으로 변환
             specs = tuple(cls.convert_item_to_spec(item) for item in request.items)
-            
+
             # SchemaBatch 생성
             batch_data = {
                 "change_id": request.change_id,
@@ -140,19 +146,19 @@ class SchemaTypeAdapters:
                 "subject_strategy": DomainSubjectStrategy(request.subject_strategy.value),
                 "specs": specs,
             }
-            
+
             return cls.schema_batch_adapter.validate_python(batch_data)
-            
+
         except ValidationError as e:
             raise ValueError(f"Failed to convert SchemaBatchRequest to SchemaBatch: {e}") from e
 
     @classmethod
     def convert_plan_to_response(cls, plan: DomainSchemaPlan) -> SchemaBatchDryRunResponse:
         """DomainSchemaPlan을 SchemaBatchDryRunResponse로 변환
-        
+
         Args:
             plan: 변환할 DomainSchemaPlan
-            
+
         Returns:
             변환된 SchemaBatchDryRunResponse
         """
@@ -225,10 +231,10 @@ class SchemaTypeAdapters:
         cls, result: DomainSchemaApplyResult
     ) -> SchemaBatchApplyResponse:
         """DomainSchemaApplyResult를 SchemaBatchApplyResponse로 변환
-        
+
         Args:
             result: 변환할 DomainSchemaApplyResult
-            
+
         Returns:
             변환된 SchemaBatchApplyResponse
         """

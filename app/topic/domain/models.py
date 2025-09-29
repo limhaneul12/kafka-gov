@@ -7,10 +7,10 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import TypeAlias
 
-from ...policy import PolicySeverity, PolicyViolation
+from ...policy import DomainPolicySeverity, DomainPolicyViolation
 
 
-class Environment(str, Enum):
+class DomainEnvironment(str, Enum):
     """환경 타입"""
 
     DEV = "dev"
@@ -18,7 +18,7 @@ class Environment(str, Enum):
     PROD = "prod"
 
 
-class TopicAction(str, Enum):
+class DomainTopicAction(str, Enum):
     """토픽 액션 타입"""
 
     CREATE = "create"
@@ -27,7 +27,7 @@ class TopicAction(str, Enum):
     DELETE = "delete"
 
 
-class PlanAction(str, Enum):
+class DomainPlanAction(str, Enum):
     """계획 액션 타입"""
 
     CREATE = "CREATE"
@@ -35,7 +35,7 @@ class PlanAction(str, Enum):
     DELETE = "DELETE"
 
 
-class CleanupPolicy(str, Enum):
+class DomainCleanupPolicy(str, Enum):
     """토픽 정리 정책"""
 
     DELETE = "delete"
@@ -43,7 +43,7 @@ class CleanupPolicy(str, Enum):
     COMPACT_DELETE = "compact,delete"
 
 
-class CompressionType(str, Enum):
+class DomainCompressionType(str, Enum):
     """압축 타입"""
 
     NONE = "none"
@@ -61,7 +61,7 @@ DocumentUrl: TypeAlias = str
 
 
 @dataclass(slots=True, frozen=True)
-class TopicMetadata:
+class DomainTopicMetadata:
     """토픽 메타데이터 값 객체"""
 
     owner: TeamName
@@ -76,13 +76,13 @@ class TopicMetadata:
 
 
 @dataclass(slots=True, frozen=True)
-class TopicConfig:
+class DomainTopicConfig:
     """토픽 설정 값 객체"""
 
     partitions: int
     replication_factor: int
-    cleanup_policy: CleanupPolicy = CleanupPolicy.DELETE
-    compression_type: CompressionType = CompressionType.ZSTD
+    cleanup_policy: DomainCleanupPolicy = DomainCleanupPolicy.DELETE
+    compression_type: DomainCompressionType = DomainCompressionType.ZSTD
     retention_ms: int | None = None
     min_insync_replicas: int | None = None
     max_message_bytes: int | None = None
@@ -123,13 +123,13 @@ class TopicConfig:
 
 
 @dataclass(slots=True, frozen=True)
-class TopicSpec:
+class DomainTopicSpec:
     """토픽 명세 엔티티"""
 
     name: TopicName
-    action: TopicAction
-    config: TopicConfig | None = None
-    metadata: TopicMetadata | None = None
+    action: DomainTopicAction
+    config: DomainTopicConfig | None = None
+    metadata: DomainTopicMetadata | None = None
     reason: str | None = None
 
     def __post_init__(self) -> None:
@@ -137,7 +137,7 @@ class TopicSpec:
         if not self.name:
             raise ValueError("name is required")
 
-        if self.action == TopicAction.DELETE:
+        if self.action == DomainTopicAction.DELETE:
             if not self.reason:
                 raise ValueError("reason is required for delete action")
             if self.config is not None:
@@ -149,10 +149,10 @@ class TopicSpec:
                 raise ValueError(f"metadata is required for {self.action} action")
 
     @property
-    def environment(self) -> Environment:
+    def environment(self) -> DomainEnvironment:
         """토픽 이름에서 환경 추출"""
         env_prefix = self.name.split(".")[0]
-        return Environment(env_prefix)
+        return DomainEnvironment(env_prefix)
 
     def fingerprint(self) -> str:
         """명세 지문 생성 (변경 감지용)"""
@@ -166,12 +166,12 @@ class TopicSpec:
 
 
 @dataclass(slots=True, frozen=True)
-class TopicBatch:
+class DomainTopicBatch:
     """토픽 배치 엔티티"""
 
     change_id: ChangeId
-    env: Environment
-    specs: tuple[TopicSpec, ...]
+    env: DomainEnvironment
+    specs: tuple[DomainTopicSpec, ...]
 
     def __post_init__(self) -> None:
         """배치 검증"""
@@ -202,11 +202,11 @@ class TopicBatch:
 
 
 @dataclass(slots=True, frozen=True)
-class TopicPlanItem:
+class DomainTopicPlanItem:
     """토픽 계획 아이템 값 객체"""
 
     name: TopicName
-    action: PlanAction
+    action: DomainPlanAction
     diff: dict[str, str]
     current_config: dict[str, str] | None = None
     target_config: dict[str, str] | None = None
@@ -217,15 +217,14 @@ class TopicPlanItem:
             raise ValueError("name is required")
 
 
-
 @dataclass(slots=True, frozen=True)
-class TopicPlan:
+class DomainTopicPlan:
     """토픽 계획 엔티티"""
 
     change_id: ChangeId
-    env: Environment
-    items: tuple[TopicPlanItem, ...]
-    violations: tuple[PolicyViolation, ...]
+    env: DomainEnvironment
+    items: tuple[DomainTopicPlanItem, ...]
+    violations: tuple[DomainPolicyViolation, ...]
 
     def __post_init__(self) -> None:
         """계획 검증"""
@@ -238,14 +237,18 @@ class TopicPlan:
         return len(self.violations) > 0
 
     @property
-    def error_violations(self) -> tuple[PolicyViolation, ...]:
+    def error_violations(self) -> tuple[DomainPolicyViolation, ...]:
         """에러 수준 위반 사항"""
-        return tuple(v for v in self.violations if v.severity in (PolicySeverity.ERROR, PolicySeverity.CRITICAL))
+        return tuple(
+            v
+            for v in self.violations
+            if v.severity in (DomainPolicySeverity.ERROR, DomainPolicySeverity.CRITICAL)
+        )
 
     @property
-    def warning_violations(self) -> tuple[PolicyViolation, ...]:
+    def warning_violations(self) -> tuple[DomainPolicyViolation, ...]:
         """경고 수준 위반 사항"""
-        return tuple(v for v in self.violations if v.severity == PolicySeverity.WARNING)
+        return tuple(v for v in self.violations if v.severity == DomainPolicySeverity.WARNING)
 
     @property
     def can_apply(self) -> bool:
@@ -270,11 +273,11 @@ class TopicPlan:
 
 
 @dataclass(slots=True, frozen=True)
-class TopicApplyResult:
+class DomainTopicApplyResult:
     """토픽 적용 결과 엔티티"""
 
     change_id: ChangeId
-    env: Environment
+    env: DomainEnvironment
     applied: tuple[TopicName, ...]
     skipped: tuple[TopicName, ...]
     failed: tuple[dict[str, str], ...]

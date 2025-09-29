@@ -8,12 +8,12 @@ from typing import Any
 
 from ..models import (
     ChangeId,
-    SchemaApplyResult,
-    SchemaArtifact,
-    SchemaCompatibilityReport,
-    SchemaPlan,
-    SchemaSpec,
-    SchemaUploadResult,
+    DomainSchemaApplyResult,
+    DomainSchemaArtifact,
+    DomainSchemaCompatibilityReport,
+    DomainSchemaPlan,
+    DomainSchemaSpec,
+    DomainSchemaUploadResult,
     SubjectName,
 )
 
@@ -30,15 +30,15 @@ class ISchemaRegistryRepository(ABC):
     @abstractmethod
     async def check_compatibility(
         self,
-        spec: SchemaSpec,
+        spec: DomainSchemaSpec,
         references: list[dict[str, Any]] | None = None,
-    ) -> SchemaCompatibilityReport:
+    ) -> DomainSchemaCompatibilityReport:
         """호환성 검증"""
 
     @abstractmethod
     async def register_schema(
         self,
-        spec: SchemaSpec,
+        spec: DomainSchemaSpec,
         compatibility: bool = True,
     ) -> int:
         """스키마 등록 후 버전 반환"""
@@ -52,23 +52,23 @@ class ISchemaMetadataRepository(ABC):
     """스키마 메타데이터/Audit Repository 인터페이스"""
 
     @abstractmethod
-    async def save_plan(self, plan: SchemaPlan, created_by: str) -> None:
+    async def save_plan(self, plan: DomainSchemaPlan, created_by: str) -> None:
         pass
 
     @abstractmethod
-    async def get_plan(self, change_id: ChangeId) -> SchemaPlan | None:
+    async def get_plan(self, change_id: ChangeId) -> DomainSchemaPlan | None:
         pass
 
     @abstractmethod
-    async def save_apply_result(self, result: SchemaApplyResult, applied_by: str) -> None:
+    async def save_apply_result(self, result: DomainSchemaApplyResult, applied_by: str) -> None:
         pass
 
     @abstractmethod
-    async def record_artifact(self, artifact: SchemaArtifact, change_id: ChangeId) -> None:
+    async def record_artifact(self, artifact: DomainSchemaArtifact, change_id: ChangeId) -> None:
         pass
 
     @abstractmethod
-    async def save_upload_result(self, upload: SchemaUploadResult, uploaded_by: str) -> None:
+    async def save_upload_result(self, upload: DomainSchemaUploadResult, uploaded_by: str) -> None:
         pass
 
 

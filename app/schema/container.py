@@ -26,7 +26,7 @@ from .domain.repositories.interfaces import (
 from .infrastructure.repository.audit_repository import MySQLSchemaAuditRepository
 from .infrastructure.repository.mysql_repository import MySQLSchemaMetadataRepository
 from .infrastructure.schema_registry_adapter import ConfluentSchemaRegistryAdapter
-from .infrastructure.storage.minio_adapter import MinIOObjectStorageAdapter
+from .infrastructure.storage.minio_adapter import create_minio_storage_adapter
 
 
 class SchemaContainer(containers.DeclarativeContainer):
@@ -42,20 +42,20 @@ class SchemaContainer(containers.DeclarativeContainer):
         client=infrastructure.schema_registry_client,
     )
 
-    # MySQL 기반 구현체들
+    # MySQL 기반 구현체들 (팩토리 함수 사용)
     metadata_repository: providers.Provider[ISchemaMetadataRepository] = providers.Factory(
-        MySQLSchemaMetadataRepository,
+        MySQLSchemaMetadataRepository,  # type: ignore[arg-type]
         session=providers.Dependency(),  # 세션은 외부에서 주입
     )
 
     audit_repository: providers.Provider[ISchemaAuditRepository] = providers.Factory(
-        MySQLSchemaAuditRepository,
+        MySQLSchemaAuditRepository,  # type: ignore[arg-type]
         session=providers.Dependency(),  # 세션은 외부에서 주입
     )
 
     # Object Storage (MinIO)
     object_storage_repository: providers.Provider[IObjectStorageRepository] = providers.Singleton(
-        MinIOObjectStorageAdapter,
+        create_minio_storage_adapter,
         client=infrastructure.minio_client,
         bucket_name=config.storage_bucket_name,
         base_url=config.storage_base_url,
@@ -107,50 +107,11 @@ container.infrastructure.override(infrastructure_container)
 class SchemaUseCaseFactory:
     """스키마 유스케이스 팩토리 - 세션 관리 개선"""
 
-    def __init__(self) -> None:
-        self.registry_repo = container.schema_registry_repository()
-        self.policy_engine = container.policy_engine()
-        self.storage_repo = container.object_storage_repository()
-
-    async def create_dry_run_use_case(self, session: AsyncSession) -> SchemaBatchDryRunUseCase:
-        """Dry-Run 유스케이스 생성"""
-        metadata_repo = MySQLSchemaMetadataRepository(session)
-        audit_repo = MySQLSchemaAuditRepository(session)
-
-        return SchemaBatchDryRunUseCase(
-            registry_repository=self.registry_repo,
-            metadata_repository=metadata_repo,
-            audit_repository=audit_repo,
-            policy_engine=self.policy_engine,
-        )
-
-    async def create_apply_use_case(self, session: AsyncSession) -> SchemaBatchApplyUseCase:
-        """Apply 유스케이스 생성"""
-        metadata_repo = MySQLSchemaMetadataRepository(session)
-        audit_repo = MySQLSchemaAuditRepository(session)
-
-        return SchemaBatchApplyUseCase(
-            registry_repository=self.registry_repo,
-            metadata_repository=metadata_repo,
-            audit_repository=audit_repo,
-            storage_repository=self.storage_repo,
-            policy_engine=self.policy_engine,
-        )
-
-    async def create_upload_use_case(self, session: AsyncSession) -> SchemaUploadUseCase:
-        """Upload 유스케이스 생성"""
-        metadata_repo = MySQLSchemaMetadataRepository(session)
-        audit_repo = MySQLSchemaAuditRepository(session)
-
-        return SchemaUploadUseCase(
-            storage_repository=self.storage_repo,
-            metadata_repository=metadata_repo,
-            audit_repository=audit_repo,
-        )
+    # 테스트/런타임 시점에 의존성 초기화를 강제하지 않기 위해 전역 팩토리를 사용하지 않습니다.
+    # 라우터 의존성 함수(get_schema_*_use_case) 내부에서 지연 생성합니다.
 
 
-# 전역 팩토리 인스턴스
-_factory = SchemaUseCaseFactory()
+# 전역 팩토리 인스턴스를 생성하지 않습니다(지연 생성).
 
 # 타입 별칭 (Depends 패턴 개선)
 DbSession = Annotated[AsyncSession, Depends(get_db_session)]
@@ -158,24 +119,45 @@ DbSession = Annotated[AsyncSession, Depends(get_db_session)]
 
 async def get_schema_dry_run_use_case(session: DbSession) -> SchemaBatchDryRunUseCase:
     """SchemaBatchDryRunUseCase 의존성 (세션 포함)"""
-    return await _factory.create_dry_run_use_case(session)
+    metadata_repo = MySQLSchemaMetadataRepository(session)
+    audit_repo = MySQLSchemaAuditRepository(session)
+    return SchemaBatchDryRunUseCase(
+        registry_repository=container.schema_registry_repository(),
+        metadata_repository=metadata_repo,  # type: ignore[arg-type]
+        audit_repository=audit_repo,  # type: ignore[arg-type]
+        policy_engine=container.policy_engine(),
+    )
 
 
 async def get_schema_apply_use_case(session: DbSession) -> SchemaBatchApplyUseCase:
     """SchemaBatchApplyUseCase 의존성 (세션 포함)"""
-    return await _factory.create_apply_use_case(session)
+    metadata_repo = MySQLSchemaMetadataRepository(session)
+    audit_repo = MySQLSchemaAuditRepository(session)
+    return SchemaBatchApplyUseCase(
+        registry_repository=container.schema_registry_repository(),
+        metadata_repository=metadata_repo,  # type: ignore[arg-type]
+        audit_repository=audit_repo,  # type: ignore[arg-type]
+        storage_repository=container.object_storage_repository(),
+        policy_engine=container.policy_engine(),
+    )
 
 
 async def get_schema_upload_use_case(session: DbSession) -> SchemaUploadUseCase:
     """SchemaUploadUseCase 의존성 (세션 포함)"""
-    return await _factory.create_upload_use_case(session)
+    metadata_repo = MySQLSchemaMetadataRepository(session)
+    audit_repo = MySQLSchemaAuditRepository(session)
+    return SchemaUploadUseCase(
+        storage_repository=container.object_storage_repository(),
+        metadata_repository=metadata_repo,  # type: ignore[arg-type]
+        audit_repository=audit_repo,  # type: ignore[arg-type]
+    )
 
 
 def get_schema_plan_use_case(session: DbSession) -> SchemaPlanUseCase:
     """SchemaPlanUseCase 의존성 (세션 포함)"""
     metadata_repo = MySQLSchemaMetadataRepository(session)
     return SchemaPlanUseCase(
-        metadata_repository=metadata_repo,
+        metadata_repository=metadata_repo,  # type: ignore[arg-type]
     )
 
 

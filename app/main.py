@@ -7,6 +7,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import ORJSONResponse
 
 from .policy import policy_router, policy_use_case_factory
 from .schema.interface.router import router as schema_router
@@ -32,11 +33,12 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 def create_app() -> FastAPI:
     """FastAPI 애플리케이션 생성"""
     app = FastAPI(
+        default_response_class=ORJSONResponse,
         title="Kafka Governance API",
         description="Kafka Topic / Schema Registry 관리용 API",
         version="0.1.0",
         docs_url="/swagger",  # Swagger 경로 변경 (기본은 /docs)
-        redoc_url="/redoc",  # ReDoc 비활성화
+        redoc_url="/redoc",
         lifespan=lifespan,
         swagger_ui_parameters={
             "defaultModelsExpandDepth": -1,  # 모델 섹션 기본 접기
@@ -49,7 +51,7 @@ def create_app() -> FastAPI:
     )
     # CORS 설정
     app.add_middleware(
-        CORSMiddleware,
+        CORSMiddleware,  # type: ignore[arg-type]
         allow_origins=["*"],  # 운영에서는 구체적인 도메인 지정
         allow_credentials=True,
         allow_methods=["*"],

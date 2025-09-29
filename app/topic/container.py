@@ -8,24 +8,24 @@ from dependency_injector import containers, providers
 from fastapi import Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ...policy import policy_use_case_factory
-from ...shared.container import infrastructure_container, shared_container
-from ...shared.database import get_db_session
-from .application.policy_integration import TopicPolicyAdapter
-from .application.use_cases import (
+from app.policy import policy_use_case_factory
+from app.shared.container import infrastructure_container, shared_container
+from app.shared.database import get_db_session
+from app.topic.application.policy_integration import TopicPolicyAdapter
+from app.topic.application.use_cases import (
     TopicBatchApplyUseCase,
     TopicBatchDryRunUseCase,
     TopicDetailUseCase,
     TopicPlanUseCase,
 )
-from .domain.repositories.interfaces import (
+from app.topic.domain.repositories.interfaces import (
     IAuditRepository,
     ITopicMetadataRepository,
     ITopicRepository,
 )
-from .infrastructure.kafka_adapter import KafkaTopicAdapter
-from .infrastructure.repository.audit_repository import MySQLAuditRepository
-from .infrastructure.repository.mysql_repository import MySQLTopicMetadataRepository
+from app.topic.infrastructure.kafka_adapter import KafkaTopicAdapter
+from app.topic.infrastructure.repository.audit_repository import MySQLAuditRepository
+from app.topic.infrastructure.repository.mysql_repository import MySQLTopicMetadataRepository
 
 
 class TopicContainer(containers.DeclarativeContainer):
@@ -93,40 +93,47 @@ class TopicContainer(containers.DeclarativeContainer):
 container = TopicContainer()
 
 # 공통 컨테이너와 연결
-container.config.override(shared_container.config)
+container.config.override(shared_container)
 container.infrastructure.override(infrastructure_container)
 
 
 # 의존성 주입 헬퍼 함수들 (세션 관리 개선)
 class TopicUseCaseFactory:
     """토픽 유스케이스 팩토리 - 세션 관리 개선"""
-    
+
     def __init__(self) -> None:
-        self.topic_repo = container.topic_repository()
-        self.policy_adapter = container.policy_adapter()
-    
+        # Provider 레퍼런스만 보관하고, 실제 인스턴스 생성은 호출 시점에 수행
+        self._topic_repo_provider = container.topic_repository
+        self._policy_adapter_provider = container.policy_adapter
+
     async def create_dry_run_use_case(self, session: AsyncSession) -> TopicBatchDryRunUseCase:
         """Dry-Run 유스케이스 생성"""
         metadata_repo = MySQLTopicMetadataRepository(session)
         audit_repo = MySQLAuditRepository(session)
-        
+
+        topic_repo = self._topic_repo_provider()
+        policy_adapter = self._policy_adapter_provider()
+
         return TopicBatchDryRunUseCase(
-            topic_repository=self.topic_repo,
+            topic_repository=topic_repo,
             metadata_repository=metadata_repo,
             audit_repository=audit_repo,
-            policy_adapter=self.policy_adapter,
+            policy_adapter=policy_adapter,
         )
-    
+
     async def create_apply_use_case(self, session: AsyncSession) -> TopicBatchApplyUseCase:
         """Apply 유스케이스 생성"""
         metadata_repo = MySQLTopicMetadataRepository(session)
         audit_repo = MySQLAuditRepository(session)
-        
+
+        topic_repo = self._topic_repo_provider()
+        policy_adapter = self._policy_adapter_provider()
+
         return TopicBatchApplyUseCase(
-            topic_repository=self.topic_repo,
+            topic_repository=topic_repo,
             metadata_repository=metadata_repo,
             audit_repository=audit_repo,
-            policy_adapter=self.policy_adapter,
+            policy_adapter=policy_adapter,
         )
 
 
@@ -150,7 +157,7 @@ async def get_apply_use_case(session: DbSession) -> TopicBatchApplyUseCase:
 def get_detail_use_case(session: DbSession) -> TopicDetailUseCase:
     """Detail 유스케이스 의존성 (세션 포함)"""
     metadata_repo = MySQLTopicMetadataRepository(session)
-    topic_repo = container.topic_repository()
+    topic_repo = _factory._topic_repo_provider()
 
     return TopicDetailUseCase(
         topic_repository=topic_repo,
@@ -165,10 +172,3 @@ def get_plan_use_case(session: DbSession) -> TopicPlanUseCase:
     return TopicPlanUseCase(
         metadata_repository=metadata_repo,
     )
-
-
-async def get_current_user() -> str:
-    """현재 사용자 정보 (개발용 임시)"""
-    # 실제 FastAPI 라우터에서는 shared.auth.get_current_user 의존성을 사용
-    # 이 함수는 컴테이너 테스트용으로만 사용
-    return "dev-user"  # 개발용 임시 사용자

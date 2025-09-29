@@ -47,4 +47,4 @@ python-jose[cryptography]
 orjson
 dependency-injector
 
-# Development tools are managed via [tool.uv.dependency-groups] in pyproject.toml
+pre-commit

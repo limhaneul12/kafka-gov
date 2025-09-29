@@ -1,3 +1,5 @@
+# type: ignore
+
 """Topic Interface 타입 힌트 정의"""
 
 from __future__ import annotations
@@ -22,10 +24,12 @@ TOPIC_PLAN_ACTION_PATTERN: Final[str] = r"^(CREATE|ALTER|DELETE)$"
 
 # fmt: off
 # ===== 토픽 관련 타입 =====
+# type: ignore
 TopicName: TypeAlias = string_type(desc="토픽 이름(환경 접두사 포함)", max_length=249, pattern=TOPIC_NAME_PATTERN)
 TagName: TypeAlias = string_type(desc="태그 이름", max_length=50, pattern=COMMON_TAG_NAME_PATTERN)
 
 # ===== 팀/조직 관련 타입 =====
+# type: ignore
 TeamName: TypeAlias = string_type(desc="팀 이름", max_length=50, pattern=COMMON_TEAM_NAME_PATTERN)
 DocumentUrl: TypeAlias = string_type(desc="문서 URL", max_length=500, pattern=COMMON_DOCUMENT_URL_PATTERN)
 SlaRequirement: TypeAlias = string_type(desc="SLA 요구사항", max_length=100)

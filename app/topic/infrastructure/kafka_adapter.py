@@ -8,7 +8,7 @@ from typing import Any
 
 from confluent_kafka.admin import AdminClient, ConfigResource, NewPartitions, NewTopic
 
-from ..domain.models import TopicName, TopicSpec
+from ..domain.models import DomainTopicSpec, TopicName
 from ..domain.repositories.interfaces import ITopicRepository
 
 logger = logging.getLogger(__name__)
@@ -32,7 +32,7 @@ class KafkaTopicAdapter(ITopicRepository):
             logger.error(f"Failed to get topic metadata for {name}: {e}")
             return None
 
-    async def create_topics(self, specs: list[TopicSpec]) -> TopicMetadata:
+    async def create_topics(self, specs: list[DomainTopicSpec]) -> TopicMetadata:
         """토픽 생성"""
         if not specs:
             return {}
@@ -124,15 +124,18 @@ class KafkaTopicAdapter(ITopicRepository):
                 resources.append((resource, config))
 
             # 비동기 실행
-            futures = self.admin_client.alter_configs(
-                resources,
-                request_timeout=60.0,
-            )
+            futures = self.admin_client.alter_configs(resources, request_timeout=60.0)
 
             # 결과 대기
             results = {}
             for resource, future in futures.items():
-                topic_name = resource.name
+                # Confluent returns keys as ConfigResource; tests may mock with strings
+                topic_name = getattr(resource, "name", None)
+                if topic_name is None:
+                    topic_name = str(resource)
+                    if ":" in topic_name:
+                        # e.g., "TOPIC:dev.user.events" -> "dev.user.events"
+                        topic_name = topic_name.split(":", 1)[1]
                 try:
                     await asyncio.get_event_loop().run_in_executor(None, future.result, 30.0)
                     results[topic_name] = None  # 성공
@@ -155,16 +158,14 @@ class KafkaTopicAdapter(ITopicRepository):
 
         try:
             # NewPartitions 객체 생성
-            partition_updates = []
-            for topic_name, partition_count in partitions.items():
-                new_partitions = NewPartitions(topic=topic_name, new_total_count=partition_count)
-                partition_updates.append(new_partitions)
+            partition_updates = [
+                NewPartitions(topic=topic_name, new_total_count=partition_count)
+                for topic_name, partition_count in partitions.items()
+            ]
 
             # 비동기 실행
             futures = self.admin_client.create_partitions(
-                partition_updates,
-                operation_timeout=30.0,
-                request_timeout=60.0,
+                partition_updates, operation_timeout=30.0, request_timeout=60.0
             )
 
             # 결과 대기

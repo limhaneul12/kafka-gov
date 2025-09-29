@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import cast
+
 import orjson
 import yaml
 
@@ -76,11 +78,14 @@ class TopicBatchParser:
         data = request.model_dump(exclude_none=True, by_alias=True)
 
         # YAML 문자열로 변환
-        return yaml.dump(
-            data,
-            default_flow_style=False,
-            allow_unicode=True,
-            sort_keys=False,
+        return cast(
+            str,
+            yaml.dump(
+                data,
+                default_flow_style=False,
+                allow_unicode=True,
+                sort_keys=False,
+            ),
         )
 
     @staticmethod

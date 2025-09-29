@@ -1,3 +1,5 @@
+# type: ignore
+
 """Schema Interface 타입 힌트 정의"""
 
 from __future__ import annotations

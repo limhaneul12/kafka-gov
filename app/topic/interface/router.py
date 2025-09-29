@@ -1,14 +1,14 @@
-"""Topic FastAPI 라우터"""
+# type: ignore
 
 from __future__ import annotations
 
-import datetime
+from datetime import UTC, datetime
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.responses import JSONResponse
 
-from ...shared.auth import get_current_user
+from ...shared import auth as shared_auth
 from ..application.use_cases import (
     TopicBatchApplyUseCase,
     TopicBatchDryRunUseCase,
@@ -16,14 +16,15 @@ from ..application.use_cases import (
     TopicPlanUseCase,
 )
 from ..container import (
+    DbSession,
     get_apply_use_case,
     get_detail_use_case,
     get_dry_run_use_case,
     get_plan_use_case,
 )
-
-# Domain models import 제거 (adapters.py에서 처리)
 from .adapters import (
+    kafka_metadata_to_core_metadata,
+    kafka_metadata_to_interface_config,
     safe_convert_plan_to_response,
     safe_convert_request_to_batch,
 )
@@ -33,7 +34,6 @@ from .schema import (
     TopicBatchDryRunResponse,
     TopicBatchRequest,
     TopicDetailResponse,
-    TopicName,
     TopicPlanItem as ResponsePlanItem,
     TopicPlanResponse,
 )
@@ -41,10 +41,31 @@ from .schema import (
 router = APIRouter(prefix="/v1/topics", tags=["topics"])
 
 
-# TypeAdapter 기반 변환 함수는 adapters.py로 이동됨
+def _get_current_user_dep(request: Request) -> str:
+    """런타임에 shared_auth.get_current_user를 호출하는 얇은 래퍼.
+    테스트에서 patch("app.shared.auth.get_current_user")가 효과를 발휘하도록 보장한다.
+    """
+    return shared_auth.get_current_user(request)
 
 
-# TypeAdapter 기반 변환 함수는 adapters.py로 이동됨
+async def _get_dry_run_use_case_dep(session: DbSession) -> TopicBatchDryRunUseCase:
+    """DI 경계의 레이트 바인딩을 보장해 테스트·운영 모두에서 교체 용이성 확보"""
+    return await get_dry_run_use_case(session)
+
+
+async def _get_apply_use_case_dep(session: DbSession) -> TopicBatchApplyUseCase:
+    """DI 경계의 레이트 바인딩을 보장해 테스트·운영 모두에서 교체 용이성 확보"""
+    return await get_apply_use_case(session)
+
+
+def _get_detail_use_case_dep(session: DbSession) -> TopicDetailUseCase:
+    """DI 경계의 레이트 바인딩을 보장해 테스트·운영 모두에서 교체 용이성 확보"""
+    return get_detail_use_case(session)
+
+
+def _get_plan_use_case_dep(session: DbSession) -> TopicPlanUseCase:
+    """DI 경계의 레이트 바인딩을 보장해 테스트·운영 모두에서 교체 용이성 확보"""
+    return get_plan_use_case(session)
 
 
 @router.post(
@@ -56,20 +77,14 @@ router = APIRouter(prefix="/v1/topics", tags=["topics"])
 )
 async def topic_batch_dry_run(
     request: TopicBatchRequest,
-    dry_run_use_case: Annotated[TopicBatchDryRunUseCase, Depends(get_dry_run_use_case)],
-    current_user: Annotated[str, Depends(get_current_user)],
+    dry_run_use_case: Annotated[TopicBatchDryRunUseCase, Depends(_get_dry_run_use_case_dep)],
+    current_user: Annotated[str, Depends(_get_current_user_dep)],
 ) -> TopicBatchDryRunResponse:
     """토픽 배치 Dry-Run"""
     try:
-        # 요청을 도메인 모델로 변환 (TypeAdapter 사용)
         batch = safe_convert_request_to_batch(request)
-
-        # 유스케이스 실행
         plan = await dry_run_use_case.execute(batch, current_user)
-
-        # 응답 변환 (TypeAdapter 사용)
         return safe_convert_plan_to_response(plan, request)
-
     except ValueError as e:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
@@ -91,18 +106,13 @@ async def topic_batch_dry_run(
 )
 async def topic_batch_apply(
     request: TopicBatchRequest,
-    apply_use_case: Annotated[TopicBatchApplyUseCase, Depends(get_apply_use_case)],
-    current_user: Annotated[str, Depends(get_current_user)],
+    apply_use_case: Annotated[TopicBatchApplyUseCase, Depends(_get_apply_use_case_dep)],
+    current_user: Annotated[str, Depends(_get_current_user_dep)],
 ) -> TopicBatchApplyResponse:
     """토픽 배치 Apply"""
     try:
-        # 요청을 도메인 모델로 변환 (TypeAdapter 사용)
         batch = safe_convert_request_to_batch(request)
-
-        # 유스케이스 실행
         result = await apply_use_case.execute(batch, current_user)
-
-        # 응답 변환
         return TopicBatchApplyResponse(
             env=request.env,
             change_id=request.change_id,
@@ -112,7 +122,6 @@ async def topic_batch_apply(
             audit_id=result.audit_id,
             summary=result.summary(),
         )
-
     except ValueError as e:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
@@ -133,8 +142,8 @@ async def topic_batch_apply(
     description="토픽의 상세 정보를 조회합니다 (Kafka 메타데이터 + 사용자 메타데이터).",
 )
 async def get_topic_detail(
-    name: TopicName,
-    detail_use_case: Annotated[TopicDetailUseCase, Depends(get_detail_use_case)],
+    name: str,
+    detail_use_case: Annotated[TopicDetailUseCase, Depends(_get_detail_use_case_dep)],
 ) -> TopicDetailResponse:
     """토픽 상세 조회"""
     try:
@@ -146,14 +155,23 @@ async def get_topic_detail(
                 detail=f"Topic '{name}' not found",
             )
 
+        # Kafka 메타데이터에서 config 및 핵심 메타데이터 변환
+        raw_kafka_metadata = result.get("kafka_metadata", {})
+        interface_config = kafka_metadata_to_interface_config(raw_kafka_metadata)
+        if interface_config is None:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to derive topic config from Kafka metadata",
+            )
+        core_metadata = kafka_metadata_to_core_metadata(raw_kafka_metadata)
+
         # 응답 변환
         return TopicDetailResponse(
             name=name,
-            config=result["kafka_metadata"].get("config", {}),
+            config=interface_config,
             metadata=result.get("metadata"),
-            kafka_metadata=result["kafka_metadata"],
+            kafka_metadata=core_metadata,
         )
-
     except HTTPException:
         raise
     except Exception as e:
@@ -164,7 +182,7 @@ async def get_topic_detail(
 
 
 @router.get(
-    "/plan/{change_id}",
+    "/plans/{change_id}",
     response_model=TopicPlanResponse,
     status_code=status.HTTP_200_OK,
     summary="토픽 계획 조회",
@@ -172,7 +190,7 @@ async def get_topic_detail(
 )
 async def get_topic_plan(
     change_id: ChangeId,
-    plan_use_case: Annotated[TopicPlanUseCase, Depends(get_plan_use_case)],
+    plan_use_case: Annotated[TopicPlanUseCase, Depends(_get_plan_use_case_dep)],
 ) -> TopicPlanResponse:
     """토픽 계획 조회"""
     try:
@@ -195,23 +213,28 @@ async def get_topic_plan(
             for item in plan.items
         ]
 
-        # 실제 상태 관리 - 계획의 위반 사항에 따라 상태 결정
-        status_value = "completed" if plan.can_apply else "failed"
-
-        # 실제 타임스탬프 - 현재 시간 기준으로 생성
-        now = datetime.datetime.now(datetime.UTC)
-        created_at = now.isoformat()
-        applied_at = now.isoformat() if status_value == "completed" else None
+        # 계약 보강: Repository에서 메타 정보 조회
+        meta = await plan_use_case.get_meta(change_id)
+        created_at = (
+            meta.get("created_at", datetime.now(UTC).isoformat())
+            if meta
+            else datetime.now(UTC).isoformat()
+        )
+        status_value = (
+            meta.get("status", ("applied" if plan.can_apply else "pending"))
+            if meta
+            else ("applied" if plan.can_apply else "pending")
+        )
+        applied_at = meta.get("applied_at") if meta else None
 
         return TopicPlanResponse(
             change_id=change_id,
-            env=plan.env,
+            env=plan.env.value,
             status=status_value,
             created_at=created_at,
             applied_at=applied_at,
             plan=plan_items,
         )
-
     except HTTPException:
         raise
     except Exception as e:

@@ -7,16 +7,17 @@ from typing import Any
 
 from ..domain.models import (
     ChangeId,
-    TopicApplyResult,
-    TopicBatch,
+    DomainTopicApplyResult,
+    DomainTopicBatch,
+    DomainTopicPlan,
+    DomainTopicSpec,
     TopicName,
-    TopicPlan,
-    TopicSpec,
 )
 from ..domain.repositories.interfaces import (
     IAuditRepository,
     ITopicMetadataRepository,
     ITopicRepository,
+    PlanMeta,
 )
 from ..domain.services import TopicPlannerService
 from .policy_integration import TopicPolicyAdapter
@@ -38,7 +39,7 @@ class TopicBatchDryRunUseCase:
         self.policy_adapter = policy_adapter
         self.planner_service = TopicPlannerService(topic_repository, policy_adapter)
 
-    async def execute(self, batch: TopicBatch, actor: str) -> TopicPlan:
+    async def execute(self, batch: DomainTopicBatch, actor: str) -> DomainTopicPlan:
         """Dry-Run 실행"""
         # 감사 로그 기록
         await self.audit_repository.log_topic_operation(
@@ -99,7 +100,7 @@ class TopicBatchApplyUseCase:
         self.policy_adapter = policy_adapter
         self.planner_service = TopicPlannerService(topic_repository, policy_adapter)
 
-    async def execute(self, batch: TopicBatch, actor: str) -> TopicApplyResult:
+    async def execute(self, batch: DomainTopicBatch, actor: str) -> DomainTopicApplyResult:
         """배치 적용 실행"""
         audit_id = str(uuid.uuid4())
 
@@ -126,7 +127,7 @@ class TopicBatchApplyUseCase:
             applied, skipped, failed = await self._apply_topics(batch.specs, actor, batch.change_id)
 
             # 결과 생성
-            result = TopicApplyResult(
+            result = DomainTopicApplyResult(
                 change_id=batch.change_id,
                 env=batch.env,
                 applied=tuple(applied),
@@ -164,7 +165,7 @@ class TopicBatchApplyUseCase:
             raise
 
     async def _apply_topics(
-        self, specs: tuple[TopicSpec, ...], actor: str, change_id: ChangeId
+        self, specs: tuple[DomainTopicSpec, ...], actor: str, change_id: ChangeId
     ) -> tuple[list[TopicName], list[TopicName], list[dict[str, str]]]:
         """토픽 적용 실행"""
         applied = []
@@ -311,6 +312,10 @@ class TopicPlanUseCase:
     def __init__(self, metadata_repository: ITopicMetadataRepository) -> None:
         self.metadata_repository = metadata_repository
 
-    async def execute(self, change_id: ChangeId) -> TopicPlan | None:
+    async def execute(self, change_id: ChangeId) -> DomainTopicPlan | None:
         """계획 조회"""
         return await self.metadata_repository.get_plan(change_id)
+
+    async def get_meta(self, change_id: ChangeId) -> PlanMeta | None:
+        """계획 메타 정보 조회 (상태/타임스탬프)"""
+        return await self.metadata_repository.get_plan_meta(change_id)

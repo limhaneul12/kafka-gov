@@ -6,7 +6,6 @@ from .enums import (
     SubjectStrategy,
 )
 from .type_hints import (
-    Actor,
     ChangeId,
     FileReference,
     PlanAction,
@@ -18,7 +17,6 @@ from .type_hints import (
 )
 
 __all__ = [
-    "Actor",
     "ChangeId",
     "CompatibilityMode",
     "Environment",

@@ -177,9 +177,17 @@ class SchemaBatchItem(BaseModel):
     )
 
     subject: SubjectName
-    type: SchemaType
+    type: SchemaType = Field(
+        validation_alias=AliasChoices("schema_type", "type"),
+        serialization_alias="type",
+    )
     compatibility: CompatibilityMode | None = None
-    schema: SchemaDefinition | None = None
+    schema_text: SchemaDefinition | None = Field(
+        default=None,
+        description="스키마 정의 텍스트",
+        validation_alias=AliasChoices("schema", "schema_text"),
+        serialization_alias="schema",
+    )
     source: SchemaSource | None = None
     schema_hash: SchemaHash | None = Field(
         default=None,
@@ -196,9 +204,9 @@ class SchemaBatchItem(BaseModel):
     @model_validator(mode="after")
     def validate_payload(self) -> SchemaBatchItem:
         """스키마 내용/소스 검증"""
-        if not self.schema and not self.source:
+        if not self.schema_text and not self.source:
             raise ValueError("schema or source must be provided")
-        if self.schema and self.source and self.source.type is not SchemaSourceType.INLINE:
+        if self.schema_text and self.source and self.source.type is not SchemaSourceType.INLINE:
             raise ValueError("schema literal is only allowed with inline source or without source")
         return self
 
@@ -255,7 +263,13 @@ class SchemaBatchRequest(BaseModel):
     )
     items: Annotated[
         list[SchemaBatchItem],
-        Field(min_length=1, max_length=200, description="스키마 배치 항목"),
+        Field(
+            min_length=1,
+            max_length=200,
+            description="스키마 배치 항목",
+            validation_alias=AliasChoices("items", "specs"),
+            serialization_alias="items",
+        ),
     ]
 
     @field_validator("kind")
@@ -558,5 +572,9 @@ class SchemaUploadResponse(BaseModel):
     )
 
     upload_id: StrictStr
-    objects: list[SchemaArtifact] = Field(default_factory=list)
+    artifacts: list[SchemaArtifact] = Field(
+        default_factory=list,
+        validation_alias=AliasChoices("artifacts", "objects"),
+        serialization_alias="artifacts",
+    )
     summary: dict[str, int] = Field(default_factory=dict)

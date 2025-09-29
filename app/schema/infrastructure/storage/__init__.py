@@ -8,6 +8,6 @@ from .minio_adapter import (
 
 __all__ = [
     "MinIOObjectStorageAdapter",
-    "create_minio_client", 
+    "create_minio_client",
     "create_minio_storage_adapter",
 ]
