@@ -26,26 +26,36 @@ jobs:
         run: |
           uv sync --group dev --frozen
 
-      - name: Ruff format check
+      - name: Code formatting and linting
         run: |
-          uv run ruff format --check .
-
-      - name: Ruff lint
-        run: |
+          # Apply formatting first, then check if any changes were made
+          uv run ruff format .
+          if ! git diff --quiet; then
+            echo "❌ Code formatting issues found. Please run 'uv run ruff format .' locally and commit the changes."
+            git diff --name-only
+            exit 1
+          fi
+          # Run linting
           uv run ruff check .
 
-      - name: Pyrefly type check
+      - name: Type checking
         run: |
           uv run pyrefly check
 
-      - name: Run tests
+      - name: Run tests with coverage
         run: |
-          uv run pytest
+          uv run pytest --cov=app --cov-report=xml --cov-report=term-missing
 
-      - name: pip-audit (vulnerability scan)
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v3
+        if: success()
+        with:
+          file: ./coverage.xml
+          fail_ci_if_error: false
+
+      - name: Security checks
         run: |
+          # Vulnerability scan
           uv run pip-audit --progress-spinner off
-
-      - name: Bandit (security static analysis)
-        run: |
+          # Security static analysis
           uv run bandit -r app -x tests -ll
