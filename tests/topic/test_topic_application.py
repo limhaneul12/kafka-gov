@@ -595,8 +595,8 @@ class TestTopicPolicyAdapter:
 
         # Assert
         assert result["name"] == "dev.user.events"
-        assert result["config"]["partitions"] == 3
-        assert result["config"]["replication.factor"] == 2
+        assert result["config"]["partitions"] == "3"  # 문자열로 변환됨
+        assert result["config"]["replication.factor"] == "2"  # 문자열로 변환됨
         assert result["metadata"]["owner"] == "data-team"
         assert result["metadata"]["sla"] == "99.9%"
 

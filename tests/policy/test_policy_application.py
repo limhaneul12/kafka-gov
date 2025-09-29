@@ -32,7 +32,7 @@ class TestPolicyEvaluationService:
         engine = PolicyEngine()
 
         # 테스트용 정책 등록
-        naming_rule = DomainNamingRule(pattern=r"^[a-z][a-z0-9-]*[a-z0-9]$", field="name")
+        naming_rule = DomainNamingRule(pattern=r"^[a-z][a-z0-9-]*[a-z0-9]$")
         partition_rule = DomainConfigurationRule(
             config_key="partitions",
             min_value=3,

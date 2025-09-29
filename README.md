@@ -1,39 +1,69 @@
-# Kafka Governance API
+<div align="center">
+  <img src="https://raw.githubusercontent.com/your-org/kafka-gov/main/static/logo.png" alt="Kafka Gov Logo" width="400"/>
+  
+  # Kafka Gov
+  
+  **🛡️ Enterprise-grade Kafka Topic & Schema Registry Governance Platform**
+  
+  [![Python](https://img.shields.io/badge/Python-3.12+-blue.svg)](https://python.org)
+  [![FastAPI](https://img.shields.io/badge/FastAPI-0.104+-green.svg)](https://fastapi.tiangolo.com)
+  [![License](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+  [![CI](https://github.com/your-org/kafka-gov/workflows/CI/badge.svg)](https://github.com/your-org/kafka-gov/actions)
+  [![Coverage](https://codecov.io/gh/your-org/kafka-gov/branch/main/graph/badge.svg)](https://codecov.io/gh/your-org/kafka-gov)
+  
+  [🚀 Quick Start](#-quick-start) • [📖 Documentation](#-documentation) • [🤝 Contributing](#-contributing) • [💬 Community](#-community)
+</div>
 
-Kafka Topic 및 Schema Registry 관리를 위한 Clean Architecture 기반 API 서비스입니다.
+---
 
-## 🏗️ 아키텍처
+## ✨ Features
 
-이 프로젝트는 Clean Architecture 원칙을 따라 도메인별로 구조화되어 있습니다:
+### 🎯 **Topic Management**
+- **Batch Operations**: Plan and execute multiple topic changes with dry-run support
+- **Policy Enforcement**: Automated validation against naming conventions and configuration rules
+- **Environment-aware**: DEV/STG/PROD environment separation with different policies
+- **Audit Trail**: Complete history of all topic changes with rollback capabilities
+
+### 📋 **Schema Registry Governance**
+- **Schema Evolution**: Manage schema versions with compatibility validation
+- **Subject Management**: Organize schemas by subject with version control
+- **File Upload**: Bulk schema upload with validation and conflict resolution
+- **Storage Integration**: MinIO-backed schema artifact storage
+
+### 🔒 **Security & Compliance**
+- **JWT Authentication**: Secure API access with role-based permissions
+- **Policy Engine**: Configurable rules for naming, configuration, and resource limits
+- **Violation Detection**: Real-time policy violation detection with severity levels
+- **Compliance Reporting**: Generate compliance reports for audit purposes
+
+### 🏗️ **Enterprise Architecture**
+- **Clean Architecture**: Domain-driven design with clear layer separation
+- **High Performance**: Async/await throughout with connection pooling
+- **Observability**: Structured logging, metrics, and health checks
+- **Scalability**: Horizontal scaling support with stateless design
+
+## 🏗️ Architecture
+
+Built on **Clean Architecture** principles with domain-driven design:
 
 ```
 app/
-├── shared/                    # 공통 모듈
-│   ├── settings.py           # Pydantic Settings 기반 설정 (공통 helper로 일관화)
-│   └── containers.py         # 공통 인프라 컨테이너 + 모듈 컨테이너 집합 초기화
-├── topic/                    # Topic 도메인
-│   ├── containers.py         # Topic 모듈 DI 컨테이너
-│   ├── domain/              # 도메인 레이어
-│   │   ├── models.py        # 도메인 모델
-│   │   ├── repositories.py  # 리포지토리 인터페이스
-│   │   └── services.py      # 도메인 서비스
-│   ├── application/         # 애플리케이션 레이어
-│   │   └── services.py      # 유스케이스 조정
-│   ├── infrastructure/      # 인프라 레이어
-│   │   └── repositories.py  # 리포지토리 구현
-│   └── interface/           # 인터페이스 레이어
-│       ├── router.py        # FastAPI 라우터
-│       └── schemas.py       # API 스키마
-├── schema/                  # Schema Registry 도메인
-│   ├── containers.py        # Schema 모듈 DI 컨테이너
-│   └── (동일한 구조)
-├── auth/                    # 인증 도메인 (신규)
-│   ├── containers.py        # Auth 모듈 DI 컨테이너
-│   ├── domain/              # 도메인 레이어
-│   ├── application/         # 애플리케이션 서비스
-│   ├── infrastructure/      # 인프라(인메모리 저장소)
-│   └── interface/           # 라우터
-└── main.py                  # 애플리케이션 엔트리포인트
+├── shared/                    # Common infrastructure
+│   ├── database.py           # SQLAlchemy async engine
+│   ├── container.py          # Dependency injection
+│   └── auth.py              # JWT authentication
+├── policy/                   # Policy engine domain
+│   ├── domain/              # Policy rules & evaluation
+│   ├── application/         # Policy services
+│   └── infrastructure/      # Rule repositories
+├── topic/                    # Topic management domain
+│   ├── domain/              # Topic models & business logic
+│   ├── application/         # Use cases & orchestration
+│   ├── infrastructure/      # Kafka & database adapters
+│   └── interface/           # REST API endpoints
+├── schema/                   # Schema registry domain
+│   └── (similar structure)
+└── main.py                   # Application entry point
 ```
 
 ## 🚀 주요 기능

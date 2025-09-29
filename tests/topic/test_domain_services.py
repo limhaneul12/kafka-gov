@@ -8,6 +8,7 @@ from unittest.mock import AsyncMock
 import pytest
 
 from app.topic.domain.models import (
+    DomainEnvironment,
     DomainPlanAction as PlanAction,
     DomainTopicAction as TopicAction,
     DomainTopicBatch as TopicBatch,
@@ -127,11 +128,11 @@ async def test_create_plan_covers_environment_mapping(
         config=TopicConfig(partitions=3, replication_factor=2),
         metadata=TopicMetadata(owner="data-team"),
     )
-    batch = TopicBatch(change_id="chg-1", env="stg", specs=(spec,))
+    batch = TopicBatch(change_id="chg-1", env=DomainEnvironment.STG, specs=(spec,))
     # 현재 토픽 없음
     mock_topic_repository.describe_topics.return_value = {}
     plan = await planner.create_plan(batch, actor="tester")
-    assert plan.env == "stg"
+    assert plan.env == DomainEnvironment.STG
     assert len(plan.items) == 1
 
 
