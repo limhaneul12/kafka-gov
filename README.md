@@ -1,7 +1,7 @@
 <div align="center">
   <img src="https://raw.githubusercontent.com/limhaneul12/kafka-gov/main/image/logo.png" alt="Kafka Gov Logo" width="400"/>
   
-  **🛡️ Enterprise-grade Kafka Topic & Schema Registry Governance Platform**
+  **🛡️ Kafka Topic & Schema Registry Governance Platform**
   
   [![Python](https://img.shields.io/badge/Python-3.12+-blue.svg)](https://python.org)
   [![FastAPI](https://img.shields.io/badge/FastAPI-0.104+-green.svg)](https://fastapi.tiangolo.com)
