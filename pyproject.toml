@@ -3,7 +3,7 @@ name = "kafka-gov"
 version = "0.1.0"
 description = "Kafka governance project with FastAPI"
 readme = "README.md"
-requires-python = ">=3.12.10"
+requires-python = ">=3.12,<3.14"
 dependencies = [
     "fastapi>=0.117.1",
     "pydantic[email]>=2.11.9",
@@ -36,7 +36,7 @@ dependencies = [
     "argon2-cffi>=25.1.0",
     "pyjwt>=2.10.1",
     "python-jose[cryptography]>=3.5.0",
-    "ecdsa>=0.20.0",  # 보안 취약점 해결
+    "ecdsa>=0.19.0",  # 보안 취약점 해결 (호환성 고려)
     "orjson>=3.11.3",
     "dependency-injector>=4.48.2",
     "prometheus-client>=0.20.0",
