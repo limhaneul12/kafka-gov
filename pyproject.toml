@@ -36,6 +36,7 @@ dependencies = [
     "argon2-cffi>=25.1.0",
     "pyjwt>=2.10.1",
     "python-jose[cryptography]>=3.5.0",
+    "ecdsa>=0.20.0",  # 보안 취약점 해결
     "orjson>=3.11.3",
     "dependency-injector>=4.48.2",
     "prometheus-client>=0.20.0",
