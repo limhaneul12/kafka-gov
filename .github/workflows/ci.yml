@@ -7,6 +7,7 @@ on:
 jobs:
   build-test:
     runs-on: ubuntu-latest
+    timeout-minutes: 15  # CI 타임아웃 설정
 
     steps:
       - name: Checkout
@@ -42,12 +43,13 @@ jobs:
         run: |
           uv run pyrefly check
 
-      - name: Run tests with coverage
+      - name: Run tests with coverage (optimized)
         run: |
           # Clean Python cache to avoid import conflicts
           find . -type d -name "__pycache__" -exec rm -rf {} + || true
           find . -name "*.pyc" -delete || true
-          uv run pytest --cov=app --cov-report=xml --cov-report=term-missing
+          # Run tests with parallel execution and fail-fast for efficiency
+          uv run pytest -n auto --maxfail=5 --tb=short --cov=app --cov-report=xml --cov-report=term-missing --durations=10
           
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v3

@@ -93,11 +93,12 @@ dev = [
   "pyrefly>=0.34.0",
   "pytest>=8.4.2",
   "pytest-asyncio>=1.2.0",
-    "pytest-cov>=5.0",
-    "coverage>=7.6",
-    "pip-audit>=2.7",
-    "bandit>=1.7",
-    "aiosqlite>=0.20.0",
+  "pytest-cov>=5.0",
+  "pytest-xdist>=3.6.0",  # 병렬 테스트 실행
+  "coverage>=7.6",
+  "pip-audit>=2.7",
+  "bandit>=1.7",
+  "aiosqlite>=0.20.0",
   ]
 
 [tool.ruff]
