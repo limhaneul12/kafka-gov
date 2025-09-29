@@ -29,11 +29,12 @@ jobs:
 
       - name: Code formatting and linting
         run: |
-          # Apply formatting first, then check if any changes were made
+          # Apply formatting first, then check if any changes were made (excluding uv.lock)
           uv run ruff format .
-          if ! git diff --quiet; then
+          # Check only Python files for formatting changes, ignore uv.lock
+          if ! git diff --quiet -- '*.py' '*.pyi'; then
             echo "❌ Code formatting issues found. Please run 'uv run ruff format .' locally and commit the changes."
-            git diff --name-only
+            git diff --name-only -- '*.py' '*.pyi'
             exit 1
           fi
           # Run linting
