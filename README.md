@@ -1,20 +1,22 @@
 <div align="center">
-  <img src="https://raw.githubusercontent.com/your-org/kafka-gov/main/static/logo.png" alt="Kafka Gov Logo" width="400"/>
+  <!-- 로고 이미지를 static/logo.png에 저장 후 아래 주석을 해제하세요 -->
+  <img src="https://raw.githubusercontent.com/limhaneul12/kafka-gov/images/logo.png" alt="Kafka Gov Logo" width="400"/>
   
-  # Kafka Gov
+  <!-- 임시: 텍스트 로고 -->
+  <h1>🛡️ Kafka Gov</h1>
   
   **🛡️ Enterprise-grade Kafka Topic & Schema Registry Governance Platform**
   
   [![Python](https://img.shields.io/badge/Python-3.12+-blue.svg)](https://python.org)
   [![FastAPI](https://img.shields.io/badge/FastAPI-0.104+-green.svg)](https://fastapi.tiangolo.com)
   [![License](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-  [![CI](https://github.com/your-org/kafka-gov/workflows/CI/badge.svg)](https://github.com/your-org/kafka-gov/actions)
-  [![Coverage](https://codecov.io/gh/your-org/kafka-gov/branch/main/graph/badge.svg)](https://codecov.io/gh/your-org/kafka-gov)
+  [![pytest](https://img.shields.io/badge/pytest-8.4.2-blue.svg)](https://github.com/limhaneul12/kafka-gov/actions)
+  [![CI](https://github.com/limhaneul12/kafka-gov/workflows/CI/badge.svg)](https://github.com/limhaneul12/kafka-gov/actions)
   
   [🚀 Quick Start](#-quick-start) • [📖 Documentation](#-documentation) • [🤝 Contributing](#-contributing) • [💬 Community](#-community)
 </div>
 
----
+--- 
 
 ## ✨ Features
 
@@ -66,123 +68,257 @@ app/
 └── main.py                   # Application entry point
 ```
 
-## 🚀 주요 기능
+## 🚀 Quick Start
 
-### Topic 관리
-- Topic 생성, 수정, 삭제
-- 배치 작업 계획 수립 및 실행
-- 정책 검증 및 위반 사항 확인
-- Dry-run 모드 지원
+### Prerequisites
+- Python 3.12+
+- Docker & Docker Compose
+- Kafka cluster
+- MySQL/PostgreSQL database
 
-### Schema Registry 관리
-- 스키마 등록, 조회, 삭제
-- Subject 및 버전 관리
-- 호환성 모드 설정
-- MinIO 기반 스키마 저장소
+### Installation
 
-## 🛠️ 기술 스택
+1. **Clone the repository**
+   ```bash
+   git clone https://github.com/your-org/kafka-gov.git
+   cd kafka-gov
+   ```
 
-- **Framework**: FastAPI
-- **DI Container**: dependency-injector
-- **Settings**: pydantic-settings
-- **Database**: SQLAlchemy (Async)
-- **Kafka**: confluent-kafka-python
-- **Storage**: MinIO
-- **Type Safety**: Python 3.12+ with strict typing
-- **Auth**: argon2-cffi (패스워드 해시), python-jose (JWT)
+2. **Set up environment**
+   ```bash
+   cp .env.example .env
+   # Edit .env with your configuration
+   ```
 
-## 📋 환경 설정
+3. **Install dependencies**
+   ```bash
+   # Using uv (recommended)
+   uv sync
+   
+   # Or using pip
+   pip install -r requirements.txt
+   ```
 
-1. `.env` 파일을 생성하고 `.env.example`을 참고하여 설정:
+4. **Start with Docker Compose**
+   ```bash
+   docker-compose up -d
+   ```
 
-```bash
-cp .env.example .env
-```
+5. **Access the application**
+   - API: http://localhost:8000
+   - Swagger UI: http://localhost:8000/docs
+   - Health Check: http://localhost:8000/health
 
-2. 주요 설정 항목:
-   - `KAFKA_BOOTSTRAP_SERVERS`: Kafka 브로커 서버 목록
-   - `MINIO_ENDPOINT`: MinIO 서버 엔드포인트
-   - `SCHEMA_REGISTRY_URL`: Schema Registry URL
-   - `DATABASE_URL`: 데이터베이스 연결 URL
-   - `SECRET_KEY`: JWT 서명용 시크릿 (예시값 제공, 반드시 교체)
-   - `JWT_ALGORITHM`, `JWT_EXPIRE_MINUTES`: JWT 설정
-
-## 🏃‍♂️ 실행 방법
-
-### 개발 환경
+### Example Usage
 
 ```bash
-# 의존성 설치
-pip install -r requirements.txt
+# Register a new user
+curl -X POST "http://localhost:8000/api/v1/auth/register" \
+  -H "Content-Type: application/json" \
+  -d '{"username": "admin", "password": "secure123"}'
 
-# 개발 서버 실행
-python -m app.main
+# Plan topic changes
+curl -X POST "http://localhost:8000/api/v1/topics/dev/batch/dry-run" \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "topics": [
+      {
+        "name": "user-events",
+        "action": "CREATE",
+        "config": {
+          "partitions": 3,
+          "replication_factor": 2
+        }
+      }
+    ]
+  }'
 ```
 
-### Docker Compose 실행
+## 🛠️ Tech Stack
+
+| Category | Technology |
+|----------|------------|
+| **Framework** | FastAPI, Pydantic |
+| **Database** | SQLAlchemy (Async), MySQL |
+| **Message Broker** | Apache Kafka, Confluent Platform |
+| **Storage** | MinIO (S3-compatible) |
+| **Authentication** | JWT, Argon2 |
+| **Architecture** | Clean Architecture, DDD |
+| **Testing** | pytest, pytest-asyncio |
+| **Type Safety** | Python 3.12+ strict typing |
+
+## 📖 Documentation
+
+### 🔧 Configuration
+
+Key environment variables:
 
 ```bash
-docker-compose up -d
+# Kafka Configuration
+KAFKA_BOOTSTRAP_SERVERS=localhost:9092
+SCHEMA_REGISTRY_URL=http://localhost:8081
+
+# Database
+DATABASE_URL=mysql+aiomysql://user:pass@localhost/kafka_gov
+
+# Storage
+MINIO_ENDPOINT=localhost:9000
+MINIO_ACCESS_KEY=minioadmin
+MINIO_SECRET_KEY=minioadmin
+
+# Authentication
+SECRET_KEY=your-secret-key-here
+JWT_ALGORITHM=HS256
+JWT_EXPIRE_MINUTES=1800
 ```
 
-## 📚 API 문서
+### 🛡️ API Endpoints
 
-서버 실행 후 다음 URL에서 API 문서를 확인할 수 있습니다:
-
-- Swagger UI: http://localhost:8000/docs
-- ReDoc: http://localhost:8000/redoc
-
-## 🧪 주요 엔드포인트
-
-### Topic 관리
-- `GET /api/v1/topics/{env}` - Topic 목록 조회
-- `GET /api/v1/topics/{env}/{topic_name}` - Topic 설정 조회
-- `POST /api/v1/topics/{env}/plan` - 배치 작업 계획 수립
-- `POST /api/v1/topics/{env}/apply` - 배치 작업 실행
-
-### Schema Registry
-- `GET /api/v1/schemas/subjects` - Subject 목록 조회
-- `GET /api/v1/schemas/subjects/{subject}/versions` - Subject 버전 목록
-- `GET /api/v1/schemas/subjects/{subject}/versions/{version}` - 스키마 조회
-- `POST /api/v1/schemas/{env}/plan` - 스키마 배치 계획 수립
-- `POST /api/v1/schemas/{env}/apply` - 스키마 배치 실행
-
-### Auth (신규)
-- `POST /api/v1/auth/register` - 회원가입 및 액세스 토큰 발급
-- `POST /api/v1/auth/login` - 로그인 및 액세스 토큰 발급
-
-응답:
+#### Topic Management
 ```
-{
-  "access_token": "...",
-  "token_type": "bearer",
-  "expires_in": 1800
-}
+GET    /api/v1/topics/{env}                    # List topics
+GET    /api/v1/topics/{env}/{topic}            # Get topic details
+POST   /api/v1/topics/{env}/batch/dry-run      # Plan topic changes
+POST   /api/v1/topics/{env}/batch/apply        # Apply topic changes
+GET    /api/v1/topics/{env}/plan/{change_id}   # Get execution plan
 ```
 
-## 🔧 개발 원칙
+#### Schema Registry
+```
+GET    /api/v1/schemas/subjects                # List subjects
+POST   /api/v1/schemas/{env}/batch/dry-run     # Plan schema changes
+POST   /api/v1/schemas/{env}/batch/apply       # Apply schema changes
+POST   /api/v1/schemas/{env}/upload            # Upload schema files
+GET    /api/v1/schemas/{env}/plan/{change_id}  # Get schema plan
+```
 
-### 타입 안정성
-- Python 3.12+ 기준 엄격한 타입 힌트 사용
-- `Optional` 대신 `| None` 사용
-- 모든 공개 함수/클래스에 타입 힌트 필수
+#### Authentication
+```
+POST   /api/v1/auth/register                   # Register user
+POST   /api/v1/auth/login                      # Login user
+```
 
-### 도메인 분리
-- IO 경계는 Pydantic 모델 사용
-- 내부 도메인은 dataclass(frozen=True, slots=True) 사용
-- 불변성 원칙 준수
+#### System
+```
+GET    /health                                 # Health check
+GET    /docs                                   # Swagger UI
+GET    /redoc                                  # ReDoc
+```
 
-### 의존성 관리
-- dependency-injector 기반
-- 공통 인프라 컨테이너(shared) + 모듈별 컨테이너(topic/schema/auth) 구성
-- 모듈 경계에서만 와이어링(lifespan에서 초기화)
-
-## 🏥 헬스체크
+### 🧪 Testing
 
 ```bash
-curl http://localhost:8000/health
+# Run all tests
+pytest
+
+# Run with coverage
+pytest --cov=app --cov-report=html
+
+# Run specific module tests
+pytest tests/topic/
+pytest tests/schema/
+pytest tests/policy/
 ```
 
-## 📝 라이선스
+## 🚀 Deployment
 
-MIT License
+### Docker Production
+
+```bash
+# Build production image
+docker build -t kafka-gov:latest .
+
+# Run with production settings
+docker run -d \
+  --name kafka-gov \
+  -p 8000:8000 \
+  --env-file .env.prod \
+  kafka-gov:latest
+```
+
+### Kubernetes
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kafka-gov
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: kafka-gov
+  template:
+    metadata:
+      labels:
+        app: kafka-gov
+    spec:
+      containers:
+      - name: kafka-gov
+        image: kafka-gov:latest
+        ports:
+        - containerPort: 8000
+        env:
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: kafka-gov-secrets
+              key: database-url
+```
+
+## 🤝 Contributing
+
+We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) for details.
+
+### Development Setup
+
+1. **Fork and clone**
+   ```bash
+   git clone https://github.com/your-username/kafka-gov.git
+   cd kafka-gov
+   ```
+
+2. **Set up development environment**
+   ```bash
+   uv sync --group dev
+   pre-commit install
+   ```
+
+3. **Run tests**
+   ```bash
+   pytest
+   ```
+
+4. **Submit a pull request**
+
+### Code Standards
+
+- **Type Safety**: Full type hints with Python 3.12+
+- **Testing**: 90%+ test coverage required
+- **Documentation**: Docstrings for all public APIs
+- **Formatting**: ruff
+- **Architecture**: Follow Clean Architecture principles
+
+## 💬 Community
+
+- **Issues**: [GitHub Issues](https://github.com/your-org/kafka-gov/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/your-org/kafka-gov/discussions)
+- **Security**: [Security Policy](SECURITY.md)
+
+## 📄 License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## 🙏 Acknowledgments
+
+- [FastAPI](https://fastapi.tiangolo.com/) for the excellent web framework
+- [Confluent](https://www.confluent.io/) for Kafka Python client
+- [SQLAlchemy](https://www.sqlalchemy.org/) for database ORM
+- [Pydantic](https://pydantic.dev/) for data validation
+
+---
+
+<div align="center">
+  <strong>Built with ❤️ for the Kafka community</strong>
+</div>
