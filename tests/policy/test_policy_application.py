@@ -484,17 +484,17 @@ class TestDefaultPolicyFactory:
 
         # DEV는 가장 관대한 정책
         dev_naming = next(r for r in dev_policy.rules if isinstance(r, DomainNamingRule))
-        assert "dev." in dev_naming.pattern
+        assert "dev\\." in dev_naming.pattern  # 정규식에서는 \. 형태로 저장됨
         assert len(dev_naming.forbidden_prefixes) == 0
 
         # STG는 중간 수준
         stg_naming = next(r for r in stg_policy.rules if isinstance(r, DomainNamingRule))
-        assert "stg." in stg_naming.pattern
+        assert "stg\\." in stg_naming.pattern
         assert len(stg_naming.forbidden_prefixes) > 0
 
         # PROD는 가장 엄격한 정책
         prod_naming = next(r for r in prod_policy.rules if isinstance(r, DomainNamingRule))
-        assert "prod." in prod_naming.pattern
+        assert "prod\\." in prod_naming.pattern
         assert len(prod_naming.forbidden_prefixes) > len(stg_naming.forbidden_prefixes)
 
     @pytest.mark.unit

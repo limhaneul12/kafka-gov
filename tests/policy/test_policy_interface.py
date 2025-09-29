@@ -5,7 +5,7 @@ from __future__ import annotations
 from unittest.mock import AsyncMock, patch
 
 import pytest
-from fastapi import status
+from fastapi import FastAPI, status
 from fastapi.testclient import TestClient
 
 from app.policy.domain.models import (
@@ -19,6 +19,8 @@ from app.policy.interface.dto import (
     PolicyViolationResponse,
     ValidationSummaryResponse,
 )
+from app.policy.interface.router import router
+from app.shared.auth import get_current_user
 
 
 class TestPolicyEvaluationRequest:
@@ -287,115 +289,134 @@ class TestPolicyRouter:
         return {"sub": "test-user", "name": "Test User"}
 
     @pytest.fixture
-    def client(self) -> TestClient:
-        """테스트 클라이언트 픽스처"""
+    def app(self, mock_current_user: dict[str, str]) -> FastAPI:
+        """테스트용 FastAPI 앱 픽스처"""
         from fastapi import FastAPI
 
         from app.policy.interface.router import router
+        from app.shared.auth import get_current_user
 
         app = FastAPI()
         app.include_router(router)
+
+        # 의존성 오버라이드
+        def mock_get_current_user_dep():
+            return mock_current_user
+
+        app.dependency_overrides[get_current_user] = mock_get_current_user_dep
+
+        return app
+
+    @pytest.fixture
+    def client(self, app: FastAPI) -> TestClient:
+        """테스트 클라이언트 픽스처"""
         return TestClient(app)
 
     @pytest.mark.unit
-    @patch("app.policy.interface.router.policy_use_case_factory")
-    @patch("app.policy.interface.router.get_current_user")
     def test_should_evaluate_policies_successfully(
         self,
-        mock_get_current_user,
-        mock_factory,
         client: TestClient,
-        mock_evaluation_service: AsyncMock,
         mock_current_user: dict[str, str],
     ) -> None:
         """정책을 성공적으로 평가해야 한다."""
-        # Arrange
-        mock_get_current_user.return_value = mock_current_user
-        mock_factory.get_policy_evaluation_service.return_value = mock_evaluation_service
+        # Arrange - 완전히 모킹된 서비스 사용
+        with (
+            patch("app.policy.interface.router.policy_use_case_factory") as mock_factory,
+            patch("app.policy.interface.router.optimize_violation_memory_usage") as mock_optimize,
+        ):
+            # Mock 서비스 설정 - 동기/비동기 메서드 구분
+            from unittest.mock import Mock
 
-        # 위반 없는 성공 케이스
-        mock_evaluation_service.evaluate_batch.return_value = []
-        mock_evaluation_service.has_blocking_violations.return_value = False
-        mock_evaluation_service.group_violations_by_severity.return_value = {}
+            mock_service = Mock()
+            mock_factory.get_policy_evaluation_service.return_value = mock_service
+            mock_optimize.return_value = []
 
-        request_data = {
-            "environment": "prod",
-            "resource_type": "topic",
-            "targets": [{"name": "user-events", "config": {"partitions": 3}}],
-            "actor": "test-user",
-        }
+            # 비동기 메서드는 AsyncMock 사용
+            mock_service.evaluate_batch = AsyncMock(return_value=[])
+            # 동기 메서드는 일반 Mock 사용
+            mock_service.has_blocking_violations.return_value = False
+            mock_service.group_violations_by_severity.return_value = {}
 
-        # Act
-        response = client.post("/v1/policies/evaluate", json=request_data)
+            request_data = {
+                "environment": "prod",
+                "resource_type": "topic",
+                "targets": [{"name": "user-events", "config": {"partitions": 3}}],
+                "actor": "test-user",
+            }
 
-        # Assert
-        assert response.status_code == status.HTTP_200_OK
-        data = response.json()
-        assert data["environment"] == "prod"
-        assert data["resource_type"] == "topic"
-        assert data["total_targets"] == 1
-        assert data["violations"] == []
-        assert data["has_blocking_violations"] is False
-        assert data["summary"] == {}
+            # Act
+            response = client.post("/v1/policies/evaluate", json=request_data)
+
+            # Assert
+            if response.status_code != status.HTTP_200_OK:
+                print(f"Error response: {response.json()}")
+            assert response.status_code == status.HTTP_200_OK
+            data = response.json()
+            assert data["environment"] == "prod"
+            assert data["resource_type"] == "topic"
+            assert data["total_targets"] == 1
+            assert data["violations"] == []
+            assert data["has_blocking_violations"] is False
+            assert data["summary"] == {}
 
     @pytest.mark.unit
-    @patch("app.policy.interface.router.policy_use_case_factory")
-    @patch("app.policy.interface.router.get_current_user")
     def test_should_evaluate_policies_with_violations(
         self,
-        mock_get_current_user,
-        mock_factory,
         client: TestClient,
-        mock_evaluation_service: AsyncMock,
         mock_current_user: dict[str, str],
     ) -> None:
         """위반이 있는 정책 평가를 처리해야 한다."""
         # Arrange
-        mock_get_current_user.return_value = mock_current_user
-        mock_factory.get_policy_evaluation_service.return_value = mock_evaluation_service
+        with (
+            patch("app.policy.interface.router.policy_use_case_factory") as mock_factory,
+            patch("app.policy.interface.router.optimize_violation_memory_usage") as mock_optimize,
+        ):
+            # Mock 서비스 설정
+            from unittest.mock import Mock
 
-        # 위반이 있는 케이스
-        violations = [
-            PolicyViolationResponse(
-                resource_type=DomainResourceType.TOPIC,
-                resource_name="test-topic",
-                rule_id="naming.pattern",
-                message="Name does not match pattern",
-                severity=DomainPolicySeverity.ERROR,
-            )
-        ]
+            mock_service = Mock()
+            mock_factory.get_policy_evaluation_service.return_value = mock_service
 
-        mock_evaluation_service.evaluate_batch.return_value = violations
-        mock_evaluation_service.has_blocking_violations.return_value = True
-        mock_evaluation_service.group_violations_by_severity.return_value = {"error": 1}
+            # 위반이 있는 케이스 - 도메인 모델 사용
+            from app.policy.domain.models import DomainPolicyViolation
 
-        request_data = {
-            "environment": "prod",
-            "resource_type": "topic",
-            "targets": [{"name": "InvalidName"}],
-            "actor": "test-user",
-        }
+            violations = [
+                DomainPolicyViolation(
+                    resource_type=DomainResourceType.TOPIC,
+                    resource_name="test-topic",
+                    rule_id="naming.pattern",
+                    message="Name does not match pattern",
+                    severity=DomainPolicySeverity.ERROR,
+                )
+            ]
 
-        # Act
-        response = client.post("/v1/policies/evaluate", json=request_data)
+            mock_service.evaluate_batch = AsyncMock(return_value=violations)
+            mock_service.has_blocking_violations.return_value = True
+            mock_service.group_violations_by_severity.return_value = {"error": violations}
+            mock_optimize.return_value = violations
 
-        # Assert
-        assert response.status_code == status.HTTP_200_OK
-        data = response.json()
-        assert data["has_blocking_violations"] is True
-        assert len(data["violations"]) == 1
-        assert data["violations"][0]["rule_id"] == "naming.pattern"
-        assert data["summary"] == {"error": 1}
+            request_data = {
+                "environment": "prod",
+                "resource_type": "topic",
+                "targets": [{"name": "InvalidName"}],
+                "actor": "test-user",
+            }
+
+            # Act
+            response = client.post("/v1/policies/evaluate", json=request_data)
+
+            # Assert
+            assert response.status_code == status.HTTP_200_OK
+            data = response.json()
+            assert data["has_blocking_violations"] is True
+            assert len(data["violations"]) == 1
+            assert data["violations"][0]["rule_id"] == "naming.pattern"
+            assert data["summary"] == {"error": 1}
 
     @pytest.mark.unit
-    @patch("app.policy.interface.router.get_current_user")
-    def test_should_return_400_for_invalid_request(
-        self, mock_get_current_user, client: TestClient, mock_current_user: dict[str, str]
-    ) -> None:
+    def test_should_return_400_for_invalid_request(self, client: TestClient) -> None:
         """잘못된 요청에 대해 400을 반환해야 한다."""
         # Arrange
-        mock_get_current_user.return_value = mock_current_user
-
         invalid_request_data = {
             "environment": "invalid_env",  # 잘못된 환경
             "resource_type": "topic",
@@ -411,10 +432,10 @@ class TestPolicyRouter:
 
     @pytest.mark.unit
     @patch("app.policy.interface.router.policy_use_case_factory")
-    @patch("app.policy.interface.router.get_current_user")
+    @patch("app.policy.interface.router.optimize_violation_memory_usage")
     def test_should_return_500_for_internal_error(
         self,
-        mock_get_current_user,
+        mock_optimize,
         mock_factory,
         client: TestClient,
         mock_evaluation_service: AsyncMock,
@@ -422,8 +443,8 @@ class TestPolicyRouter:
     ) -> None:
         """내부 에러에 대해 500을 반환해야 한다."""
         # Arrange
-        mock_get_current_user.return_value = mock_current_user
         mock_factory.get_policy_evaluation_service.return_value = mock_evaluation_service
+        mock_optimize.return_value = []
 
         # 서비스에서 예외 발생
         mock_evaluation_service.evaluate_batch.side_effect = Exception("Internal error")
@@ -442,9 +463,19 @@ class TestPolicyRouter:
         assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
 
     @pytest.mark.unit
-    def test_should_require_authentication(self, client: TestClient) -> None:
+    def test_should_require_authentication(self) -> None:
         """인증이 필요해야 한다."""
-        # Arrange
+        # Arrange - 인증 없는 클라이언트 사용
+        from fastapi import FastAPI
+
+        from app.policy.interface.router import router
+
+        app = FastAPI()
+        app.include_router(router)
+        # 의존성 오버라이드 없이 사용 (인증 실패 유도)
+
+        client_no_auth = TestClient(app)
+
         request_data = {
             "environment": "prod",
             "resource_type": "topic",
@@ -453,30 +484,27 @@ class TestPolicyRouter:
         }
 
         # Act
-        response = client.post("/v1/policies/evaluate", json=request_data)
+        response = client_no_auth.post("/v1/policies/evaluate", json=request_data)
 
         # Assert
-        # get_current_user 의존성이 실패하면 401 또는 403 반환
+        # get_current_user 의존성이 실패하면 401 또는 500 반환
         assert response.status_code in [
             status.HTTP_401_UNAUTHORIZED,
-            status.HTTP_403_FORBIDDEN,
-            status.HTTP_500_INTERNAL_SERVER_ERROR,  # Mock되지 않은 경우
+            status.HTTP_500_INTERNAL_SERVER_ERROR,
         ]
 
     @pytest.mark.unit
     @patch("app.policy.interface.router.policy_use_case_factory")
-    @patch("app.policy.interface.router.get_current_user")
+    @patch("app.policy.interface.router.optimize_violation_memory_usage")
     def test_should_handle_empty_targets_list(
         self,
-        mock_get_current_user,
+        mock_optimize,
         mock_factory,
         client: TestClient,
         mock_current_user: dict[str, str],
     ) -> None:
         """빈 대상 목록을 처리해야 한다."""
         # Arrange
-        mock_get_current_user.return_value = mock_current_user
-
         request_data = {
             "environment": "prod",
             "resource_type": "topic",
@@ -493,39 +521,49 @@ class TestPolicyRouter:
         assert "targets" in str(data["detail"])
 
     @pytest.mark.unit
-    @patch("app.policy.interface.router.policy_use_case_factory")
-    @patch("app.policy.interface.router.get_current_user")
-    def test_should_extract_actor_from_current_user(
-        self,
-        mock_get_current_user,
-        mock_factory,
-        client: TestClient,
-        mock_evaluation_service: AsyncMock,
-    ) -> None:
+    def test_should_extract_actor_from_current_user(self) -> None:
         """현재 사용자에서 액터를 추출해야 한다."""
-        # Arrange
-        mock_current_user = {"sub": "extracted-user", "name": "Extracted User"}
-        mock_get_current_user.return_value = mock_current_user
-        mock_factory.get_policy_evaluation_service.return_value = mock_evaluation_service
+        # Arrange - 다른 사용자로 설정된 클라이언트
 
-        mock_evaluation_service.evaluate_batch.return_value = []
-        mock_evaluation_service.has_blocking_violations.return_value = False
-        mock_evaluation_service.group_violations_by_severity.return_value = {}
+        app = FastAPI()
+        app.include_router(router)
 
-        request_data = {
-            "environment": "prod",
-            "resource_type": "topic",
-            "targets": [{"name": "test"}],
-            "actor": "request-user",  # 요청의 액터는 무시되고 토큰에서 추출
-        }
+        # 다른 사용자로 오버라이드
+        def mock_extracted_user():
+            return {"sub": "extracted-user", "name": "Extracted User"}
 
-        # Act
-        response = client.post("/v1/policies/evaluate", json=request_data)
+        app.dependency_overrides[get_current_user] = mock_extracted_user
+        client = TestClient(app)
 
-        # Assert
-        assert response.status_code == status.HTTP_200_OK
+        with (
+            patch("app.policy.interface.router.policy_use_case_factory") as mock_factory,
+            patch("app.policy.interface.router.optimize_violation_memory_usage") as mock_optimize,
+        ):
+            # Mock 서비스 설정
+            from unittest.mock import Mock
 
-        # 서비스 호출 시 토큰에서 추출한 사용자 ID 사용 확인
-        mock_evaluation_service.evaluate_batch.assert_called_once()
-        call_args = mock_evaluation_service.evaluate_batch.call_args
-        assert call_args.kwargs["actor"] == "extracted-user"
+            mock_service = Mock()
+            mock_factory.get_policy_evaluation_service.return_value = mock_service
+
+            mock_service.evaluate_batch = AsyncMock(return_value=[])
+            mock_service.has_blocking_violations.return_value = False
+            mock_service.group_violations_by_severity.return_value = {}
+            mock_optimize.return_value = []
+
+            request_data = {
+                "environment": "prod",
+                "resource_type": "topic",
+                "targets": [{"name": "test"}],
+                "actor": "request-user",  # 요청의 액터는 무시되고 토큰에서 추출
+            }
+
+            # Act
+            response = client.post("/v1/policies/evaluate", json=request_data)
+
+            # Assert
+            assert response.status_code == status.HTTP_200_OK
+
+            # 실제로 extracted-user가 사용되었는지 확인
+            mock_service.evaluate_batch.assert_called_once()
+            call_args = mock_service.evaluate_batch.call_args
+            assert call_args.kwargs["actor"] == "extracted-user"
