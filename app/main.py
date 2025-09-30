@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
@@ -16,6 +17,8 @@ from .schema.interface.router import router as schema_router
 from .shared.database import get_db_session
 from .topic.interface.router import router as topic_router
 
+logger = logging.getLogger(__name__)
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
@@ -24,18 +27,18 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     try:
         # Policy 기본 정책 초기화
         await policy_use_case_factory.initialize_default_policies()
-        print("✅ Policy 기본 정책이 초기화되었습니다.")
+        logger.info("Policy 기본 정책이 초기화되었습니다.")
 
         # Analysis 이벤트 핸들러 등록
         from .analysis.container import register_event_handlers
 
         async for session in get_db_session():
             register_event_handlers(session)
-            print("✅ Analysis 이벤트 핸들러가 등록되었습니다.")
+            logger.info("Analysis 이벤트 핸들러가 등록되었습니다.")
             break
 
     except Exception as e:
-        print(f"⚠️ 초기화 중 오류 발생: {e}")
+        logger.error(f"초기화 중 오류 발생: {e}", exc_info=True)
 
     yield
 

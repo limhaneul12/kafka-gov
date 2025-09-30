@@ -4,7 +4,9 @@
   **🛡️ Kafka Topic & Schema Registry Governance Platform**
   
   [![Python](https://img.shields.io/badge/Python-3.12+-blue.svg)](https://python.org)
-  [![FastAPI](https://img.shields.io/badge/FastAPI-0.104+-green.svg)](https://fastapi.tiangolo.com)
+  [![FastAPI](https://img.shields.io/badge/FastAPI-0.117+-green.svg)](https://fastapi.tiangolo.com)
+  [![Confluent Kafka](https://img.shields.io/badge/Confluent_Kafka-2.6.1+-red.svg)](https://docs.confluent.io/platform/current/clients/confluent-kafka-python/html/index.html)
+  [![Coverage](https://img.shields.io/badge/Coverage-81%25-green.svg)](https://github.com/limhaneul12/kafka-gov)
   [![License](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
   [![pytest](https://img.shields.io/badge/pytest-8.4.2-blue.svg)](https://github.com/limhaneul12/kafka-gov/actions)
   [![CI](https://github.com/limhaneul12/kafka-gov/workflows/CI/badge.svg)](https://github.com/limhaneul12/kafka-gov/actions)
@@ -24,17 +26,15 @@
 
 ### 📋 **Schema Registry Governance**
 - **Schema Evolution**: Manage schema versions with compatibility validation
-- **Subject Management**: Organize schemas by subject with version control
 - **File Upload**: Bulk schema upload with validation and conflict resolution
 - **Storage Integration**: MinIO-backed schema artifact storage
+- **Schema Management**: Delete analysis and safe schema deletion
 
-### 🔒 **Security & Compliance**
-- **JWT Authentication**: Secure API access with role-based permissions
+### 🔒 **Security & Policy Management**
 - **Policy Engine**: Configurable rules for naming, configuration, and resource limits
 - **Violation Detection**: Real-time policy violation detection with severity levels
-- **Compliance Reporting**: Generate compliance reports for audit purposes
 
-### 🏗️ **Enterprise Architecture**
+### 🏗️ **Architecture**
 - **Clean Architecture**: Domain-driven design with clear layer separation
 - **High Performance**: Async/await throughout with connection pooling
 - **Observability**: Structured logging, metrics, and health checks
@@ -49,27 +49,34 @@ app/
 ├── shared/                    # Common infrastructure
 │   ├── database.py           # SQLAlchemy async engine
 │   ├── container.py          # Dependency injection
-│   └── auth.py              # JWT authentication
+│   └── settings.py           # Application configuration
+├── analysis/                  # Analysis and monitoring domain
+│   ├── domain/              # Analysis models & business logic
+│   ├── application/         # Analysis services
+│   ├── infrastructure/      # Analysis repositories
+│   └── interface/           # Analysis REST API endpoints
 ├── policy/                   # Policy engine domain
 │   ├── domain/              # Policy rules & evaluation
 │   ├── application/         # Policy services
-│   └── infrastructure/      # Rule repositories
+│   ├── infrastructure/      # Rule repositories
+│   └── interface/           # Policy REST API endpoints
 ├── topic/                    # Topic management domain
 │   ├── domain/              # Topic models & business logic
-│   ├── application/         # Use cases & orchestration
+│   ├── application/         # Topic use cases & orchestration
 │   ├── infrastructure/      # Kafka & database adapters
-│   └── interface/           # REST API endpoints
+│   └── interface/           # Topic REST API endpoints
 ├── schema/                   # Schema registry domain
-│   └── (similar structure)
+│   ├── domain/              # Schema models & business logic
+│   ├── application/         # Schema use cases & orchestration
+│   ├── infrastructure/      # Schema registry & storage adapters
+│   └── interface/           # Schema REST API endpoints
 └── main.py                   # Application entry point
 ```
-
-## 🚀 Quick Start
 
 ### Prerequisites
 - Python 3.12+
 - Docker & Docker Compose
-- Kafka cluster
+- Kafka cluster with Schema Registry
 - MySQL/PostgreSQL database
 
 ### Installation
@@ -136,13 +143,15 @@ curl -X POST "http://localhost:8000/api/v1/topics/dev/batch/dry-run" \
 | Category | Technology |
 |----------|------------|
 | **Framework** | FastAPI, Pydantic |
-| **Database** | SQLAlchemy (Async), MySQL |
+| **Database** | SQLAlchemy (Async), MySQL/PostgreSQL |
 | **Message Broker** | Apache Kafka, Confluent Platform |
+| **Schema Registry** | Confluent Schema Registry |
 | **Storage** | MinIO (S3-compatible) |
 | **Authentication** | JWT, Argon2 |
 | **Architecture** | Clean Architecture, DDD |
-| **Testing** | pytest, pytest-asyncio |
+| **Testing** | pytest, pytest-asyncio, pytest-cov |
 | **Type Safety** | Python 3.12+ strict typing |
+| **Main Libraries** | confluent-kafka, aiokafka |
 
 ## 📖 Documentation
 
@@ -173,26 +182,26 @@ JWT_EXPIRE_MINUTES=1800
 
 #### Topic Management
 ```
-GET    /api/v1/topics/{env}                    # List topics
-GET    /api/v1/topics/{env}/{topic}            # Get topic details
 POST   /api/v1/topics/{env}/batch/dry-run      # Plan topic changes
 POST   /api/v1/topics/{env}/batch/apply        # Apply topic changes
-GET    /api/v1/topics/{env}/plan/{change_id}   # Get execution plan
+GET    /api/v1/topics/{env}/{name}             # Get topic details
+GET    /api/v1/topics/{env}/plans/{change_id}  # Get execution plan
 ```
 
 #### Schema Registry
 ```
-GET    /api/v1/schemas/subjects                # List subjects
 POST   /api/v1/schemas/{env}/batch/dry-run     # Plan schema changes
 POST   /api/v1/schemas/{env}/batch/apply       # Apply schema changes
 POST   /api/v1/schemas/{env}/upload            # Upload schema files
 GET    /api/v1/schemas/{env}/plan/{change_id}  # Get schema plan
+POST   /api/v1/schemas/delete/analyze          # Analyze schema deletion impact
+DELETE /api/v1/schemas/delete/{subject}        # Delete schema safely
 ```
 
-#### Authentication
+#### Policy Management
 ```
-POST   /api/v1/auth/register                   # Register user
-POST   /api/v1/auth/login                      # Login user
+GET    /api/v1/policies                        # List policies
+POST   /api/v1/policies/validate              # Validate against policies
 ```
 
 #### System
@@ -233,35 +242,7 @@ docker run -d \
   kafka-gov:latest
 ```
 
-### Kubernetes
 
-```yaml
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: kafka-gov
-spec:
-  replicas: 3
-  selector:
-    matchLabels:
-      app: kafka-gov
-  template:
-    metadata:
-      labels:
-        app: kafka-gov
-    spec:
-      containers:
-      - name: kafka-gov
-        image: kafka-gov:latest
-        ports:
-        - containerPort: 8000
-        env:
-        - name: DATABASE_URL
-          valueFrom:
-            secretKeyRef:
-              name: kafka-gov-secrets
-              key: database-url
-```
 
 ## 🤝 Contributing
 

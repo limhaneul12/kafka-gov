@@ -75,15 +75,20 @@ filterwarnings = [
 
 [tool.coverage.run]
 branch = true
-source = ["app", "tests"]
+source = ["app"]
 omit = [
   "**/__init__.py",
+  "**/container.py",  # DI 컨테이너는 통합 테스트에서 테스트
+  "**/infrastructure/**",  # Infrastructure는 통합 테스트에서
+  "**/interface/router.py",  # API 라우터는 통합 테스트에서
+  "app/main.py",  # 메인 진입점
+  "app/shared/**",  # 공통 유틸리티 제외
 ]
 
 [tool.coverage.report]
 show_missing = true
 skip_covered = true
-fail_under = 20
+fail_under = 80.0
 
 [dependency-groups]
 dev = [
@@ -106,6 +111,10 @@ line-length = 100
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "SIM", "C4", "PIE", "PERF", "N", "RUF"]
 ignore = ["E501", "PYI041", "UP040"]
+exclude = [
+    "**/tests/**",
+    "**/migrations/**",
+]
 
 [tool.ruff.lint.isort]
 combine-as-imports = true

@@ -36,6 +36,27 @@ class DomainPolicySeverity(Enum):
 PolicyTarget: TypeAlias = dict[str, Any]  # 정책 대상 (Topic/Schema spec)
 
 
+def extract_resource_name(target: PolicyTarget, resource_type: DomainResourceType) -> str:
+    """리소스 타입에 따라 이름 추출
+
+    Args:
+        target: 정책 대상 딕셔너리
+        resource_type: 리소스 타입
+
+    Returns:
+        리소스 이름 (topic name 또는 schema subject)
+
+    Raises:
+        ValueError: 지원하지 않는 리소스 타입
+    """
+    if resource_type == DomainResourceType.TOPIC:
+        return target.get("name", "")
+    elif resource_type == DomainResourceType.SCHEMA:
+        return target.get("subject", "")
+    else:
+        raise ValueError(f"unsupported resource type: {resource_type}")
+
+
 class PolicyRule(Protocol):
     """정책 규칙 프로토콜"""
 
@@ -105,7 +126,7 @@ class DomainNamingRule(msgspec.Struct):
         self, target: PolicyTarget, context: DomainPolicyContext
     ) -> list[DomainPolicyViolation]:
         violations: list[DomainPolicyViolation] = []
-        name = self._extract_name(target, context.resource_type)
+        name = extract_resource_name(target, context.resource_type)
 
         if not re.match(self.pattern, name):
             violations.append(
@@ -139,15 +160,6 @@ class DomainNamingRule(msgspec.Struct):
                 ]
             )
         return violations
-
-    def _extract_name(self, target: PolicyTarget, resource_type: DomainResourceType) -> str:
-        """타겟에서 이름 추출"""
-        if resource_type == DomainResourceType.TOPIC:
-            return target.get("name", "")
-        elif resource_type == DomainResourceType.SCHEMA:
-            return target.get("subject", "")
-        else:
-            raise ValueError(f"unsupported resource type: {resource_type}")
 
 
 class DomainConfigurationRule(msgspec.Struct):
@@ -184,7 +196,7 @@ class DomainConfigurationRule(msgspec.Struct):
         violations: list[DomainPolicyViolation] = []
         config = target.get("config", {})
         value = config.get(self.config_key)
-        name = self._extract_name(target, context.resource_type)
+        name = extract_resource_name(target, context.resource_type)
 
         # 필수값 검사
         if self.required and value is None:
@@ -248,15 +260,6 @@ class DomainConfigurationRule(msgspec.Struct):
             )
 
         return violations
-
-    def _extract_name(self, target: PolicyTarget, resource_type: DomainResourceType) -> str:
-        """타겟에서 이름 추출"""
-        if resource_type == DomainResourceType.TOPIC:
-            return target.get("name", "")
-        elif resource_type == DomainResourceType.SCHEMA:
-            return target.get("subject", "")
-        else:
-            raise ValueError(f"unsupported resource type: {resource_type}")
 
 
 class DomainPolicySet(msgspec.Struct):

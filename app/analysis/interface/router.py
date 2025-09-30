@@ -9,7 +9,7 @@ from fastapi.responses import ORJSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.analysis.container import get_correlation_query_service, get_impact_analysis_service
-from app.analysis.domain.authorization import AnalysisAuthorization
+from app.analysis.domain.authorization import validate_action
 from app.analysis.interface.schema import (
     SchemaImpactAnalysisResponse,
     TopicSchemaCorrelationResponse,
@@ -34,7 +34,7 @@ async def get_all_correlations(
     """모든 토픽-스키마 상관관계 조회"""
     try:
         # 권한 검증
-        AnalysisAuthorization.validate_action(role, "view")
+        validate_action(role, "view")
 
         service = get_correlation_query_service(session)
         correlations = await service.get_all_correlations()
@@ -155,7 +155,7 @@ async def analyze_schema_impact(
     """스키마 변경/삭제 시 영향도 분석"""
     try:
         # 권한 검증
-        AnalysisAuthorization.validate_action(role, "analyze")
+        validate_action(role, "analyze")
 
         service = get_impact_analysis_service(session)
         analysis = await service.analyze_schema_impact(subject, strategy)

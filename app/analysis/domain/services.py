@@ -4,8 +4,13 @@ from __future__ import annotations
 
 import uuid
 
+from app.shared.domain.subject_utils import extract_topics_from_subject
+
 from .models import SchemaImpactAnalysis, SubjectName, TopicName, TopicSchemaCorrelation
 from .repositories import ICorrelationRepository
+
+# 위험도 계산 임계값
+HIGH_RISK_TOPIC_THRESHOLD = 5  # 영향받는 토픽이 이 개수 이상이면 high risk
 
 
 class CorrelationAnalyzer:
@@ -44,23 +49,13 @@ class CorrelationAnalyzer:
 
     def _extract_topics_from_subject(self, subject: SubjectName, strategy: str) -> list[TopicName]:
         """Subject naming에서 토픽 추출"""
-        if strategy == "TopicNameStrategy":
-            if subject.endswith(("-key", "-value")):
-                topic_name = subject.rsplit("-", 1)[0]
-                return [topic_name]
-
-        elif strategy == "TopicRecordNameStrategy":
-            parts = subject.split("-", 1)
-            if len(parts) >= 2:
-                return [parts[0]]
-
-        return []
+        return extract_topics_from_subject(subject, strategy)
 
     def _calculate_risk_level(self, topic_count: int, subject: str) -> str:
         """위험도 계산"""
         if topic_count == 0:
             return "low"
-        if topic_count >= 5 or "prod" in subject.lower():
+        if topic_count >= HIGH_RISK_TOPIC_THRESHOLD or "prod" in subject.lower():
             return "high"
         return "medium"
 

@@ -5,44 +5,29 @@ from __future__ import annotations
 from ...shared.roles import UserRole
 
 
-class AnalysisAuthorization:
-    """Analysis 도메인 권한 검증"""
+def validate_action(role: UserRole, action: str) -> None:
+    """액션 권한 검증
 
-    @staticmethod
-    def can_view_correlation(role: UserRole) -> bool:
-        """상관관계 조회 권한"""
-        return role.can_read
+    Args:
+        role: 사용자 역할
+        action: 액션 타입 ("view", "analyze", "link", "delete")
 
-    @staticmethod
-    def can_analyze_impact(role: UserRole) -> bool:
-        """영향도 분석 권한"""
-        return role.can_read
+    Raises:
+        ValueError: 알 수 없는 액션
+        PermissionError: 권한 없음
 
-    @staticmethod
-    def can_manual_link(role: UserRole) -> bool:
-        """수동 연결 권한 (ADMIN, DEVELOPER만)"""
-        return role.can_create
+    Note:
+        MVP에서는 모든 사용자가 ADMIN이므로 실질적으로 항상 통과
+    """
+    action_permissions = {
+        "view": role.can_read,
+        "analyze": role.can_read,
+        "link": role.can_create,
+        "delete": role.can_delete,
+    }
 
-    @staticmethod
-    def can_delete_correlation(role: UserRole) -> bool:
-        """상관관계 삭제 권한 (ADMIN만)"""
-        return role.can_delete
+    if action not in action_permissions:
+        raise ValueError(f"Unknown action: {action}")
 
-    @staticmethod
-    def validate_action(role: UserRole, action: str) -> None:
-        """액션 권한 검증 (예외 발생)"""
-        permissions = {
-            "view": AnalysisAuthorization.can_view_correlation,
-            "analyze": AnalysisAuthorization.can_analyze_impact,
-            "link": AnalysisAuthorization.can_manual_link,
-            "delete": AnalysisAuthorization.can_delete_correlation,
-        }
-
-        validator = permissions.get(action)
-        if not validator:
-            raise ValueError(f"Unknown action: {action}")
-
-        if not validator(role):
-            raise PermissionError(
-                f"Role '{role.value}' does not have permission for action '{action}'"
-            )
+    if not action_permissions[action]:
+        raise PermissionError(f"Role '{role.value}' does not have permission for action '{action}'")

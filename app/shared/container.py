@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from dependency_injector import containers, providers
 
+from app.schema.infrastructure.storage.minio_adapter import create_minio_client
+
 from .database import DatabaseManager
 from .settings import get_settings
 
@@ -34,13 +36,9 @@ class InfrastructureContainer(containers.DeclarativeContainer):
     # Schema Registry Client (외부에서 주입)
     schema_registry_client = providers.Dependency()
 
-    # MinIO Client - Lazy 초기화
+    # MinIO Client - Factory
     minio_client = providers.Factory(
-        providers.Callable(
-            lambda: __import__(
-                "app.schema.infrastructure.storage.minio_adapter", fromlist=["create_minio_client"]
-            ).create_minio_client
-        ),
+        create_minio_client,
         endpoint=providers.Callable(
             lambda: get_settings()
             .storage.endpoint_url.replace("http://", "")

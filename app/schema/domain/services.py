@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from app.shared.domain.subject_utils import SubjectStrategy, extract_topics_from_subject
+
 from .models import (
     DomainPlanAction,
     DomainSchemaBatch,
@@ -17,6 +19,9 @@ from .models import (
 )
 from .policies import SchemaPolicyEngine
 from .repositories.interfaces import ISchemaRegistryRepository
+
+# 스키마 버전 임계값
+HIGH_VERSION_COUNT_THRESHOLD = 10  # 버전이 이 개수를 초과하면 경고
 
 
 class SchemaImpactAnalyzer:
@@ -45,24 +50,14 @@ class SchemaImpactAnalyzer:
         self, subject: SubjectName, strategy: DomainSubjectStrategy
     ) -> list[str]:
         """Subject naming strategy에 따라 토픽명 추출"""
-        if strategy == DomainSubjectStrategy.TOPIC_NAME:
-            # 예: "orders-value" -> ["orders"]
-            if subject.endswith(("-key", "-value")):
-                topic_name = subject.rsplit("-", 1)[0]
-                return [topic_name]
-
-        elif strategy == DomainSubjectStrategy.TOPIC_RECORD_NAME:
-            # 예: "orders-com.example.Order" -> ["orders"]
-            parts: list[str] = subject.split("-", 1)
-            if len(parts) >= 2:
-                return [parts[0]]
-
-        elif strategy == DomainSubjectStrategy.RECORD_NAME:
-            # 예: "com.example.Order" -> 토픽명 추론 불가
-            # Schema Registry에서 역방향 조회 필요
-            return []
-
-        return []
+        # DomainSubjectStrategy를 SubjectStrategy로 매핑
+        strategy_map = {
+            DomainSubjectStrategy.TOPIC_NAME: SubjectStrategy.TOPIC_NAME,
+            DomainSubjectStrategy.RECORD_NAME: SubjectStrategy.RECORD_NAME,
+            DomainSubjectStrategy.TOPIC_RECORD_NAME: SubjectStrategy.TOPIC_RECORD_NAME,
+        }
+        mapped_strategy = strategy_map.get(strategy, SubjectStrategy.TOPIC_NAME)
+        return extract_topics_from_subject(subject, mapped_strategy)
 
 
 class SchemaDeleteAnalyzer:
@@ -140,7 +135,7 @@ class SchemaDeleteAnalyzer:
             )
 
         # 경고 2: 버전이 많은 경우
-        if current_version and current_version > 10:
+        if current_version and current_version > HIGH_VERSION_COUNT_THRESHOLD:
             warnings.append(
                 f"이 스키마는 {current_version}개의 버전이 있습니다. "
                 f"삭제 시 모든 버전이 제거됩니다."
