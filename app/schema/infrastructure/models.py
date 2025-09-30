@@ -115,6 +115,29 @@ class SchemaArtifactModel(Base):
         return f"<SchemaArtifact(subject={self.subject}, version={self.version})>"
 
 
+class SchemaUploadResultModel(Base):
+    """스키마 업로드 결과 테이블"""
+
+    __tablename__ = "schema_upload_results"
+
+    # 기본 키
+    upload_id: Mapped[str] = mapped_column(String(100), primary_key=True, comment="업로드 ID")
+
+    # 업로드 정보
+    change_id: Mapped[str] = mapped_column(String(36), comment="변경 ID")
+    artifacts: Mapped[dict[str, Any]] = mapped_column(JSON, comment="업로드된 아티팩트 목록 (JSON)")
+    artifact_count: Mapped[int] = mapped_column(default=0, comment="아티팩트 개수")
+
+    # 감사 정보
+    uploaded_by: Mapped[str] = mapped_column(String(100), comment="업로드한 사용자")
+    uploaded_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), comment="업로드 시간"
+    )
+
+    def __repr__(self) -> str:
+        return f"<SchemaUploadResult(upload_id={self.upload_id}, artifacts={self.artifact_count})>"
+
+
 class SchemaAuditLogModel(Base):
     """스키마 감사 로그 테이블"""
 

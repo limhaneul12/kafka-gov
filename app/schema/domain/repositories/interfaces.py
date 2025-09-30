@@ -8,12 +8,14 @@ from typing import Any
 
 from ..models import (
     ChangeId,
+    DescribeResult,
     DomainSchemaApplyResult,
     DomainSchemaArtifact,
     DomainSchemaCompatibilityReport,
     DomainSchemaPlan,
     DomainSchemaSpec,
     DomainSchemaUploadResult,
+    Reference,
     SubjectName,
 )
 
@@ -22,25 +24,17 @@ class ISchemaRegistryRepository(ABC):
     """Schema Registry 어댑터 인터페이스"""
 
     @abstractmethod
-    async def describe_subjects(
-        self, subjects: Iterable[SubjectName]
-    ) -> dict[SubjectName, dict[str, Any]]:
+    async def describe_subjects(self, subjects: Iterable[SubjectName]) -> DescribeResult:
         """Subject들의 최신 버전 및 메타데이터 조회"""
 
     @abstractmethod
     async def check_compatibility(
-        self,
-        spec: DomainSchemaSpec,
-        references: list[dict[str, Any]] | None = None,
+        self, spec: DomainSchemaSpec, references: list[Reference] | None = None
     ) -> DomainSchemaCompatibilityReport:
         """호환성 검증"""
 
     @abstractmethod
-    async def register_schema(
-        self,
-        spec: DomainSchemaSpec,
-        compatibility: bool = True,
-    ) -> int:
+    async def register_schema(self, spec: DomainSchemaSpec, compatibility: bool = True) -> int:
         """스키마 등록 후 버전 반환"""
 
     @abstractmethod
@@ -53,23 +47,23 @@ class ISchemaMetadataRepository(ABC):
 
     @abstractmethod
     async def save_plan(self, plan: DomainSchemaPlan, created_by: str) -> None:
-        pass
+        """계획 저장"""
 
     @abstractmethod
     async def get_plan(self, change_id: ChangeId) -> DomainSchemaPlan | None:
-        pass
+        """계획 조회"""
 
     @abstractmethod
     async def save_apply_result(self, result: DomainSchemaApplyResult, applied_by: str) -> None:
-        pass
+        """적용 결과 저장"""
 
     @abstractmethod
     async def record_artifact(self, artifact: DomainSchemaArtifact, change_id: ChangeId) -> None:
-        pass
+        """아티팩트 기록"""
 
     @abstractmethod
     async def save_upload_result(self, upload: DomainSchemaUploadResult, uploaded_by: str) -> None:
-        pass
+        """업로드 결과 저장"""
 
 
 class ISchemaAuditRepository(ABC):
@@ -86,7 +80,7 @@ class ISchemaAuditRepository(ABC):
         message: str | None = None,
         snapshot: dict[str, Any] | None = None,
     ) -> str:
-        pass
+        """감사 로그 기록"""
 
 
 class IObjectStorageRepository(ABC):
@@ -103,4 +97,4 @@ class IObjectStorageRepository(ABC):
 
     @abstractmethod
     async def delete_prefix(self, prefix: str) -> None:
-        pass
+        """prefix로 객체 삭제"""

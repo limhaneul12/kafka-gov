@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from typing import Any
 
+from app.policy.domain.models import DomainEnvironment as PolicyEnvironment
+
 from ..application.policy_integration import TopicPolicyAdapter
 from .models import (
     DomainPlanAction,
@@ -29,8 +31,6 @@ class TopicPlannerService:
 
     async def create_plan(self, batch: DomainTopicBatch, actor: str = "system") -> DomainTopicPlan:
         """배치에 대한 실행 계획 생성"""
-        # 정책 위반 검증 - Environment 타입 변환
-        from app.policy.domain.models import DomainEnvironment as PolicyEnvironment
 
         policy_env = PolicyEnvironment(batch.env.value)
         violations = await self.policy_adapter.validate_topic_specs(
@@ -40,17 +40,15 @@ class TopicPlannerService:
         )
 
         # 현재 토픽 상태 조회
-        topic_names = [spec.name for spec in batch.specs]
+        topic_names: list[str] = [spec.name for spec in batch.specs]
         current_topics = await self.topic_repository.describe_topics(topic_names)
 
         # 계획 아이템 생성
-        # 가독성 우선
-        plan_items = []
-        for spec in batch.specs:
-            current_topic = current_topics.get(spec.name)
-            plan_item = self._create_plan_item(spec, current_topic)
-            if plan_item:
-                plan_items.append(plan_item)
+        plan_items: list[DomainTopicPlanItem] = [
+            item
+            for spec in batch.specs
+            if (item := self._create_plan_item(spec, current_topics.get(spec.name))) is not None
+        ]
 
         return DomainTopicPlan(
             change_id=batch.change_id,
@@ -88,8 +86,8 @@ class TopicPlannerService:
 
         # 기존 토픽 수정
         current_config = current_topic.get("config", {})
-        target_config = self._spec_to_config_dict(spec)
-        diff = self._calculate_config_diff(current_config, target_config)
+        target_config: dict[str, str] = self._spec_to_config_dict(spec)
+        diff: dict = self._calculate_config_diff(current_config, target_config)
 
         if not diff:
             # 변경 사항 없음 - 스킵

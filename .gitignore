@@ -209,3 +209,5 @@ __marimo__/
 # VSCode
 .vscode/
 .windsurfrules
+alembic
+alembic.ini

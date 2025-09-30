@@ -1,34 +1,32 @@
-# type: ignore
-
 from __future__ import annotations
 
 from datetime import UTC, datetime
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import JSONResponse
 
-from ...shared import auth as shared_auth
-from ..application.use_cases import (
+from app.shared.roles import DEFAULT_USER
+from app.topic.application.use_cases import (
     TopicBatchApplyUseCase,
     TopicBatchDryRunUseCase,
     TopicDetailUseCase,
     TopicPlanUseCase,
 )
-from ..container import (
+from app.topic.container import (
     DbSession,
     get_apply_use_case,
     get_detail_use_case,
     get_dry_run_use_case,
     get_plan_use_case,
 )
-from .adapters import (
+from app.topic.interface.adapters import (
     kafka_metadata_to_core_metadata,
     kafka_metadata_to_interface_config,
     safe_convert_plan_to_response,
     safe_convert_request_to_batch,
 )
-from .schema import (
+from app.topic.interface.schema import (
     ChangeId,
     TopicBatchApplyResponse,
     TopicBatchDryRunResponse,
@@ -41,19 +39,16 @@ from .schema import (
 router = APIRouter(prefix="/v1/topics", tags=["topics"])
 
 
-def _get_current_user_dep(request: Request) -> str:
-    """런타임에 shared_auth.get_current_user를 호출하는 얇은 래퍼.
-    테스트에서 patch("app.shared.auth.get_current_user")가 효과를 발휘하도록 보장한다.
-    """
-    return shared_auth.get_current_user(request)
-
-
-async def _get_dry_run_use_case_dep(session: DbSession) -> TopicBatchDryRunUseCase:
+async def _get_dry_run_use_case_dep(
+    session: DbSession,
+) -> TopicBatchDryRunUseCase:
     """DI 경계의 레이트 바인딩을 보장해 테스트·운영 모두에서 교체 용이성 확보"""
     return await get_dry_run_use_case(session)
 
 
-async def _get_apply_use_case_dep(session: DbSession) -> TopicBatchApplyUseCase:
+async def _get_apply_use_case_dep(
+    session: DbSession,
+) -> TopicBatchApplyUseCase:
     """DI 경계의 레이트 바인딩을 보장해 테스트·운영 모두에서 교체 용이성 확보"""
     return await get_apply_use_case(session)
 
@@ -78,12 +73,11 @@ def _get_plan_use_case_dep(session: DbSession) -> TopicPlanUseCase:
 async def topic_batch_dry_run(
     request: TopicBatchRequest,
     dry_run_use_case: Annotated[TopicBatchDryRunUseCase, Depends(_get_dry_run_use_case_dep)],
-    current_user: Annotated[str, Depends(_get_current_user_dep)],
 ) -> TopicBatchDryRunResponse:
     """토픽 배치 Dry-Run"""
     try:
         batch = safe_convert_request_to_batch(request)
-        plan = await dry_run_use_case.execute(batch, current_user)
+        plan = await dry_run_use_case.execute(batch, DEFAULT_USER)
         return safe_convert_plan_to_response(plan, request)
     except ValueError as e:
         raise HTTPException(
@@ -107,12 +101,11 @@ async def topic_batch_dry_run(
 async def topic_batch_apply(
     request: TopicBatchRequest,
     apply_use_case: Annotated[TopicBatchApplyUseCase, Depends(_get_apply_use_case_dep)],
-    current_user: Annotated[str, Depends(_get_current_user_dep)],
 ) -> TopicBatchApplyResponse:
     """토픽 배치 Apply"""
     try:
         batch = safe_convert_request_to_batch(request)
-        result = await apply_use_case.execute(batch, current_user)
+        result = await apply_use_case.execute(batch, DEFAULT_USER)
         return TopicBatchApplyResponse(
             env=request.env,
             change_id=request.change_id,

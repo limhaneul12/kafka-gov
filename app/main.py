@@ -7,10 +7,13 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import ORJSONResponse
+from fastapi.responses import ORJSONResponse, RedirectResponse
+from fastapi.staticfiles import StaticFiles
 
+from .analysis.interface.router import router as analysis_router
 from .policy import policy_router, policy_use_case_factory
 from .schema.interface.router import router as schema_router
+from .shared.database import get_db_session
 from .topic.interface.router import router as topic_router
 
 
@@ -22,8 +25,17 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         # Policy 기본 정책 초기화
         await policy_use_case_factory.initialize_default_policies()
         print("✅ Policy 기본 정책이 초기화되었습니다.")
+
+        # Analysis 이벤트 핸들러 등록
+        from .analysis.container import register_event_handlers
+
+        async for session in get_db_session():
+            register_event_handlers(session)
+            print("✅ Analysis 이벤트 핸들러가 등록되었습니다.")
+            break
+
     except Exception as e:
-        print(f"⚠️ Policy 초기화 중 오류 발생: {e}")
+        print(f"⚠️ 초기화 중 오류 발생: {e}")
 
     yield
 
@@ -58,14 +70,23 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
 
+    # 정적 파일 서빙
+    app.mount("/static", StaticFiles(directory="static"), name="static")
+
     # 라우터 등록
     app.include_router(topic_router, prefix="/api")
     app.include_router(schema_router, prefix="/api")
     app.include_router(policy_router, prefix="/api")
+    app.include_router(analysis_router, prefix="/api")  # 🆕 Analysis 라우터
 
     @app.get("/")
-    async def root() -> dict[str, str]:
-        """루트 엔드포인트"""
+    async def root() -> RedirectResponse:
+        """루트 엔드포인트 - 프론트엔드로 리다이렉트"""
+        return RedirectResponse(url="/static/index.html")
+
+    @app.get("/api")
+    async def api_info() -> dict[str, str]:
+        """API 정보 엔드포인트"""
         return {"message": "Kafka Governance API", "version": "1.0.0"}
 
     @app.get("/health")

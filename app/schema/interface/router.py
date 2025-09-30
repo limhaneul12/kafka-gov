@@ -2,47 +2,48 @@
 
 from __future__ import annotations
 
-from typing import Annotated
+from typing import Annotated, cast
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile, status
-from fastapi.responses import JSONResponse
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
+from fastapi.responses import ORJSONResponse
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from ...shared import auth as shared_auth
-from ..application.use_cases import (
+from app.schema.application.use_cases import (
     SchemaBatchApplyUseCase,
     SchemaBatchDryRunUseCase,
+    SchemaDeleteAnalysisUseCase,
     SchemaPlanUseCase,
     SchemaUploadUseCase,
 )
-from ..container import (
+from app.schema.container import (
     DbSession,
+    container,
     get_schema_apply_use_case,
     get_schema_dry_run_use_case,
     get_schema_plan_use_case,
     get_schema_upload_use_case,
 )
-from .adapters import (
+from app.schema.domain.models import DomainEnvironment, DomainSubjectStrategy
+from app.schema.domain.repositories.interfaces import ISchemaAuditRepository
+from app.schema.infrastructure.repository.audit_repository import MySQLSchemaAuditRepository
+from app.schema.interface.adapters import (
     safe_convert_apply_result_to_response,
     safe_convert_plan_to_response,
     safe_convert_request_to_batch,
 )
-from .schema import (
+from app.schema.interface.schema import (
     SchemaBatchApplyResponse,
     SchemaBatchDryRunResponse,
     SchemaBatchRequest,
+    SchemaDeleteImpactResponse,
     SchemaUploadResponse,
 )
-from .types.enums import Environment
-from .types.type_hints import ChangeId
+from app.schema.interface.types.enums import Environment
+from app.schema.interface.types.type_hints import ChangeId
+from app.shared.database import get_db_session
+from app.shared.roles import DEFAULT_USER
 
 router = APIRouter(prefix="/v1/schemas", tags=["schemas"])
-
-
-def _get_current_user_dep(request: Request) -> str:
-    """런타임에 shared_auth.get_current_user를 호출하는 얇은 래퍼.
-    테스트에서 patch("app.shared.auth.get_current_user")가 효과를 발휘하도록 보장한다.
-    """
-    return shared_auth.get_current_user(request)
 
 
 async def _get_dry_run_use_case_dep(session: DbSession) -> SchemaBatchDryRunUseCase:
@@ -75,12 +76,11 @@ def _get_plan_use_case_dep(session: DbSession) -> SchemaPlanUseCase:
 async def schema_batch_dry_run(
     request: SchemaBatchRequest,
     dry_run_use_case: Annotated[SchemaBatchDryRunUseCase, Depends(_get_dry_run_use_case_dep)],
-    current_user: Annotated[str, Depends(_get_current_user_dep)],
 ) -> SchemaBatchDryRunResponse:
     """스키마 배치 Dry-Run 실행"""
     try:
         batch = safe_convert_request_to_batch(request)
-        plan = await dry_run_use_case.execute(batch, current_user)
+        plan = await dry_run_use_case.execute(batch, DEFAULT_USER)
         return safe_convert_plan_to_response(plan)
     except ValueError as exc:
         raise HTTPException(
@@ -104,12 +104,11 @@ async def schema_batch_dry_run(
 async def schema_batch_apply(
     request: SchemaBatchRequest,
     apply_use_case: Annotated[SchemaBatchApplyUseCase, Depends(_get_apply_use_case_dep)],
-    current_user: Annotated[str, Depends(_get_current_user_dep)],
 ) -> SchemaBatchApplyResponse:
     """스키마 배치 Apply 실행"""
     try:
         batch = safe_convert_request_to_batch(request)
-        result = await apply_use_case.execute(batch, current_user)
+        result = await apply_use_case.execute(batch, DEFAULT_USER)
         return safe_convert_apply_result_to_response(result)
     except ValueError as exc:
         raise HTTPException(
@@ -135,7 +134,6 @@ async def upload_schemas(
     change_id: Annotated[ChangeId, Form(..., description="변경 ID")],
     files: Annotated[list[UploadFile], File(..., description="업로드할 스키마 파일 목록")],
     upload_use_case: Annotated[SchemaUploadUseCase, Depends(_get_upload_use_case_dep)],
-    current_user: Annotated[str, Depends(_get_current_user_dep)],
 ) -> SchemaUploadResponse:
     """스키마 파일 업로드"""
     if not files:
@@ -145,16 +143,11 @@ async def upload_schemas(
         )
 
     try:
-        # Environment 타입 변환
-        from ..domain.models import DomainEnvironment
-
-        domain_env = DomainEnvironment(env.value)
-
         result = await upload_use_case.execute(
-            env=domain_env,
+            env=DomainEnvironment(env.value),
             change_id=change_id,
             files=files,
-            actor=current_user,
+            actor=DEFAULT_USER,
         )
         return SchemaUploadResponse.model_validate(result)
     except ValueError as exc:
@@ -198,15 +191,119 @@ async def get_schema_plan(
         ) from exc
 
 
+@router.post(
+    "/delete/analyze",
+    response_model=SchemaDeleteImpactResponse,
+    status_code=status.HTTP_200_OK,
+    summary="스키마 삭제 영향도 분석",
+    description="스키마 삭제 전 영향도를 분석합니다. 실제 삭제는 수행하지 않습니다.",
+)
+async def analyze_schema_delete_impact(
+    subject: str,
+    session: Annotated[AsyncSession, Depends(get_db_session)],
+    strategy: str = "TopicNameStrategy",
+) -> SchemaDeleteImpactResponse:
+    """스키마 삭제 영향도 분석"""
+    try:
+        # Use Case 생성
+        audit_repo = cast(ISchemaAuditRepository, MySQLSchemaAuditRepository(session))
+        use_case = SchemaDeleteAnalysisUseCase(
+            registry_repository=container.schema_registry_repository(),
+            audit_repository=audit_repo,
+        )
+
+        # 영향도 분석 수행
+        strategy_enum = DomainSubjectStrategy(strategy)
+        impact = await use_case.analyze(
+            subject=subject,
+            strategy=strategy_enum,
+            actor=DEFAULT_USER,
+        )
+
+        # 응답 변환
+        return SchemaDeleteImpactResponse(
+            subject=impact.subject,
+            current_version=impact.current_version,
+            total_versions=impact.total_versions,
+            affected_topics=list(impact.affected_topics),
+            warnings=list(impact.warnings),
+            safe_to_delete=impact.safe_to_delete,
+        )
+
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"Validation error: {exc!s}",
+        ) from exc
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Internal server error: {exc!s}",
+        ) from exc
+
+
+@router.delete(
+    "/delete/{subject}",
+    response_model=SchemaDeleteImpactResponse,
+    status_code=status.HTTP_200_OK,
+    summary="스키마 삭제",
+    description="스키마를 삭제합니다. 영향도 분석 후 안전하지 않으면 실패합니다.",
+)
+async def delete_schema(
+    subject: str,
+    session: Annotated[AsyncSession, Depends(get_db_session)],
+    strategy: str = "TopicNameStrategy",
+    force: bool = False,
+) -> SchemaDeleteImpactResponse:
+    """스키마 삭제 (영향도 분석 포함)"""
+    try:
+        # Use Case 생성
+        audit_repo = cast(ISchemaAuditRepository, MySQLSchemaAuditRepository(session))
+        use_case = SchemaDeleteAnalysisUseCase(
+            registry_repository=container.schema_registry_repository(),
+            audit_repository=audit_repo,
+        )
+
+        # 삭제 실행
+        strategy_enum = DomainSubjectStrategy(strategy)
+        impact = await use_case.delete(
+            subject=subject,
+            strategy=strategy_enum,
+            actor=DEFAULT_USER,
+            force=force,
+        )
+
+        # 응답 변환
+        return SchemaDeleteImpactResponse(
+            subject=impact.subject,
+            current_version=impact.current_version,
+            total_versions=impact.total_versions,
+            affected_topics=list(impact.affected_topics),
+            warnings=list(impact.warnings),
+            safe_to_delete=impact.safe_to_delete,
+        )
+
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Delete not safe: {exc!s}",
+        ) from exc
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Internal server error: {exc!s}",
+        ) from exc
+
+
 @router.get(
     "/health",
     status_code=status.HTTP_200_OK,
     summary="스키마 모듈 헬스체크",
     description="스키마 모듈의 기본 헬스 상태를 확인합니다.",
 )
-async def health_check() -> JSONResponse:
+async def health_check() -> ORJSONResponse:
     """헬스체크"""
-    return JSONResponse(
+    return ORJSONResponse(
         content={
             "status": "healthy",
             "module": "schema",

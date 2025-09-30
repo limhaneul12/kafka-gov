@@ -2,13 +2,12 @@
 
 from __future__ import annotations
 
-from typing import Annotated, Any
+from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, HTTPException, status
 from fastapi.responses import JSONResponse
 
-from ...shared.auth import get_current_user
-from ..application.performance_utils import optimize_violation_memory_usage
+from ...shared.roles import DEFAULT_USER
 from ..container import policy_use_case_factory
 from ..domain import DomainEnvironment, DomainPolicySeverity, DomainResourceType
 from .dto import (
@@ -32,7 +31,6 @@ router = APIRouter(prefix="/v1/policies", tags=["policies"])
 )
 async def evaluate_policies(
     request: PolicyEvaluationRequest,
-    current_user: Annotated[dict[str, Any], Depends(get_current_user)],
 ) -> PolicyEvaluationResponse:
     """정책 평가 API"""
     try:
@@ -42,12 +40,11 @@ async def evaluate_policies(
             environment=request.environment,
             resource_type=request.resource_type,
             targets=request.targets,
-            actor=current_user.get("sub", "unknown"),
+            actor=DEFAULT_USER,
             metadata=request.metadata,
         )
 
-        # 위반 사항 메모리 최적화 및 DTO로 변환
-        optimized_violations = optimize_violation_memory_usage(violations)
+        # DTO로 변환
         violation_responses = [
             PolicyViolationResponse(
                 resource_type=v.resource_type,
@@ -59,7 +56,7 @@ async def evaluate_policies(
                 current_value=v.current_value,
                 expected_value=v.expected_value,
             )
-            for v in optimized_violations
+            for v in violations
         ]
 
         # 심각도별 요약
@@ -92,7 +89,6 @@ async def get_validation_summary(
     environment: DomainEnvironment,
     resource_type: DomainResourceType,
     targets: list[dict[str, Any]],
-    current_user: Annotated[dict[str, Any], Depends(get_current_user)],
 ) -> ValidationSummaryResponse:
     """검증 요약 API"""
     try:
@@ -102,7 +98,7 @@ async def get_validation_summary(
             environment=environment,
             resource_type=resource_type,
             targets=targets,
-            actor=current_user.get("sub", "unknown"),
+            actor=DEFAULT_USER,
         )
 
         blocking_count = sum(
@@ -142,9 +138,7 @@ async def get_validation_summary(
     summary="정책 목록 조회",
     description="등록된 모든 정책 집합을 조회합니다.",
 )
-async def list_policies(
-    current_user: Annotated[dict[str, Any], Depends(get_current_user)],
-) -> PolicyListResponse:
+async def list_policies() -> PolicyListResponse:
     """정책 목록 조회 API"""
     try:
         engine = policy_use_case_factory.get_policy_engine()
@@ -195,7 +189,6 @@ async def list_policies(
 async def get_policy_set(
     environment: DomainEnvironment,
     resource_type: DomainResourceType,
-    current_user: Annotated[dict[str, Any], Depends(get_current_user)],
 ) -> PolicySetResponse:
     """특정 정책 집합 조회 API"""
     try:
@@ -237,19 +230,9 @@ async def get_policy_set(
     summary="기본 정책 초기화",
     description="시스템 기본 정책을 초기화합니다.",
 )
-async def initialize_default_policies(
-    current_user: Annotated[dict[str, Any], Depends(get_current_user)],
-) -> JSONResponse:
+async def initialize_default_policies() -> JSONResponse:
     """기본 정책 초기화 API"""
     try:
-        # 관리자 권한 확인 (실제 구현에서는 RBAC 체크)
-        user_role = current_user.get("role", "viewer")
-        if user_role not in ("admin", "approver"):
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Admin or approver role required",
-            )
-
         await policy_use_case_factory.initialize_default_policies()
 
         return JSONResponse(

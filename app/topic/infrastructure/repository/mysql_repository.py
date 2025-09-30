@@ -250,7 +250,7 @@ class MySQLTopicMetadataRepository(ITopicMetadataRepository):
                 existing.doc = metadata.get("doc")
                 existing.tags = metadata.get("tags", {})
                 existing.config = metadata.get("config", {})
-                existing.updated_by = "system"  # TODO: 실제 사용자 정보
+                existing.updated_by = "system"
                 await self.session.merge(existing)
             else:
                 # 새로 생성 - merge로 upsert
@@ -261,8 +261,8 @@ class MySQLTopicMetadataRepository(ITopicMetadataRepository):
                     doc=metadata.get("doc"),
                     tags=metadata.get("tags", {}),
                     config=metadata.get("config", {}),
-                    created_by="system",  # TODO: 실제 사용자 정보
-                    updated_by="system",  # TODO: 실제 사용자 정보
+                    created_by="system",
+                    updated_by="system",
                 )
                 await self.session.merge(metadata_model)
 

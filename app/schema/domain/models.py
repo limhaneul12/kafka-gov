@@ -4,9 +4,10 @@ from __future__ import annotations
 
 import hashlib
 from collections.abc import Iterable
-from dataclasses import dataclass
 from enum import Enum
 from typing import TypeAlias
+
+import msgspec
 
 
 class DomainEnvironment(str, Enum):
@@ -73,8 +74,7 @@ SchemaHash: TypeAlias = str
 Actor: TypeAlias = str
 
 
-@dataclass(slots=True, frozen=True)
-class DomainSchemaMetadata:
+class DomainSchemaMetadata(msgspec.Struct, frozen=True):
     """스키마 메타데이터 값 객체"""
 
     owner: str
@@ -87,8 +87,7 @@ class DomainSchemaMetadata:
             raise ValueError("owner is required")
 
 
-@dataclass(slots=True, frozen=True)
-class DomainSchemaReference:
+class DomainSchemaReference(msgspec.Struct, frozen=True):
     """스키마 참조 정보"""
 
     name: str
@@ -104,8 +103,7 @@ class DomainSchemaReference:
             raise ValueError("reference subject is required")
 
 
-@dataclass(slots=True, frozen=True)
-class DomainSchemaSource:
+class DomainSchemaSource(msgspec.Struct, frozen=True):
     """스키마 소스 정의"""
 
     type: DomainSchemaSourceType
@@ -131,8 +129,7 @@ class DomainSchemaSource:
                 raise ValueError("yaml source cannot include inline or file data")
 
 
-@dataclass(slots=True, frozen=True)
-class DomainSchemaSpec:
+class DomainSchemaSpec(msgspec.Struct, frozen=True):
     """스키마 등록 명세"""
 
     subject: SubjectName
@@ -178,8 +175,7 @@ class DomainSchemaSpec:
         return hashlib.sha256(content.encode()).hexdigest()[:16]
 
 
-@dataclass(slots=True, frozen=True)
-class DomainSchemaBatch:
+class DomainSchemaBatch(msgspec.Struct, frozen=True):
     """스키마 배치 엔티티"""
 
     change_id: ChangeId
@@ -211,8 +207,7 @@ class DomainSchemaBatch:
         return hashlib.sha256(content.encode()).hexdigest()[:16]
 
 
-@dataclass(slots=True, frozen=True)
-class DomainPolicyViolation:
+class DomainPolicyViolation(msgspec.Struct, frozen=True):
     """정책 위반 정보"""
 
     subject: SubjectName
@@ -226,8 +221,7 @@ class DomainPolicyViolation:
         return self.severity == "error"
 
 
-@dataclass(slots=True, frozen=True)
-class DomainSchemaCompatibilityIssue:
+class DomainSchemaCompatibilityIssue(msgspec.Struct, frozen=True):
     """호환성 위반 상세"""
 
     path: str
@@ -235,8 +229,7 @@ class DomainSchemaCompatibilityIssue:
     issue_type: str
 
 
-@dataclass(slots=True, frozen=True)
-class DomainSchemaCompatibilityReport:
+class DomainSchemaCompatibilityReport(msgspec.Struct, frozen=True):
     """호환성 검증 결과"""
 
     subject: SubjectName
@@ -245,8 +238,7 @@ class DomainSchemaCompatibilityReport:
     issues: tuple[DomainSchemaCompatibilityIssue, ...] = ()
 
 
-@dataclass(slots=True, frozen=True)
-class DomainSchemaImpactRecord:
+class DomainSchemaImpactRecord(msgspec.Struct, frozen=True):
     """스키마 영향도 정보"""
 
     subject: SubjectName
@@ -254,19 +246,38 @@ class DomainSchemaImpactRecord:
     consumers: tuple[str, ...] = ()
 
 
-@dataclass(slots=True, frozen=True)
-class DomainSchemaPlanItem:
+class DomainSchemaDeleteImpact(msgspec.Struct, frozen=True):
+    """스키마 삭제 영향도 분석 결과"""
+
+    subject: SubjectName
+    current_version: int | None
+    total_versions: int
+    affected_topics: tuple[str, ...] = ()
+    warnings: tuple[str, ...] = ()
+    safe_to_delete: bool = False
+
+
+class DomainSchemaDiff(msgspec.Struct, frozen=True):
+    """스키마 변경 사항"""
+
+    type: str  # "new_registration" | "update"
+    changes: tuple[str, ...]
+    current_version: int | None
+    target_compatibility: str
+    schema_type: str | None
+
+
+class DomainSchemaPlanItem(msgspec.Struct, frozen=True):
     """스키마 배치 계획 항목"""
 
     subject: SubjectName
     action: DomainPlanAction
     current_version: int | None
     target_version: int | None
-    diff: dict[str, object]
+    diff: DomainSchemaDiff
 
 
-@dataclass(slots=True, frozen=True)
-class DomainSchemaPlan:
+class DomainSchemaPlan(msgspec.Struct, frozen=True):
     """스키마 배치 계획"""
 
     change_id: ChangeId
@@ -310,8 +321,7 @@ class DomainSchemaPlan:
         return tuple(v for v in self.violations if v.is_error)
 
 
-@dataclass(slots=True, frozen=True)
-class DomainSchemaApplyResult:
+class DomainSchemaApplyResult(msgspec.Struct, frozen=True):
     """스키마 배치 적용 결과"""
 
     change_id: ChangeId
@@ -331,8 +341,7 @@ class DomainSchemaApplyResult:
         }
 
 
-@dataclass(slots=True, frozen=True)
-class DomainSchemaArtifact:
+class DomainSchemaArtifact(msgspec.Struct, frozen=True):
     """저장된 스키마 아티팩트"""
 
     subject: SubjectName
@@ -347,8 +356,7 @@ class DomainSchemaArtifact:
             raise ValueError("storage_url is required")
 
 
-@dataclass(slots=True, frozen=True)
-class DomainSchemaUploadResult:
+class DomainSchemaUploadResult(msgspec.Struct, frozen=True):
     """스키마 업로드 결과"""
 
     upload_id: str
@@ -378,3 +386,31 @@ def ensure_unique_subjects(subjects: Iterable[SubjectName]) -> None:
     duplicates = {subject for subject in subject_list if subject_list.count(subject) > 1}
     if duplicates:
         raise ValueError(f"duplicate subjects detected: {sorted(duplicates)}")
+
+
+class Reference(msgspec.Struct):
+    name: str
+    subject: str
+    version: int
+
+    def to_dict(self) -> dict[str, int | str]:
+        return {
+            "name": self.name,
+            "subject": self.subject,
+            "version": self.version,
+        }
+
+
+class SchemaVersionInfo(msgspec.Struct):
+    """스키마 버전 정보 - 내부 처리용"""
+
+    version: int | None
+    schema_id: int | None
+    schema: str | None
+    schema_type: str | None
+    references: list[Reference]
+    hash: str
+
+
+CompatibilityResult = dict[SubjectName, DomainSchemaCompatibilityReport]
+DescribeResult = dict[SubjectName, SchemaVersionInfo]

@@ -1,8 +1,6 @@
-"""Schema Interface TypeAdapter 기반 변환 어댑터"""
+"""Schema Interface 수동 변환 어댑터 - 고성능 최적화"""
 
 from __future__ import annotations
-
-from pydantic import TypeAdapter, ValidationError
 
 from ..domain.models import (
     DomainCompatibilityMode,
@@ -33,124 +31,99 @@ from .schema import (
 from .types.enums import Environment
 
 
-class SchemaTypeAdapters:
-    """Schema 모듈 TypeAdapter 컬렉션"""
+class SchemaConverter:
+    """Schema 모듈 고성능 변환기 - msgspec 직접 생성"""
 
-    # Domain 모델 어댑터들
-    schema_spec_adapter: TypeAdapter[DomainSchemaSpec] = TypeAdapter(DomainSchemaSpec)
-    schema_metadata_adapter: TypeAdapter[DomainSchemaMetadata] = TypeAdapter(DomainSchemaMetadata)
-    schema_reference_adapter: TypeAdapter[DomainSchemaReference] = TypeAdapter(
-        DomainSchemaReference
-    )
-    schema_source_adapter: TypeAdapter[DomainSchemaSource] = TypeAdapter(DomainSchemaSource)
-    schema_batch_adapter: TypeAdapter[DomainSchemaBatch] = TypeAdapter(DomainSchemaBatch)
+    __slots__ = ()  # 메모리 최적화
 
-    # Interface 모델 어댑터들
-    schema_batch_request_adapter: TypeAdapter[SchemaBatchRequest] = TypeAdapter(SchemaBatchRequest)
-
-    @classmethod
-    def convert_item_to_spec(cls, item: SchemaBatchItem) -> DomainSchemaSpec:
-        """SchemaBatchRequest의 item(SchemaBatchItem)을 DomainSchemaSpec으로 안전하게 변환
+    @staticmethod
+    def convert_item_to_spec(item: SchemaBatchItem) -> DomainSchemaSpec:
+        """SchemaBatchItem을 DomainSchemaSpec으로 직접 변환 (고성능)
 
         Args:
-            item: 변환할 스키마 아이템 (인터페이스 레이어 모델)
+            item: 변환할 스키마 아이템
 
         Returns:
             변환된 DomainSchemaSpec
 
         Raises:
-            ValidationError: 변환 중 검증 실패 시
+            ValueError: 변환 중 검증 실패 시
         """
-        try:
-            # 메타데이터 변환
-            domain_metadata = None
-            if item.metadata:
-                metadata_data = {
-                    "owner": item.metadata.owner,
-                    "doc": item.metadata.doc,
-                    "tags": tuple(item.metadata.tags),
-                    "description": item.metadata.description,
-                }
-                domain_metadata = cls.schema_metadata_adapter.validate_python(metadata_data)
+        # 메타데이터 변환 - 직접 생성
+        domain_metadata = None
+        if item.metadata:
+            domain_metadata = DomainSchemaMetadata(
+                owner=item.metadata.owner,
+                doc=item.metadata.doc,
+                tags=tuple(item.metadata.tags) if item.metadata.tags else (),
+                description=item.metadata.description,
+            )
 
-            # 참조 변환
-            references = tuple(
-                cls.schema_reference_adapter.validate_python(
-                    {
-                        "name": ref.name,
-                        "subject": ref.subject,
-                        "version": ref.version,
-                    }
+        # 참조 변환 - 직접 생성 (리스트 컴프리헨션으로 최적화)
+        references = (
+            tuple(
+                DomainSchemaReference(
+                    name=ref.name,
+                    subject=ref.subject,
+                    version=ref.version,
                 )
                 for ref in item.references
             )
+            if item.references
+            else ()
+        )
 
-            # 소스 변환
-            domain_source = None
-            if item.source:
-                source_data = {
-                    "type": DomainSchemaSourceType(item.source.type.value),
-                    "inline": item.source.inline,
-                    "file": item.source.file,
-                    "yaml": item.source.yaml,
-                }
-                domain_source = cls.schema_source_adapter.validate_python(source_data)
-
-            # 호환성 모드 처리
-            compatibility_value = (
-                item.compatibility.value
-                if item.compatibility
-                else DomainCompatibilityMode.NONE.value
+        # 소스 변환 - 직접 생성
+        domain_source = None
+        if item.source:
+            domain_source = DomainSchemaSource(
+                type=DomainSchemaSourceType(item.source.type.value),
+                inline=item.source.inline,
+                file=item.source.file,
+                yaml=item.source.yaml,
             )
 
-            # SchemaSpec 생성
-            spec_data = {
-                "subject": item.subject,
-                "schema_type": DomainSchemaType(item.type.value),
-                "compatibility": DomainCompatibilityMode(compatibility_value),
-                "schema": item.schema_text,
-                "source": domain_source,
-                "schema_hash": item.schema_hash,
-                "references": references,
-                "metadata": domain_metadata,
-                "reason": item.reason,
-                "dry_run_only": item.dry_run_only,
-            }
+        # 호환성 모드 - 직접 변환
+        compatibility = (
+            DomainCompatibilityMode(item.compatibility.value)
+            if item.compatibility
+            else DomainCompatibilityMode.NONE
+        )
 
-            return cls.schema_spec_adapter.validate_python(spec_data)
-
-        except ValidationError as e:
-            raise ValueError(f"Failed to convert schema item to SchemaSpec: {e}") from e
+        # SchemaSpec 직접 생성 - msgspec.Struct는 __init__으로 빠르게 생성
+        return DomainSchemaSpec(
+            subject=item.subject,
+            schema_type=DomainSchemaType(item.type.value),
+            compatibility=compatibility,
+            schema=item.schema_text,
+            source=domain_source,
+            schema_hash=item.schema_hash,
+            references=references,
+            metadata=domain_metadata,
+            reason=item.reason,
+            dry_run_only=item.dry_run_only,
+        )
 
     @classmethod
     def convert_request_to_batch(cls, request: SchemaBatchRequest) -> DomainSchemaBatch:
-        """SchemaBatchRequest를 DomainSchemaBatch로 안전하게 변환
+        """SchemaBatchRequest를 DomainSchemaBatch로 직접 변환 (고성능)
 
         Args:
             request: 변환할 SchemaBatchRequest
 
         Returns:
             변환된 DomainSchemaBatch
-
-        Raises:
-            ValidationError: 변환 중 검증 실패 시
         """
-        try:
-            # 각 아이템을 SchemaSpec으로 변환
-            specs = tuple(cls.convert_item_to_spec(item) for item in request.items)
+        # 각 아이템을 SchemaSpec으로 변환 (제너레이터로 메모리 효율화)
+        specs = tuple(cls.convert_item_to_spec(item) for item in request.items)
 
-            # SchemaBatch 생성
-            batch_data = {
-                "change_id": request.change_id,
-                "env": DomainEnvironment(request.env.value),
-                "subject_strategy": DomainSubjectStrategy(request.subject_strategy.value),
-                "specs": specs,
-            }
-
-            return cls.schema_batch_adapter.validate_python(batch_data)
-
-        except ValidationError as e:
-            raise ValueError(f"Failed to convert SchemaBatchRequest to SchemaBatch: {e}") from e
+        # SchemaBatch 직접 생성
+        return DomainSchemaBatch(
+            change_id=request.change_id,
+            env=DomainEnvironment(request.env.value),
+            subject_strategy=DomainSubjectStrategy(request.subject_strategy.value),
+            specs=specs,
+        )
 
     @classmethod
     def convert_plan_to_response(cls, plan: DomainSchemaPlan) -> SchemaBatchDryRunResponse:
@@ -163,7 +136,7 @@ class SchemaTypeAdapters:
             변환된 SchemaBatchDryRunResponse
         """
         # 계획 아이템 변환
-        plan_items = [
+        plan_items: list[SchemaPlanItem] = [
             SchemaPlanItem(
                 subject=item.subject,
                 action=item.action.value,
@@ -175,7 +148,7 @@ class SchemaTypeAdapters:
         ]
 
         # 위반 사항 변환
-        violations = [
+        violations: list[PolicyViolation] = [
             PolicyViolation(
                 subject=v.subject,
                 rule=v.rule,
@@ -187,7 +160,7 @@ class SchemaTypeAdapters:
         ]
 
         # 호환성 보고서 변환
-        compatibility_reports = [
+        compatibility_reports: list[SchemaCompatibilityReport] = [
             SchemaCompatibilityReport(
                 subject=report.subject,
                 mode=report.mode.value if hasattr(report.mode, "value") else report.mode,
@@ -207,7 +180,7 @@ class SchemaTypeAdapters:
         ]
 
         # 영향도 변환
-        impacts = [
+        impacts: list[SchemaImpactRecord] = [
             SchemaImpactRecord(
                 subject=impact.subject,
                 topics=list(impact.topics),
@@ -239,7 +212,7 @@ class SchemaTypeAdapters:
             변환된 SchemaBatchApplyResponse
         """
         # 아티팩트 변환
-        artifacts = [
+        artifacts: list[SchemaArtifact] = [
             SchemaArtifact(
                 subject=artifact.subject,
                 version=artifact.version,
@@ -261,22 +234,22 @@ class SchemaTypeAdapters:
         )
 
 
-# 전역 어댑터 인스턴스 (성능 최적화)
-schema_adapters = SchemaTypeAdapters()
+# 전역 변환기 인스턴스 (싱글톤 패턴으로 메모리 절약)
+_converter = SchemaConverter()
 
 
 def safe_convert_request_to_batch(request: SchemaBatchRequest) -> DomainSchemaBatch:
-    """안전한 SchemaBatchRequest → DomainSchemaBatch 변환 (전역 함수)"""
-    return schema_adapters.convert_request_to_batch(request)
+    """SchemaBatchRequest → DomainSchemaBatch 고성능 변환"""
+    return _converter.convert_request_to_batch(request)
 
 
 def safe_convert_plan_to_response(plan: DomainSchemaPlan) -> SchemaBatchDryRunResponse:
-    """안전한 DomainSchemaPlan → SchemaBatchDryRunResponse 변환 (전역 함수)"""
-    return schema_adapters.convert_plan_to_response(plan)
+    """DomainSchemaPlan → SchemaBatchDryRunResponse 고성능 변환"""
+    return _converter.convert_plan_to_response(plan)
 
 
 def safe_convert_apply_result_to_response(
     result: DomainSchemaApplyResult,
 ) -> SchemaBatchApplyResponse:
-    """안전한 DomainSchemaApplyResult → SchemaBatchApplyResponse 변환 (전역 함수)"""
-    return schema_adapters.convert_apply_result_to_response(result)
+    """DomainSchemaApplyResult → SchemaBatchApplyResponse 고성능 변환"""
+    return _converter.convert_apply_result_to_response(result)

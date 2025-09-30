@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kafka Governance Platform</title>
+    <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
+    <link rel="stylesheet" href="/static/css/styles.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+
+<body>
+    <!-- 헤더 -->
+    <header class="header">
+        <div class="container">
+            <div class="header-content">
+                <div class="logo">
+                    <i class="fas fa-stream"></i>
+                    <span>Kafka Gov</span>
+                </div>
+                <nav class="nav">
+                    <a href="#dashboard" class="nav-link active" data-tab="dashboard">
+                        <i class="fas fa-tachometer-alt"></i>
+                        대시보드
+                    </a>
+                    <a href="#topics" class="nav-link" data-tab="topics">
+                        <i class="fas fa-list"></i>
+                        토픽 관리
+                    </a>
+                    <a href="#schemas" class="nav-link" data-tab="schemas">
+                        <i class="fas fa-code"></i>
+                        스키마 관리
+                    </a>
+                    <a href="#policies" class="nav-link" data-tab="policies">
+                        <i class="fas fa-shield-alt"></i>
+                        정책 관리
+                    </a>
+                </nav>
+                <div class="user-menu">
+                    <div class="user-actions">
+                        <div id="connection-status" class="connection-status disconnected">
+                            <i class="fas fa-wifi-slash"></i> 연결 끊김
+                        </div>
+                        <a href="/static/settings.html" class="btn-icon" title="설정">
+                            <i class="fas fa-cog"></i>
+                        </a>
+                        <div class="user-info">
+                            <i class="fas fa-user-circle"></i>
+                            <span id="username">Admin</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- 메인 컨텐츠 -->
+    <main class="main">
+        <div class="container">
+            <!-- 대시보드 탭 -->
+            <div id="dashboard" class="tab-content active">
+                <div class="page-header">
+                    <h1>대시보드</h1>
+                    <p>Kafka 클러스터 현황을 한눈에 확인하세요</p>
+                </div>
+
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-icon">
+                            <i class="fas fa-list"></i>
+                        </div>
+                        <div class="stat-content">
+                            <h3 id="topic-count">-</h3>
+                            <p>총 토픽 수</p>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon">
+                            <i class="fas fa-code"></i>
+                        </div>
+                        <div class="stat-content">
+                            <h3 id="schema-count">-</h3>
+                            <p>등록된 스키마</p>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon">
+                            <i class="fas fa-shield-alt"></i>
+                        </div>
+                        <div class="stat-content">
+                            <h3 id="policy-count">-</h3>
+                            <p>활성 정책</p>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon">
+                            <i class="fas fa-exclamation-triangle"></i>
+                        </div>
+                        <div class="stat-content">
+                            <h3 id="violation-count">-</h3>
+                            <p>정책 위반</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="dashboard-grid">
+                    <div class="dashboard-card">
+                        <div class="card-header">
+                            <h3>최근 활동</h3>
+                            <button class="btn-icon">
+                                <i class="fas fa-refresh"></i>
+                            </button>
+                        </div>
+                        <div class="activity-list" id="recent-activities">
+                            <div class="activity-item">
+                                <div class="activity-icon success">
+                                    <i class="fas fa-plus"></i>
+                                </div>
+                                <div class="activity-content">
+                                    <p><strong>user-events</strong> 토픽이 생성되었습니다</p>
+                                    <small>5분 전</small>
+                                </div>
+                            </div>
+                            <div class="activity-item">
+                                <div class="activity-icon warning">
+                                    <i class="fas fa-exclamation"></i>
+                                </div>
+                                <div class="activity-content">
+                                    <p><strong>payment-schema</strong>에서 정책 위반 감지</p>
+                                    <small>15분 전</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="dashboard-card">
+                        <div class="card-header">
+                            <h3>환경별 상태</h3>
+                        </div>
+                        <div class="env-status">
+                            <div class="env-item">
+                                <div class="env-indicator success"></div>
+                                <span>DEV</span>
+                                <span class="env-count">12 토픽</span>
+                            </div>
+                            <div class="env-item">
+                                <div class="env-indicator success"></div>
+                                <span>STG</span>
+                                <span class="env-count">8 토픽</span>
+                            </div>
+                            <div class="env-item">
+                                <div class="env-indicator warning"></div>
+                                <span>PROD</span>
+                                <span class="env-count">25 토픽</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 토픽 관리 탭 -->
+            <div id="topics" class="tab-content">
+                <div class="page-header">
+                    <h1>토픽 관리</h1>
+                    <div class="page-actions">
+                        <button class="btn btn-primary" id="create-topic-btn">
+                            <i class="fas fa-plus"></i>
+                            토픽 생성
+                        </button>
+                    </div>
+                </div>
+
+                <div class="filters">
+                    <div class="filter-group">
+                        <label>환경</label>
+                        <select id="topic-env-filter">
+                            <option value="">전체</option>
+                            <option value="dev">DEV</option>
+                            <option value="stg">STG</option>
+                            <option value="prod">PROD</option>
+                        </select>
+                    </div>
+                    <div class="filter-group">
+                        <label>검색</label>
+                        <input type="text" id="topic-search" placeholder="토픽명 검색...">
+                    </div>
+                </div>
+
+                <div class="table-container">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>토픽명</th>
+                                <th>환경</th>
+                                <th>파티션</th>
+                                <th>복제 팩터</th>
+                                <th>소유자</th>
+                                <th>상태</th>
+                                <th>작업</th>
+                            </tr>
+                        </thead>
+                        <tbody id="topics-table-body">
+                            <!-- 동적으로 생성 -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- 스키마 관리 탭 -->
+            <div id="schemas" class="tab-content">
+                <div class="page-header">
+                    <h1>스키마 관리</h1>
+                    <div class="page-actions">
+                        <button class="btn btn-primary" id="upload-schema-btn">
+                            <i class="fas fa-upload"></i>
+                            스키마 업로드
+                        </button>
+                    </div>
+                </div>
+
+                <div class="filters">
+                    <div class="filter-group">
+                        <label>Subject</label>
+                        <input type="text" id="schema-search" placeholder="Subject 검색...">
+                    </div>
+                    <div class="filter-group">
+                        <label>타입</label>
+                        <select id="schema-type-filter">
+                            <option value="">전체</option>
+                            <option value="AVRO">AVRO</option>
+                            <option value="JSON">JSON</option>
+                            <option value="PROTOBUF">PROTOBUF</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="table-container">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Subject</th>
+                                <th>버전</th>
+                                <th>타입</th>
+                                <th>호환성</th>
+                                <th>등록일</th>
+                                <th>작업</th>
+                            </tr>
+                        </thead>
+                        <tbody id="schemas-table-body">
+                            <!-- 동적으로 생성 -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- 정책 관리 탭 -->
+            <div id="policies" class="tab-content">
+                <div class="page-header">
+                    <h1>정책 관리</h1>
+                    <div class="page-actions">
+                        <button class="btn btn-secondary" id="init-policies-btn">
+                            <i class="fas fa-sync"></i>
+                            기본 정책 초기화
+                        </button>
+                    </div>
+                </div>
+
+                <div class="policy-grid">
+                    <div class="policy-card">
+                        <div class="policy-header">
+                            <h3>네이밍 규칙</h3>
+                            <span class="policy-status active">활성</span>
+                        </div>
+                        <div class="policy-content">
+                            <p>토픽과 스키마의 네이밍 규칙을 관리합니다.</p>
+                            <ul class="policy-rules">
+                                <li>소문자와 하이픈만 허용</li>
+                                <li>최대 길이 64자</li>
+                                <li>예약어 사용 금지</li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <div class="policy-card">
+                        <div class="policy-header">
+                            <h3>설정 규칙</h3>
+                            <span class="policy-status active">활성</span>
+                        </div>
+                        <div class="policy-content">
+                            <p>토픽 설정값의 유효성을 검증합니다.</p>
+                            <ul class="policy-rules">
+                                <li>최소 복제 팩터: 3 (PROD)</li>
+                                <li>최대 파티션 수: 100</li>
+                                <li>보존 기간 제한</li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <div class="policy-card">
+                        <div class="policy-header">
+                            <h3>환경별 정책</h3>
+                            <span class="policy-status active">활성</span>
+                        </div>
+                        <div class="policy-content">
+                            <p>환경별로 다른 정책을 적용합니다.</p>
+                            <ul class="policy-rules">
+                                <li>DEV: 관대한 정책</li>
+                                <li>STG: 중간 수준 정책</li>
+                                <li>PROD: 엄격한 정책</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="violations-section">
+                    <h3>최근 정책 위반</h3>
+                    <div class="violations-list" id="violations-list">
+                        <!-- 동적으로 생성 -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- 모달들 -->
+    <!-- 토픽 생성 모달 -->
+    <div id="create-topic-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>토픽 생성</h3>
+                <button class="modal-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="create-topic-form">
+                    <div class="form-group">
+                        <label for="topic-name">토픽명</label>
+                        <input type="text" id="topic-name" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="topic-env">환경</label>
+                        <select id="topic-env" required>
+                            <option value="">선택하세요</option>
+                            <option value="dev">DEV</option>
+                            <option value="stg">STG</option>
+                            <option value="prod">PROD</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="topic-partitions">파티션 수</label>
+                        <input type="number" id="topic-partitions" min="1" value="3">
+                    </div>
+                    <div class="form-group">
+                        <label for="topic-replication">복제 팩터</label>
+                        <input type="number" id="topic-replication" min="1" value="3">
+                    </div>
+                    <div class="form-group">
+                        <label for="topic-description">설명</label>
+                        <textarea id="topic-description" rows="3"></textarea>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" id="cancel-topic">취소</button>
+                <button type="submit" class="btn btn-primary" form="create-topic-form">생성</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 스키마 업로드 모달 -->
+    <div id="upload-schema-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>스키마 업로드</h3>
+                <button class="modal-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="upload-schema-form">
+                    <div class="form-group">
+                        <label for="schema-files">스키마 파일</label>
+                        <input type="file" id="schema-files" multiple accept=".avsc,.json,.proto">
+                        <small>AVRO (.avsc), JSON (.json), Protobuf (.proto) 파일을 선택하세요</small>
+                    </div>
+                    <div class="file-list" id="selected-files"></div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" id="cancel-schema">취소</button>
+                <button type="submit" class="btn btn-primary" form="upload-schema-form">업로드</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 로딩 스피너 -->
+    <div id="loading" class="loading">
+        <div class="spinner"></div>
+    </div>
+
+    <!-- 토스트 알림 -->
+    <div id="toast-container" class="toast-container"></div>
+
+    <script src="/static/js/api.js"></script>
+    <script src="/static/js/components.js"></script>
+    <script src="/static/js/websocket.js"></script>
+    <script src="/static/js/app.js"></script>
+</body>
+
+</html>

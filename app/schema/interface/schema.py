@@ -68,11 +68,7 @@ class SchemaMetadata(BaseModel):
     owner: TeamName
     doc: DocumentUrl | None = None
     tags: list[TagName] = Field(default_factory=list, max_length=15)
-    description: StrictStr | None = Field(
-        default=None,
-        max_length=300,
-        description="스키마 설명",
-    )
+    description: StrictStr | None = Field(default=None, max_length=300, description="스키마 설명")
 
 
 class SchemaReference(BaseModel):
@@ -118,13 +114,9 @@ class SchemaSource(BaseModel):
         default=None, description="inline 타입일 때의 스키마 본문"
     )
     file: FileReference | None = Field(
-        default=None,
-        description="사전 업로드된 파일 경로 또는 스토리지 키",
+        default=None, description="사전 업로드된 파일 경로 또는 스토리지 키"
     )
-    yaml: SchemaYamlText | None = Field(
-        default=None,
-        description="YAML 타입일 때 사용되는 정의",
-    )
+    yaml: SchemaYamlText | None = Field(default=None, description="YAML 타입일 때 사용되는 정의")
 
     @model_validator(mode="after")
     def validate_payload(self) -> SchemaSource:
@@ -197,8 +189,7 @@ class SchemaBatchItem(BaseModel):
     metadata: SchemaMetadata | None = None
     reason: ReasonText | None = None
     dry_run_only: StrictBool = Field(
-        default=False,
-        description="true이면 dry-run에서만 검증하고 apply 시 제외",
+        default=False, description="true이면 dry-run에서만 검증하고 apply 시 제외"
     )
 
     @model_validator(mode="after")
@@ -501,6 +492,35 @@ class SchemaArtifact(BaseModel):
     version: SchemaVersion
     storage_url: StorageUrl
     checksum: SchemaHash | None = None
+
+
+class SchemaDeleteImpactResponse(BaseModel):
+    """스키마 삭제 영향도 분석 응답"""
+
+    model_config = ConfigDict(
+        extra="forbid",
+        json_schema_extra={
+            "example": {
+                "subject": "prod.orders.created-value",
+                "current_version": 15,
+                "total_versions": 15,
+                "affected_topics": ["prod.orders.created"],
+                "warnings": [
+                    "다음 토픽이 이 스키마를 사용 중일 수 있습니다: prod.orders.created",
+                    "이 스키마는 15개의 버전이 있습니다. 삭제 시 모든 버전이 제거됩니다.",
+                    "프로덕션 환경의 스키마입니다. 삭제 전 반드시 영향도를 확인하세요.",
+                ],
+                "safe_to_delete": False,
+            }
+        },
+    )
+
+    subject: SubjectName
+    current_version: int | None = Field(description="현재 버전 번호")
+    total_versions: int = Field(description="총 버전 개수")
+    affected_topics: list[str] = Field(default_factory=list, description="영향받는 토픽 목록")
+    warnings: list[str] = Field(default_factory=list, description="경고 메시지 목록")
+    safe_to_delete: bool = Field(description="안전 삭제 가능 여부")
 
 
 class SchemaBatchApplyResponse(BaseModel):

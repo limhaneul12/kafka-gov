@@ -9,15 +9,19 @@ from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
-class DatabaseSettings(BaseSettings):
-    """데이터베이스 설정"""
-
-    model_config = SettingsConfigDict(
-        env_prefix="DB_",
+def model_config_module(env_prefix: str) -> SettingsConfigDict:
+    return SettingsConfigDict(
+        env_prefix=env_prefix,
         env_file=".env",
         env_file_encoding="utf-8",
         extra="ignore",
     )
+
+
+class DatabaseSettings(BaseSettings):
+    """데이터베이스 설정"""
+
+    model_config = model_config_module("DB_")
 
     # MySQL 연결 설정
     host: str = Field(default="localhost", description="데이터베이스 호스트")
@@ -43,12 +47,7 @@ class DatabaseSettings(BaseSettings):
 class KafkaSettings(BaseSettings):
     """Kafka 설정"""
 
-    model_config = SettingsConfigDict(
-        env_prefix="KAFKA_",
-        env_file=".env",
-        env_file_encoding="utf-8",
-        extra="ignore",
-    )
+    model_config = model_config_module("KAFKA_")
 
     # Kafka 브로커 설정
     bootstrap_servers: str = Field(default="localhost:9092", description="Kafka 브로커 주소")
@@ -80,12 +79,7 @@ class KafkaSettings(BaseSettings):
 class SchemaRegistrySettings(BaseSettings):
     """Schema Registry 설정"""
 
-    model_config = SettingsConfigDict(
-        env_prefix="SCHEMA_REGISTRY_",
-        env_file=".env",
-        env_file_encoding="utf-8",
-        extra="ignore",
-    )
+    model_config = model_config_module("SCHEMA_REGISTRY_")
 
     # Schema Registry 연결 설정
     url: str = Field(default="http://localhost:8081", description="Schema Registry URL")
@@ -139,12 +133,7 @@ class SchemaRegistrySettings(BaseSettings):
 class ObjectStorageSettings(BaseSettings):
     """오브젝트 스토리지 설정 (MinIO/S3)"""
 
-    model_config = SettingsConfigDict(
-        env_prefix="STORAGE_",
-        env_file=".env",
-        env_file_encoding="utf-8",
-        extra="ignore",
-    )
+    model_config = model_config_module("STORAGE_")
 
     # 연결 설정
     endpoint_url: str = Field(default="http://localhost:9000", description="스토리지 엔드포인트")
@@ -157,39 +146,10 @@ class ObjectStorageSettings(BaseSettings):
     use_ssl: bool = Field(default=False, description="SSL 사용 여부")
 
 
-class SecuritySettings(BaseSettings):
-    """보안 설정"""
-
-    model_config = SettingsConfigDict(
-        env_prefix="SECURITY_",
-        env_file=".env",
-        env_file_encoding="utf-8",
-        extra="ignore",
-    )
-
-    # JWT 설정
-    jwt_secret_key: str = Field(
-        default="your-secret-key-change-in-production", description="JWT 시크릿 키"
-    )
-    jwt_algorithm: str = Field(default="HS256", description="JWT 알고리즘")
-    jwt_expire_minutes: int = Field(default=30, ge=1, description="JWT 만료 시간(분)")
-
-    @field_validator("jwt_secret_key")
-    @classmethod
-    def validate_jwt_secret(cls, v: str) -> str:
-        if len(v) < 32:
-            raise ValueError("jwt_secret_key must be at least 32 characters long")
-        return v
-
-
 class AppSettings(BaseSettings):
     """전체 애플리케이션 설정"""
 
-    model_config = SettingsConfigDict(
-        env_file=".env",
-        env_file_encoding="utf-8",
-        extra="ignore",
-    )
+    model_config = model_config_module("APP_")
 
     # 애플리케이션 기본 설정
     app_name: str = Field(default="Kafka Governance", description="애플리케이션 이름")
@@ -204,7 +164,6 @@ class AppSettings(BaseSettings):
     kafka: KafkaSettings = Field(default_factory=KafkaSettings)
     schema_registry: SchemaRegistrySettings = Field(default_factory=SchemaRegistrySettings)
     storage: ObjectStorageSettings = Field(default_factory=ObjectStorageSettings)
-    security: SecuritySettings = Field(default_factory=SecuritySettings)
 
     @field_validator("environment")
     @classmethod

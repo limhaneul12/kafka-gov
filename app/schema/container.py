@@ -103,17 +103,7 @@ container.config.override(shared_container)
 container.infrastructure.override(infrastructure_container)
 
 
-# 의존성 주입 헬퍼 함수들 (세션 관리 개선)
-class SchemaUseCaseFactory:
-    """스키마 유스케이스 팩토리 - 세션 관리 개선"""
-
-    # 테스트/런타임 시점에 의존성 초기화를 강제하지 않기 위해 전역 팩토리를 사용하지 않습니다.
-    # 라우터 의존성 함수(get_schema_*_use_case) 내부에서 지연 생성합니다.
-
-
-# 전역 팩토리 인스턴스를 생성하지 않습니다(지연 생성).
-
-# 타입 별칭 (Depends 패턴 개선)
+# 타입 별칭 (Depends 패턴)
 DbSession = Annotated[AsyncSession, Depends(get_db_session)]
 
 
@@ -159,10 +149,3 @@ def get_schema_plan_use_case(session: DbSession) -> SchemaPlanUseCase:
     return SchemaPlanUseCase(
         metadata_repository=metadata_repo,  # type: ignore[arg-type]
     )
-
-
-async def get_current_user() -> str:
-    """현재 사용자 정보 (개발용 임시)"""
-    # 실제 FastAPI 라우터에서는 shared.auth.get_current_user 의존성을 사용
-    # 이 함수는 컴테이너 테스트용으로만 사용
-    return "dev-user"  # 개발용 임시 사용자

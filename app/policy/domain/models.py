@@ -3,11 +3,11 @@
 from __future__ import annotations
 
 import re
-from abc import ABC, abstractmethod
 from collections.abc import Iterable
-from dataclasses import dataclass
 from enum import Enum
-from typing import Any, TypeAlias
+from typing import Any, Protocol, TypeAlias
+
+import msgspec
 
 
 class DomainEnvironment(Enum):
@@ -33,49 +33,22 @@ class DomainPolicySeverity(Enum):
     CRITICAL = "critical"  # 치명적 (즉시 차단)
 
 
-@dataclass(slots=True, frozen=True)
-class DomainPolicyViolation:
-    """정책 위반 정보"""
-
-    resource_type: DomainResourceType
-    resource_name: str
-    rule_id: str
-    message: str
-    severity: DomainPolicySeverity
-    field: str | None = None
-    current_value: Any = None
-    expected_value: Any = None
-
-
-@dataclass(slots=True, frozen=True)
-class DomainPolicyContext:
-    """정책 평가 컨텍스트"""
-
-    environment: DomainEnvironment
-    resource_type: DomainResourceType
-    actor: str  # 요청자
-    metadata: dict[str, Any] | None = None
-
-
 PolicyTarget: TypeAlias = dict[str, Any]  # 정책 대상 (Topic/Schema spec)
 
 
-class PolicyRule(ABC):
-    """정책 규칙 인터페이스"""
+class PolicyRule(Protocol):
+    """정책 규칙 프로토콜"""
 
     @property
-    @abstractmethod
     def rule_id(self) -> str:
         """규칙 식별자"""
         ...
 
     @property
-    @abstractmethod
     def description(self) -> str:
         """규칙 설명"""
         ...
 
-    @abstractmethod
     def validate(
         self, target: PolicyTarget, context: DomainPolicyContext
     ) -> list[DomainPolicyViolation]:
@@ -91,8 +64,29 @@ class PolicyRule(ABC):
         ...
 
 
-@dataclass(slots=True, frozen=True)
-class DomainNamingRule(PolicyRule):
+class DomainPolicyViolation(msgspec.Struct, frozen=True):
+    """정책 위반 정보"""
+
+    resource_type: DomainResourceType
+    resource_name: str
+    rule_id: str
+    message: str
+    severity: DomainPolicySeverity
+    field: str | None = None
+    current_value: Any = None
+    expected_value: Any = None
+
+
+class DomainPolicyContext(msgspec.Struct, frozen=True):
+    """정책 평가 컨텍스트"""
+
+    environment: DomainEnvironment
+    resource_type: DomainResourceType
+    actor: str
+    metadata: dict[str, Any] | None = None
+
+
+class DomainNamingRule(msgspec.Struct):
     """네이밍 규칙"""
 
     pattern: str
@@ -152,11 +146,11 @@ class DomainNamingRule(PolicyRule):
             return target.get("name", "")
         elif resource_type == DomainResourceType.SCHEMA:
             return target.get("subject", "")
-        return ""
+        else:
+            raise ValueError(f"unsupported resource type: {resource_type}")
 
 
-@dataclass(slots=True, frozen=True)
-class DomainConfigurationRule(PolicyRule):
+class DomainConfigurationRule(msgspec.Struct):
     """설정값 규칙"""
 
     config_key: str
@@ -261,16 +255,20 @@ class DomainConfigurationRule(PolicyRule):
             return target.get("name", "")
         elif resource_type == DomainResourceType.SCHEMA:
             return target.get("subject", "")
-        return ""
+        else:
+            raise ValueError(f"unsupported resource type: {resource_type}")
 
 
-@dataclass(slots=True, frozen=True)
-class DomainPolicySet:
+class DomainPolicySet(msgspec.Struct):
     """환경별 정책 집합"""
 
     environment: DomainEnvironment
     resource_type: DomainResourceType
     rules: tuple[PolicyRule, ...]
+
+    def __post_init__(self) -> None:
+        if not self.rules:
+            raise ValueError("at least one rule is required")
 
     def validate_batch(
         self, targets: Iterable[PolicyTarget], actor: str, metadata: dict[str, Any] | None = None

@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import logging
-from typing import Any
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -21,12 +20,14 @@ from app.schema.domain.models import (
     DomainSchemaImpactRecord,
     DomainSchemaPlan,
     DomainSchemaPlanItem,
+    DomainSchemaUploadResult,
 )
 from app.schema.domain.repositories.interfaces import ISchemaMetadataRepository
 from app.schema.infrastructure.models import (
     SchemaApplyResultModel,
     SchemaArtifactModel,
     SchemaPlanModel,
+    SchemaUploadResultModel,
 )
 
 logger = logging.getLogger(__name__)
@@ -123,7 +124,7 @@ class MySQLSchemaMetadataRepository(ISchemaMetadataRepository):
 
             # 계획 아이템 역직렬화
 
-            items = [
+            items: list[DomainSchemaPlanItem] = [
                 DomainSchemaPlanItem(
                     subject=item["subject"],
                     action=DomainPlanAction(item["action"]),
@@ -135,7 +136,7 @@ class MySQLSchemaMetadataRepository(ISchemaMetadataRepository):
             ]
 
             # 정책 위반 역직렬화
-            violations = [
+            violations: list[DomainPolicyViolation] = [
                 DomainPolicyViolation(
                     subject=v["subject"],
                     rule=v["rule"],
@@ -146,7 +147,7 @@ class MySQLSchemaMetadataRepository(ISchemaMetadataRepository):
                 for v in plan_data["violations"]
             ]
 
-            compatibility_reports = [
+            compatibility_reports: list[DomainSchemaCompatibilityReport] = [
                 DomainSchemaCompatibilityReport(
                     subject=report["subject"],
                     mode=DomainCompatibilityMode(report["mode"]),
@@ -164,7 +165,7 @@ class MySQLSchemaMetadataRepository(ISchemaMetadataRepository):
             ]
 
             # 영향도 정보 역직렬화
-            impacts = [
+            impacts: list[DomainSchemaImpactRecord] = [
                 DomainSchemaImpactRecord(
                     subject=impact["subject"],
                     topics=tuple(impact["topics"]),
@@ -218,8 +219,8 @@ class MySQLSchemaMetadataRepository(ISchemaMetadataRepository):
                 "summary": result.summary(),
             }
 
-            registered_count = len(result.registered)
-            failed_count = len(result.failed)
+            registered_count: int = len(result.registered)
+            failed_count: int = len(result.failed)
 
             result_model = SchemaApplyResultModel(
                 change_id=result.change_id,
@@ -259,7 +260,38 @@ class MySQLSchemaMetadataRepository(ISchemaMetadataRepository):
             logger.error(f"Failed to record schema artifact {artifact.subject}: {e}")
             raise
 
-    async def save_upload_result(self, upload: Any, uploaded_by: str) -> None:
-        """업로드 결과 저장 (미구현)"""
-        # TODO: SchemaUploadResult 모델 구현 후 추가
-        raise NotImplementedError("Schema upload result saving not implemented yet")
+    async def save_upload_result(self, upload: DomainSchemaUploadResult, uploaded_by: str) -> None:
+        """업로드 결과 저장"""
+        try:
+            # 아티팩트 목록을 JSON으로 변환
+            artifacts_data = [
+                {
+                    "subject": artifact.subject,
+                    "version": artifact.version,
+                    "storage_url": artifact.storage_url,
+                    "checksum": artifact.checksum,
+                }
+                for artifact in upload.artifacts
+            ]
+
+            # 업로드 결과 모델 생성
+            upload_model = SchemaUploadResultModel(
+                upload_id=upload.upload_id,
+                change_id=upload.upload_id.split("_")[1] if "_" in upload.upload_id else "unknown",
+                artifacts={"items": artifacts_data},
+                artifact_count=len(upload.artifacts),
+                uploaded_by=uploaded_by,
+            )
+
+            self.session.add(upload_model)
+            await self.session.flush()
+
+            logger.info(
+                f"Upload result saved: {upload.upload_id} ({len(upload.artifacts)} artifacts)"
+            )
+
+        except Exception as e:
+            logger.error(
+                f"Failed to save upload result {upload.upload_id if hasattr(upload, 'upload_id') else 'unknown'}: {e}"
+            )
+            # 업로드 결과 저장 실패는 치명적이지 않으므로 예외를 발생시키지 않음

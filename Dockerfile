@@ -27,10 +27,11 @@ RUN --mount=type=cache,target=/tmp/uv-cache \
 
 # Copy application code
 COPY app/ ./app/
-COPY alembic/ ./alembic/
-COPY alembic.ini ./
 COPY static/ ./static/
-COPY scripts/ ./scripts/
+
+# Copy optional files (if they exist)
+COPY alembic* ./
+COPY scripts* ./
 
 # Create non-root user
 RUN useradd --create-home --shell /bin/bash app && \

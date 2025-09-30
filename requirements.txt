@@ -40,11 +40,10 @@ websocket-client
 setuptools
 minio
 
-# Authentication & Security
+# Security & Utils
 argon2-cffi
-pyjwt
-python-jose[cryptography]
 orjson
 dependency-injector
+msgspec
 
 pre-commit

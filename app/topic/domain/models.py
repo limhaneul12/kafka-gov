@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 import hashlib
-from dataclasses import dataclass
 from enum import Enum
 from typing import TypeAlias
+
+import msgspec
 
 from ...policy import DomainPolicySeverity, DomainPolicyViolation
 
@@ -60,8 +61,7 @@ TeamName: TypeAlias = str
 DocumentUrl: TypeAlias = str
 
 
-@dataclass(slots=True, frozen=True)
-class DomainTopicMetadata:
+class DomainTopicMetadata(msgspec.Struct, frozen=True):
     """토픽 메타데이터 값 객체"""
 
     owner: TeamName
@@ -70,13 +70,11 @@ class DomainTopicMetadata:
     tags: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
-        """불변성 검증"""
         if not self.owner:
             raise ValueError("owner is required")
 
 
-@dataclass(slots=True, frozen=True)
-class DomainTopicConfig:
+class DomainTopicConfig(msgspec.Struct, frozen=True):
     """토픽 설정 값 객체"""
 
     partitions: int
@@ -89,7 +87,6 @@ class DomainTopicConfig:
     segment_ms: int | None = None
 
     def __post_init__(self) -> None:
-        """설정 검증"""
         if self.partitions < 1:
             raise ValueError("partitions must be >= 1")
         if self.replication_factor < 1:
@@ -122,8 +119,7 @@ class DomainTopicConfig:
         return config
 
 
-@dataclass(slots=True, frozen=True)
-class DomainTopicSpec:
+class DomainTopicSpec(msgspec.Struct, frozen=True):
     """토픽 명세 엔티티"""
 
     name: TopicName
@@ -133,7 +129,6 @@ class DomainTopicSpec:
     reason: str | None = None
 
     def __post_init__(self) -> None:
-        """명세 검증"""
         if not self.name:
             raise ValueError("name is required")
 
@@ -165,8 +160,7 @@ class DomainTopicSpec:
         return hashlib.sha256(content.encode()).hexdigest()[:16]
 
 
-@dataclass(slots=True, frozen=True)
-class DomainTopicBatch:
+class DomainTopicBatch(msgspec.Struct, frozen=True):
     """토픽 배치 엔티티"""
 
     change_id: ChangeId
@@ -174,7 +168,6 @@ class DomainTopicBatch:
     specs: tuple[DomainTopicSpec, ...]
 
     def __post_init__(self) -> None:
-        """배치 검증"""
         if not self.change_id:
             raise ValueError("change_id is required")
         if not self.specs:
@@ -201,8 +194,7 @@ class DomainTopicBatch:
         return hashlib.sha256(content.encode()).hexdigest()[:16]
 
 
-@dataclass(slots=True, frozen=True)
-class DomainTopicPlanItem:
+class DomainTopicPlanItem(msgspec.Struct, frozen=True):
     """토픽 계획 아이템 값 객체"""
 
     name: TopicName
@@ -212,13 +204,11 @@ class DomainTopicPlanItem:
     target_config: dict[str, str] | None = None
 
     def __post_init__(self) -> None:
-        """계획 아이템 검증"""
         if not self.name:
             raise ValueError("name is required")
 
 
-@dataclass(slots=True, frozen=True)
-class DomainTopicPlan:
+class DomainTopicPlan(msgspec.Struct, frozen=True):
     """토픽 계획 엔티티"""
 
     change_id: ChangeId
@@ -227,7 +217,6 @@ class DomainTopicPlan:
     violations: tuple[DomainPolicyViolation, ...]
 
     def __post_init__(self) -> None:
-        """계획 검증"""
         if not self.change_id:
             raise ValueError("change_id is required")
 
@@ -272,8 +261,7 @@ class DomainTopicPlan:
         }
 
 
-@dataclass(slots=True, frozen=True)
-class DomainTopicApplyResult:
+class DomainTopicApplyResult(msgspec.Struct, frozen=True):
     """토픽 적용 결과 엔티티"""
 
     change_id: ChangeId
@@ -284,7 +272,6 @@ class DomainTopicApplyResult:
     audit_id: str
 
     def __post_init__(self) -> None:
-        """결과 검증"""
         if not self.change_id:
             raise ValueError("change_id is required")
         if not self.audit_id:

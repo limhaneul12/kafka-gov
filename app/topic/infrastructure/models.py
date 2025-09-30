@@ -28,6 +28,17 @@ class TopicMetadataModel(Base):
     # 설정 정보 (JSON으로 저장)
     config: Mapped[dict[str, Any] | None] = mapped_column(JSON, comment="토픽 설정")
 
+    # 스키마 정보 (Schema Registry 연동)
+    key_schema_subject: Mapped[str | None] = mapped_column(
+        String(255), comment="Key 스키마 Subject 이름"
+    )
+    value_schema_subject: Mapped[str | None] = mapped_column(
+        String(255), comment="Value 스키마 Subject 이름"
+    )
+    schema_registry_ids: Mapped[dict[str, Any] | None] = mapped_column(
+        JSON, comment="Schema Registry ID 매핑 (key/value)"
+    )
+
     # 감사 정보
     created_by: Mapped[str] = mapped_column(String(100), comment="생성자")
     updated_by: Mapped[str] = mapped_column(String(100), comment="수정자")

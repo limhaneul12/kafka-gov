@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import hashlib
 import uuid
 import zipfile
+from datetime import datetime
 from io import BytesIO
 from pathlib import Path
 from typing import Any
@@ -12,6 +14,8 @@ import orjson
 
 from app.policy.domain.models import DomainPolicySeverity
 from app.schema.application.policy_adapter import SchemaPolicyAdapter
+from app.shared.domain.events import SchemaRegisteredEvent
+from app.shared.infrastructure.event_bus import get_event_bus
 
 from ..domain.models import (
     ChangeId,
@@ -19,9 +23,12 @@ from ..domain.models import (
     DomainSchemaApplyResult,
     DomainSchemaArtifact,
     DomainSchemaBatch,
+    DomainSchemaDeleteImpact,
     DomainSchemaPlan,
     DomainSchemaSpec,
     DomainSchemaUploadResult,
+    DomainSubjectStrategy,
+    SubjectName,
 )
 from ..domain.policies import SchemaPolicyEngine
 from ..domain.repositories.interfaces import (
@@ -30,7 +37,7 @@ from ..domain.repositories.interfaces import (
     ISchemaMetadataRepository,
     ISchemaRegistryRepository,
 )
-from ..domain.services import SchemaPlannerService
+from ..domain.services import SchemaDeleteAnalyzer, SchemaPlannerService
 
 
 class SchemaBatchDryRunUseCase:
@@ -124,6 +131,7 @@ class SchemaBatchApplyUseCase:
         self.storage_repository = storage_repository
         self.policy_engine = policy_engine
         self.planner_service = SchemaPlannerService(registry_repository, policy_engine)
+        self.event_bus = get_event_bus()
 
     async def execute(self, batch: DomainSchemaBatch, actor: str) -> DomainSchemaApplyResult:
         audit_id = str(uuid.uuid4())
@@ -157,6 +165,15 @@ class SchemaBatchApplyUseCase:
                     if artifact:
                         artifacts.append(artifact)
                     registered.append(spec.subject)
+
+                    # 🆕 Domain Event 발행
+                    await self._publish_schema_registered_event(
+                        spec=spec,
+                        version=version,
+                        batch=batch,
+                        actor=actor,
+                    )
+
                 except Exception as exc:
                     failed.append({"subject": spec.subject, "error": str(exc)})
 
@@ -228,11 +245,41 @@ class SchemaBatchApplyUseCase:
             checksum=spec.schema_hash or spec.fingerprint(),
         )
         await self.metadata_repository.record_artifact(artifact, change_id)
-        return artifact
+
+    async def _publish_schema_registered_event(
+        self,
+        spec: DomainSchemaSpec,
+        version: int,
+        batch: DomainSchemaBatch,
+        actor: str,
+    ) -> None:
+        """스키마 등록 이벤트 발행"""
+        # Schema Registry에서 schema_id 조회
+        subjects_info = await self.registry_repository.describe_subjects([spec.subject])
+        schema_info = subjects_info.get(spec.subject)
+        schema_id: int = (
+            schema_info.schema_id if schema_info and schema_info.schema_id is not None else 0
+        )
+
+        event = SchemaRegisteredEvent(
+            event_id=f"evt_{uuid.uuid4().hex[:12]}",
+            aggregate_id=batch.change_id,
+            occurred_at=datetime.now(),
+            subject=spec.subject,
+            version=version,
+            schema_type=spec.schema_type.value,
+            schema_id=schema_id,
+            compatibility_mode=spec.compatibility.value,
+            subject_strategy=batch.subject_strategy.value,
+            environment=batch.env.value,
+            actor=actor,
+        )
+
+        await self.event_bus.publish(event)
 
 
 class SchemaPlanUseCase:
-    """스키마 배치 계획 조회 유스케이스"""
+    """스키마 계획 조회 유스케이스"""
 
     def __init__(
         self,
@@ -291,10 +338,7 @@ class SchemaUploadUseCase:
             ]
 
             # 3. 결과 생성
-            result = DomainSchemaUploadResult(
-                upload_id=upload_id,
-                artifacts=tuple(artifacts),
-            )
+            result = DomainSchemaUploadResult(upload_id=upload_id, artifacts=tuple(artifacts))
 
             # 4. 메타데이터 저장
             await self.metadata_repository.save_upload_result(result, actor)
@@ -489,6 +533,125 @@ class SchemaUploadUseCase:
 
     def _calculate_checksum(self, content: bytes) -> str:
         """콘텐츠 체크섬 계산"""
-        import hashlib
-
         return hashlib.sha256(content).hexdigest()[:16]
+
+
+class SchemaDeleteAnalysisUseCase:
+    """스키마 삭제 영향도 분석 유스케이스"""
+
+    def __init__(
+        self,
+        registry_repository: ISchemaRegistryRepository,
+        audit_repository: ISchemaAuditRepository,
+    ) -> None:
+        self.registry_repository = registry_repository
+        self.audit_repository = audit_repository
+        self.delete_analyzer = SchemaDeleteAnalyzer(registry_repository)
+
+    async def analyze(
+        self,
+        subject: SubjectName,
+        strategy: DomainSubjectStrategy,
+        actor: str,
+    ) -> DomainSchemaDeleteImpact:
+        """스키마 삭제 영향도 분석
+
+        Args:
+            subject: 분석할 Subject 이름
+            strategy: Subject 전략
+            actor: 분석 요청자
+
+        Returns:
+            삭제 영향도 분석 결과
+        """
+        # 영향도 분석 수행
+        impact = await self.delete_analyzer.analyze_delete_impact(subject, strategy)
+
+        # 감사 로그 기록
+        await self.audit_repository.log_operation(
+            change_id=f"delete_analysis_{uuid.uuid4().hex[:8]}",
+            action="DELETE_ANALYSIS",
+            target=subject,
+            actor=actor,
+            status="completed",
+            message=f"Delete impact analysis: {len(impact.warnings)} warnings, safe={impact.safe_to_delete}",
+            snapshot={
+                "subject": subject,
+                "current_version": impact.current_version,
+                "affected_topics": list(impact.affected_topics),
+                "warnings": list(impact.warnings),
+                "safe_to_delete": impact.safe_to_delete,
+            },
+        )
+
+        return impact
+
+    async def delete(
+        self,
+        subject: SubjectName,
+        strategy: DomainSubjectStrategy,
+        actor: str,
+        force: bool = False,
+    ) -> DomainSchemaDeleteImpact:
+        """스키마 삭제 실행 (영향도 분석 포함)
+
+        Args:
+            subject: 삭제할 Subject 이름
+            strategy: Subject 전략
+            actor: 삭제 요청자
+            force: 강제 삭제 여부 (경고 무시)
+
+        Returns:
+            삭제 영향도 분석 결과
+
+        Raises:
+            ValueError: 안전하지 않은 삭제 시도 (force=False)
+        """
+        # 1. 영향도 분석
+        impact = await self.delete_analyzer.analyze_delete_impact(subject, strategy)
+
+        # 2. 안전성 검증
+        if not force and not impact.safe_to_delete:
+            warning_msg = "; ".join(impact.warnings)
+            raise ValueError(
+                f"스키마 삭제가 안전하지 않습니다: {warning_msg}. "
+                f"강제 삭제하려면 force=True를 사용하세요."
+            )
+
+        # 3. 실제 삭제 수행
+        try:
+            await self.registry_repository.delete_subject(subject)
+
+            # 4. 감사 로그 기록 (성공)
+            await self.audit_repository.log_operation(
+                change_id=f"delete_{uuid.uuid4().hex[:8]}",
+                action="DELETE",
+                target=subject,
+                actor=actor,
+                status="success",
+                message=f"Schema deleted (force={force})",
+                snapshot={
+                    "subject": subject,
+                    "deleted_version": impact.current_version,
+                    "affected_topics": list(impact.affected_topics),
+                    "force": force,
+                },
+            )
+
+        except Exception as e:
+            # 5. 감사 로그 기록 (실패)
+            await self.audit_repository.log_operation(
+                change_id=f"delete_{uuid.uuid4().hex[:8]}",
+                action="DELETE",
+                target=subject,
+                actor=actor,
+                status="failed",
+                message=f"Schema deletion failed: {e}",
+                snapshot={
+                    "subject": subject,
+                    "error": str(e),
+                },
+            )
+            raise
+
+        return impact
