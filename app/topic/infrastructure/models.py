@@ -47,7 +47,9 @@ class TopicPlanModel(Base):
     __tablename__ = "topic_plans"
 
     # 기본 키
-    change_id: Mapped[str] = mapped_column(String(36), primary_key=True, comment="변경 ID (UUID)")
+    change_id: Mapped[str] = mapped_column(
+        String(100), primary_key=True, comment="변경 ID"
+    )  # 36 → 100
 
     # 계획 정보
     env: Mapped[str] = mapped_column(String(50), comment="환경 (dev/staging/prod)")
@@ -77,7 +79,9 @@ class TopicApplyResultModel(Base):
     __tablename__ = "topic_apply_results"
 
     # 기본 키
-    change_id: Mapped[str] = mapped_column(String(36), primary_key=True, comment="변경 ID (UUID)")
+    change_id: Mapped[str] = mapped_column(
+        String(100), primary_key=True, comment="변경 ID"
+    )  # 36 → 100
 
     # 결과 정보
     result_data: Mapped[dict[str, Any]] = mapped_column(JSON, comment="적용 결과 (JSON)")
@@ -103,7 +107,7 @@ class AuditLogModel(Base):
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True, comment="로그 ID")
 
     # 감사 정보
-    change_id: Mapped[str] = mapped_column(String(36), comment="변경 ID")
+    change_id: Mapped[str] = mapped_column(String(100), comment="변경 ID")
     action: Mapped[str] = mapped_column(String(50), comment="액션")
     target: Mapped[str] = mapped_column(String(255), comment="대상 (토픽명)")
     actor: Mapped[str] = mapped_column(String(100), comment="수행자")

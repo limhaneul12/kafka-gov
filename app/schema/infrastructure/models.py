@@ -45,7 +45,9 @@ class SchemaPlanModel(Base):
     __tablename__ = "schema_plans"
 
     # 기본 키
-    change_id: Mapped[str] = mapped_column(String(36), primary_key=True, comment="변경 ID (UUID)")
+    change_id: Mapped[str] = mapped_column(
+        String(100), primary_key=True, comment="변경 ID"
+    )  # 36 → 100
 
     # 계획 정보
     env: Mapped[str] = mapped_column(String(50), comment="환경 (dev/stg/prod)")
@@ -75,7 +77,9 @@ class SchemaApplyResultModel(Base):
     __tablename__ = "schema_apply_results"
 
     # 기본 키
-    change_id: Mapped[str] = mapped_column(String(36), primary_key=True, comment="변경 ID (UUID)")
+    change_id: Mapped[str] = mapped_column(
+        String(100), primary_key=True, comment="변경 ID"
+    )  # 36 → 100
 
     # 결과 정보
     result_data: Mapped[dict[str, Any]] = mapped_column(JSON, comment="적용 결과 (JSON)")
@@ -104,7 +108,7 @@ class SchemaArtifactModel(Base):
     # 아티팩트 정보
     storage_url: Mapped[str] = mapped_column(Text, comment="저장소 URL")
     checksum: Mapped[str | None] = mapped_column(String(64), comment="체크섬")
-    change_id: Mapped[str] = mapped_column(String(36), comment="변경 ID")
+    change_id: Mapped[str] = mapped_column(String(100), comment="변경 ID")  # 36 → 100
 
     # 메타데이터
     schema_type: Mapped[str] = mapped_column(String(20), comment="스키마 타입")
@@ -128,7 +132,7 @@ class SchemaUploadResultModel(Base):
     upload_id: Mapped[str] = mapped_column(String(100), primary_key=True, comment="업로드 ID")
 
     # 업로드 정보
-    change_id: Mapped[str] = mapped_column(String(36), comment="변경 ID")
+    change_id: Mapped[str] = mapped_column(String(100), comment="변경 ID")  # 36 → 100
     artifacts: Mapped[dict[str, Any]] = mapped_column(JSON, comment="업로드된 아티팩트 목록 (JSON)")
     artifact_count: Mapped[int] = mapped_column(default=0, comment="아티팩트 개수")
 
@@ -151,7 +155,9 @@ class SchemaAuditLogModel(Base):
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True, comment="로그 ID")
 
     # 감사 정보
-    change_id: Mapped[str] = mapped_column(String(36), comment="변경 ID")
+    change_id: Mapped[str] = mapped_column(
+        String(100), comment="변경 ID"
+    )  # 36 → 100 (긴 subject명 지원)
     action: Mapped[str] = mapped_column(String(50), comment="액션")
     target: Mapped[str] = mapped_column(String(255), comment="대상 (Subject명)")
     actor: Mapped[str] = mapped_column(String(100), comment="수행자")
