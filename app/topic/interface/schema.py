@@ -24,7 +24,6 @@ from .types import (
     ErrorRule,
     ErrorSeverity,
     PlanAction,
-    PlanStatus,
     TagName,
     TeamName,
     TopicAction,
@@ -348,6 +347,9 @@ class TopicListItem(BaseModel):
             "example": {
                 "name": "dev.orders.created",
                 "owner": "team-commerce",
+                "tags": ["pii", "critical"],
+                "partition_count": 12,
+                "replication_factor": 3,
                 "environment": "dev",
             }
         },
@@ -355,6 +357,9 @@ class TopicListItem(BaseModel):
 
     name: TopicName
     owner: TeamName | None = None
+    tags: list[str] = Field(default_factory=list)
+    partition_count: int | None = None
+    replication_factor: int | None = None
     environment: str
 
 
@@ -370,11 +375,17 @@ class TopicListResponse(BaseModel):
                     {
                         "name": "dev.orders.created",
                         "owner": "team-commerce",
+                        "tags": ["pii", "critical"],
+                        "partition_count": 12,
+                        "replication_factor": 3,
                         "environment": "dev",
                     },
                     {
                         "name": "prod.payments.completed",
                         "owner": "team-payments",
+                        "tags": ["finance"],
+                        "partition_count": 24,
+                        "replication_factor": 3,
                         "environment": "prod",
                     },
                 ]
@@ -383,70 +394,6 @@ class TopicListResponse(BaseModel):
     )
 
     topics: list[TopicListItem]
-
-
-class TopicDetailResponse(BaseModel):
-    """토픽 상세 응답"""
-
-    model_config = ConfigDict(
-        extra="forbid",
-        frozen=True,
-        json_schema_extra={
-            "example": {
-                "name": "prod.orders.created",
-                "kafka_metadata": {
-                    "partition_count": 12,
-                    "replication_factor": 3,
-                    "config": {
-                        "cleanup.policy": "compact",
-                        "compression.type": "zstd",
-                        "retention.ms": "604800000",
-                    },
-                },
-                "metadata": {
-                    "owner": "team-commerce",
-                    "doc": "https://wiki.company.com/streams/orders",
-                    "tags": ["commerce", "orders"],
-                },
-            }
-        },
-    )
-
-    name: TopicName
-    kafka_metadata: dict[str, int | str | dict]  # Kafka 메타데이터 (유연한 구조)
-    metadata: TopicMetadata | None = None  # DB 메타데이터 (구조화된 모델)
-
-
-class TopicPlanResponse(BaseModel):
-    """토픽 계획 조회 응답"""
-
-    model_config = ConfigDict(
-        extra="forbid",
-        frozen=True,
-        json_schema_extra={
-            "example": {
-                "change_id": "2025-09-25_001",
-                "env": "prod",
-                "status": "applied",
-                "created_at": "2025-09-25T10:00:00Z",
-                "applied_at": "2025-09-25T10:05:00Z",
-                "plan": [
-                    {
-                        "name": "prod.orders.created",
-                        "action": "ALTER",
-                        "diff": {"partitions": "8→12"},
-                    }
-                ],
-            }
-        },
-    )
-
-    change_id: ChangeId
-    env: Environment
-    status: PlanStatus
-    created_at: StrictStr
-    applied_at: StrictStr | None = None
-    plan: list[TopicPlanItem] = Field(default_factory=list)
 
 
 class TopicBulkDeleteResponse(BaseModel):

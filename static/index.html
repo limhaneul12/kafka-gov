@@ -167,12 +167,12 @@
                                     <input type="checkbox" id="topic-select-all" title="전체 선택">
                                 </th>
                                 <th>토픽명</th>
+                                <th>소유자</th>
+                                <th>태그</th>
+                                <th>파티션</th>
+                                <th>복제</th>
                                 <th>환경</th>
-                                <th>키 스키마</th>
-                                <th>값 스키마</th>
-                                <th>신뢰도</th>
-                                <th>출처</th>
-                                <th>상세</th>
+                                <th>삭제</th>
                             </tr>
                         </thead>
                         <tbody id="topics-table-body">
@@ -238,9 +238,6 @@
                             <tr>
                                 <th>Subject</th>
                                 <th>환경</th>
-                                <th>연관 토픽</th>
-                                <th>평균 신뢰도</th>
-                                <th>출처</th>
                                 <th>분석</th>
                                 <th>삭제</th>
                             </tr>
@@ -501,20 +498,6 @@ items:
                 <button type="button" class="btn btn-secondary" id="cancel-delete-analysis">취소</button>
                 <button type="button" class="btn btn-danger" id="force-delete-schema" style="display: none;">강제
                     삭제</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- 토픽 상세 모달 -->
-    <div id="topic-detail-modal" class="modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h3>토픽 상세 정보</h3>
-                <button class="modal-close">&times;</button>
-            </div>
-            <div class="modal-body" id="topic-detail-content"></div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" onclick="Modal.hide('topic-detail-modal')">닫기</button>
             </div>
         </div>
     </div>

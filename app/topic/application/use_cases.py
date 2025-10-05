@@ -11,8 +11,6 @@ from ..domain.models import (
     ChangeId,
     DomainTopicApplyResult,
     DomainTopicBatch,
-    DomainTopicDetail,
-    DomainTopicMetadata,
     DomainTopicPlan,
     DomainTopicSpec,
     TopicName,
@@ -21,7 +19,6 @@ from ..domain.repositories.interfaces import (
     IAuditRepository,
     ITopicMetadataRepository,
     ITopicRepository,
-    PlanMeta,
 )
 from ..domain.services import TopicPlannerService
 
@@ -344,45 +341,6 @@ class TopicBatchApplyUseCase:
             logger.error(f"Failed to save topic metadata for {spec.name}: {e}", exc_info=True)
 
 
-class TopicDetailUseCase:
-    """토픽 상세 조회 유스케이스"""
-
-    def __init__(
-        self,
-        topic_repository: ITopicRepository,
-        metadata_repository: ITopicMetadataRepository,
-    ) -> None:
-        self.topic_repository = topic_repository
-        self.metadata_repository = metadata_repository
-
-    async def execute(self, name: TopicName) -> DomainTopicDetail | None:
-        """토픽 상세 정보 조회"""
-        # Kafka에서 토픽 정보 조회
-        kafka_topics = await self.topic_repository.describe_topics([name])
-        kafka_topic = kafka_topics.get(name)
-
-        if kafka_topic is None:
-            return None
-
-        # 메타데이터 조회 및 변환
-        metadata_dict = await self.metadata_repository.get_topic_metadata(name)
-
-        # dict를 DomainTopicMetadata로 변환
-        metadata = None
-        if metadata_dict:
-            metadata = DomainTopicMetadata(
-                owner=metadata_dict.get("owner"),
-                doc=metadata_dict.get("doc"),
-                tags=tuple(metadata_dict.get("tags", [])) if metadata_dict.get("tags") else (),
-            )
-
-        return DomainTopicDetail(
-            name=name,
-            kafka_metadata=kafka_topic,
-            metadata=metadata,
-        )
-
-
 class TopicListUseCase:
     """토픽 목록 조회 유스케이스"""
 
@@ -396,17 +354,28 @@ class TopicListUseCase:
 
     async def execute(self) -> list[dict[str, Any]]:
         """토픽 목록 조회"""
-        # Kafka에서 모든 토픽 조회
+        # 1. Kafka에서 모든 토픽 이름 조회
         all_topics = await self.topic_repository.list_topics()
 
-        # 메타데이터와 함께 반환
+        # 2. Kafka에서 모든 토픽 상세 정보 배치 조회 (파티션수, 복제개수)
+        topic_details = await self.topic_repository.describe_topics(all_topics)
+
+        # 3. DB 메타데이터와 Kafka 정보를 병합
         topics_with_metadata = []
         for topic_name in all_topics:
+            # DB 메타데이터 조회 (owner, tags)
             metadata = await self.metadata_repository.get_topic_metadata(topic_name)
+
+            # Kafka 상세 정보
+            kafka_info = topic_details.get(topic_name, {})
+
             topics_with_metadata.append(
                 {
                     "name": topic_name,
                     "owner": metadata.get("owner") if metadata else None,
+                    "tags": metadata.get("tags", []) if metadata else [],
+                    "partition_count": kafka_info.get("partition_count"),
+                    "replication_factor": kafka_info.get("replication_factor"),
                     "environment": self._infer_environment(topic_name),
                 }
             )
@@ -423,18 +392,3 @@ class TopicListUseCase:
         if topic_name.startswith("prod."):
             return "prod"
         return "unknown"
-
-
-class TopicPlanUseCase:
-    """토픽 계획 조회 유스케이스"""
-
-    def __init__(self, metadata_repository: ITopicMetadataRepository) -> None:
-        self.metadata_repository = metadata_repository
-
-    async def execute(self, change_id: ChangeId) -> DomainTopicPlan | None:
-        """계획 조회"""
-        return await self.metadata_repository.get_plan(change_id)
-
-    async def get_meta(self, change_id: ChangeId) -> PlanMeta | None:
-        """계획 메타 정보 조회 (상태/타임스탬프)"""
-        return await self.metadata_repository.get_plan_meta(change_id)

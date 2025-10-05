@@ -149,20 +149,6 @@ class ApiClient {
     }
 
     /**
-     * 토픽 상세 조회
-     */
-    async getTopicDetail(topicName) {
-        return this.get(`/topics/${encodeURIComponent(topicName)}`);
-    }
-
-    /**
-     * 토픽 계획 조회
-     */
-    async getTopicPlan(changeId) {
-        return this.get(`/topics/plans/${encodeURIComponent(changeId)}`);
-    }
-
-    /**
      * 토픽 삭제
      */
     async deleteTopic(topicName) {

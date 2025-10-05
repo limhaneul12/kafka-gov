@@ -6,7 +6,7 @@
   [![Python](https://img.shields.io/badge/Python-3.12+-blue.svg)](https://python.org)
   [![FastAPI](https://img.shields.io/badge/FastAPI-0.117+-green.svg)](https://fastapi.tiangolo.com)
   [![Confluent Kafka](https://img.shields.io/badge/Confluent_Kafka-2.6.1+-red.svg)](https://docs.confluent.io/platform/current/clients/confluent-kafka-python/html/index.html)
-  [![Coverage](https://img.shields.io/badge/Coverage-81%25-green.svg)](https://github.com/limhaneul12/kafka-gov)
+  [![Coverage](https://img.shields.io/badge/Coverage-85%25-brightgreen.svg)](https://github.com/limhaneul12/kafka-gov)
   [![License](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
   [![pytest](https://img.shields.io/badge/pytest-8.4.2-blue.svg)](https://github.com/limhaneul12/kafka-gov/actions)
   [![CI](https://github.com/limhaneul12/kafka-gov/workflows/CI/badge.svg)](https://github.com/limhaneul12/kafka-gov/actions)
@@ -26,17 +26,28 @@
 
 ### 📋 **Schema Registry Governance**
 - **Schema Evolution**: Manage schema versions with compatibility validation
-- **File Upload**: Bulk schema upload with validation and conflict resolution
+- **File Upload**: Bulk schema upload (.avsc, .json, .proto, .zip) with auto-registration
 - **Storage Integration**: MinIO-backed schema artifact storage
-- **Schema Management**: Delete analysis and safe schema deletion
+- **Schema Management**: Delete impact analysis and safe schema deletion
+- **Schema Sync**: Automatic synchronization from Schema Registry to database
 
-### 🔒 **Security & Policy Management**
-- **Policy Engine**: Configurable rules for naming, configuration, and resource limits
-- **Violation Detection**: Real-time policy violation detection with severity levels
+### 🔒 **Policy & Governance**
+- **Integrated Policy Engine**: Topic and Schema policies with environment-specific rules
+- **Violation Detection**: Real-time policy violation detection with severity levels (WARNING, ERROR, CRITICAL)
+- **Audit Trail**: Complete audit logging for Topic and Schema operations
+- **Role-Based Access**: User role management (VIEWER, DEVELOPER, ADMIN)
+
+### 📊 **Analysis & Monitoring**
+- **Topic-Schema Correlation**: Automatic linking between topics and schemas
+- **Impact Analysis**: Schema deletion impact analysis with affected topics
+- **Activity Dashboard**: Unified audit activity view across all components
+- **Cluster Status**: Real-time Kafka cluster health monitoring
 
 ### 🏗️ **Architecture**
 - **Clean Architecture**: Domain-driven design with clear layer separation
+- **Event-Driven**: Domain events for cross-context communication
 - **High Performance**: Async/await throughout with connection pooling
+- **Type Safety**: Python 3.12+ with strict type hints and pyrefly validation
 - **Observability**: Structured logging, metrics, and health checks
 - **Scalability**: Horizontal scaling support with stateless design
 
@@ -46,32 +57,19 @@ Built on **Clean Architecture** principles with domain-driven design:
 
 ```
 app/
-├── shared/                    # Common infrastructure
-│   ├── database.py           # SQLAlchemy async engine
-│   ├── container.py          # Dependency injection
-│   └── settings.py           # Application configuration
-├── analysis/                  # Analysis and monitoring domain
-│   ├── domain/              # Analysis models & business logic
-│   ├── application/         # Analysis services
-│   ├── infrastructure/      # Analysis repositories
-│   └── interface/           # Analysis REST API endpoints
-├── policy/                   # Policy engine domain
-│   ├── domain/              # Policy rules & evaluation
-│   ├── application/         # Policy services
-│   ├── infrastructure/      # Rule repositories
-│   └── interface/           # Policy REST API endpoints
-├── topic/                    # Topic management domain
-│   ├── domain/              # Topic models & business logic
-│   ├── application/         # Topic use cases & orchestration
-│   ├── infrastructure/      # Kafka & database adapters
-│   └── interface/           # Topic REST API endpoints
-├── schema/                   # Schema registry domain
-│   ├── domain/              # Schema models & business logic
-│   ├── application/         # Schema use cases & orchestration
-│   ├── infrastructure/      # Schema registry & storage adapters
-│   └── interface/           # Schema REST API endpoints
-└── main.py                   # Application entry point
+├── shared/          # Common infrastructure & domain events
+├── topic/           # Topic management domain
+├── schema/          # Schema registry domain
+├── analysis/        # Analysis & correlation domain
+├── container.py     # Root DI container
+└── main.py          # FastAPI application
 ```
+
+**Key Principles:**
+- **Clean Architecture**: Domain → Application → Infrastructure → Interface
+- **Event-Driven**: Domain events for cross-context communication
+- **Type Safety**: Python 3.12+ with strict typing and pyrefly validation
+- **DI Container**: Hierarchical dependency injection with `dependency-injector`
 
 ### Prerequisites
 - Python 3.12+
@@ -112,46 +110,36 @@ app/
    - Swagger UI: http://localhost:8000/docs
    - Health Check: http://localhost:8000/health
 
-### Example Usage
+### Quick Start Example
 
 ```bash
-# Register a new user
-curl -X POST "http://localhost:8000/api/v1/auth/register" \
-  -H "Content-Type: application/json" \
-  -d '{"username": "admin", "password": "secure123"}'
+# Start services
+docker-compose up -d
 
-# Plan topic changes
-curl -X POST "http://localhost:8000/api/v1/topics/dev/batch/dry-run" \
-  -H "Authorization: Bearer YOUR_TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "topics": [
-      {
-        "name": "user-events",
-        "action": "CREATE",
-        "config": {
-          "partitions": 3,
-          "replication_factor": 2
-        }
-      }
-    ]
-  }'
+# Access Swagger UI
+open http://localhost:8000/docs
+
+# Health check
+curl http://localhost:8000/health
 ```
 
 ## 🛠️ Tech Stack
 
 | Category | Technology |
 |----------|------------|
-| **Framework** | FastAPI, Pydantic |
-| **Database** | SQLAlchemy (Async), MySQL/PostgreSQL |
+| **Framework** | FastAPI 0.117+, Pydantic v2 |
+| **Domain Models** | msgspec (high-performance serialization) |
+| **Database** | SQLAlchemy 2.0 (Async), MySQL/PostgreSQL |
 | **Message Broker** | Apache Kafka, Confluent Platform |
 | **Schema Registry** | Confluent Schema Registry |
 | **Storage** | MinIO (S3-compatible) |
-| **Authentication** | JWT, Argon2 |
-| **Architecture** | Clean Architecture, DDD |
-| **Testing** | pytest, pytest-asyncio, pytest-cov |
-| **Type Safety** | Python 3.12+ strict typing |
-| **Main Libraries** | confluent-kafka, aiokafka |
+| **Dependency Injection** | dependency-injector |
+| **Event Bus** | In-memory async event bus |
+| **Architecture** | Clean Architecture, DDD, Event-Driven |
+| **Testing** | pytest, pytest-asyncio, pytest-cov (85% coverage) |
+| **Type Safety** | Python 3.12+, pyrefly, ruff |
+| **Package Manager** | uv (ultra-fast) |
+| **Main Libraries** | confluent-kafka, aiomysql, httpx, orjson |
 
 ## 📖 Documentation
 
@@ -180,28 +168,41 @@ JWT_EXPIRE_MINUTES=1800
 
 ### 🛡️ API Endpoints
 
-#### Topic Management
+#### Topic Management (`/api/v1/topics`)
 ```
-POST   /api/v1/topics/{env}/batch/dry-run      # Plan topic changes
-POST   /api/v1/topics/{env}/batch/apply        # Apply topic changes
-GET    /api/v1/topics/{env}/{name}             # Get topic details
-GET    /api/v1/topics/{env}/plans/{change_id}  # Get execution plan
-```
-
-#### Schema Registry
-```
-POST   /api/v1/schemas/{env}/batch/dry-run     # Plan schema changes
-POST   /api/v1/schemas/{env}/batch/apply       # Apply schema changes
-POST   /api/v1/schemas/{env}/upload            # Upload schema files
-GET    /api/v1/schemas/{env}/plan/{change_id}  # Get schema plan
-POST   /api/v1/schemas/delete/analyze          # Analyze schema deletion impact
-DELETE /api/v1/schemas/delete/{subject}        # Delete schema safely
+POST   /batch/dry-run                          # Plan topic changes (dry-run)
+POST   /batch/apply                            # Apply topic changes
+GET    /plan/{change_id}                       # Get plan by change ID
+GET    /detail/{topic_name}                    # Get topic details
+GET    /list                                   # List all topics
+DELETE /bulk-delete                            # Bulk delete topics
 ```
 
-#### Policy Management
+#### Schema Registry (`/api/v1/schemas`)
 ```
-GET    /api/v1/policies                        # List policies
-POST   /api/v1/policies/validate              # Validate against policies
+POST   /batch/dry-run                          # Plan schema changes (dry-run)
+POST   /batch/apply                            # Apply schema changes
+POST   /upload                                 # Upload schema files (.avsc, .json, .proto, .zip)
+GET    /plan/{change_id}                       # Get schema plan
+POST   /sync                                   # Sync from Schema Registry to DB
+POST   /delete/analyze                         # Analyze schema deletion impact
+DELETE /delete/{subject}                       # Delete schema (with force option)
+GET    /list                                   # List all schemas
+```
+
+#### Analysis & Correlation (`/api/v1/analysis`)
+```
+GET    /correlation/by-schema/{subject}        # Get topics using a schema
+GET    /correlation/by-topic/{topic_name}      # Get schema correlation for topic
+POST   /correlation/link                       # Manually link topic to schema
+GET    /impact/schema/{subject}                # Get schema impact analysis
+```
+
+#### Shared (`/api/v1`)
+```
+GET    /cluster/status                         # Kafka cluster status
+GET    /audit/activities                       # Recent audit activities
+GET    /audit/activity/{activity_id}           # Get activity detail
 ```
 
 #### System
@@ -211,71 +212,29 @@ GET    /docs                                   # Swagger UI
 GET    /redoc                                  # ReDoc
 ```
 
-### 🧪 Testing
-
-```bash
-# Run all tests
-pytest
-
-# Run with coverage
-pytest --cov=app --cov-report=html
-
-# Run specific module tests
-pytest tests/topic/
-pytest tests/schema/
-pytest tests/policy/
-```
-
 ## 🚀 Deployment
 
-### Docker Production
-
 ```bash
-# Build production image
-docker build -t kafka-gov:latest .
+# Build and run with Docker Compose
+docker-compose up -d
 
-# Run with production settings
-docker run -d \
-  --name kafka-gov \
-  -p 8000:8000 \
-  --env-file .env.prod \
-  kafka-gov:latest
+# Or build production image
+docker build -t kafka-gov:latest .
+docker run -d -p 8000:8000 --env-file .env.prod kafka-gov:latest
 ```
 
 
 
 ## 🤝 Contributing
 
-We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) for details.
+Contributions are welcome! Please:
 
-### Development Setup
+1. Fork the repository
+2. Create a feature branch
+3. Run tests: `uv run pytest --cov=app`
+4. Submit a pull request
 
-1. **Fork and clone**
-   ```bash
-   git clone https://github.com/limhaneul12/kafka-gov.git
-   cd kafka-gov
-   ```
-
-2. **Set up development environment**
-   ```bash
-   uv sync --group dev
-   pre-commit install
-   ```
-
-3. **Run tests**
-   ```bash
-   pytest
-   ```
-
-4. **Submit a pull request**
-
-### Code Standards
-
-- **Type Safety**: Full type hints with Python 3.12+
-- **Testing**: 90%+ test coverage required
-- **Documentation**: Docstrings for all public APIs
-- **Formatting**: ruff
-- **Architecture**: Follow Clean Architecture principles
+**Standards**: Python 3.12+, 80%+ test coverage, Clean Architecture
 
 ## 💬 Community
 
@@ -289,10 +248,14 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## 🙏 Acknowledgments
 
-- [FastAPI](https://fastapi.tiangolo.com/) for the excellent web framework
-- [Confluent](https://www.confluent.io/) for Kafka Python client
-- [SQLAlchemy](https://www.sqlalchemy.org/) for database ORM
+- [FastAPI](https://fastapi.tiangolo.com/) for the excellent async web framework
+- [Confluent](https://www.confluent.io/) for Kafka Python client and Schema Registry
+- [SQLAlchemy](https://www.sqlalchemy.org/) for async database ORM
 - [Pydantic](https://pydantic.dev/) for data validation
+- [msgspec](https://jcristharif.com/msgspec/) for high-performance serialization
+- [dependency-injector](https://python-dependency-injector.ets-labs.org/) for DI container
+- [uv](https://github.com/astral-sh/uv) for ultra-fast package management
+- [pyrefly](https://github.com/pyrefly-labs/pyrefly) for advanced type checking
 
 ---
 

@@ -18,16 +18,12 @@ from app.topic.interface.adapters import (
     safe_convert_request_to_batch,
 )
 from app.topic.interface.schema import (
-    ChangeId,
     TopicBatchApplyResponse,
     TopicBatchDryRunResponse,
     TopicBatchRequest,
     TopicBulkDeleteResponse,
-    TopicDetailResponse,
     TopicListItem,
     TopicListResponse,
-    TopicPlanItem as ResponsePlanItem,
-    TopicPlanResponse,
 )
 
 router = APIRouter(prefix="/v1/topics", tags=["topics"])
@@ -38,8 +34,6 @@ router = APIRouter(prefix="/v1/topics", tags=["topics"])
 ListTopicDep = Depends(Provide[AppContainer.topic_container.list_use_case])
 DryTopicDep = Depends(Provide[AppContainer.topic_container.dry_run_use_case])
 ApplyTopicDep = Depends(Provide[AppContainer.topic_container.apply_use_case])
-DetailTopicDep = Depends(Provide[AppContainer.topic_container.detail_use_case])
-PlanTopicDep = Depends(Provide[AppContainer.topic_container.plan_use_case])
 
 
 @router.get(
@@ -61,6 +55,9 @@ async def list_topics(use_case=ListTopicDep) -> TopicListResponse:
             TopicListItem(
                 name=topic["name"],
                 owner=topic.get("owner"),
+                tags=topic.get("tags", []),
+                partition_count=topic.get("partition_count"),
+                replication_factor=topic.get("replication_factor"),
                 environment=topic["environment"],
             )
             for topic in topics_data
@@ -133,124 +130,6 @@ async def topic_batch_apply(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail=f"Policy violation: {e!s}",
         ) from e
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Internal server error: {e!s}",
-        ) from e
-
-
-@router.get(
-    "/plans/{change_id}",
-    response_model=TopicPlanResponse,
-    status_code=status.HTTP_200_OK,
-    summary="토픽 계획 조회",
-    description="과거 실행된 토픽 배치 계획을 조회합니다.",
-    response_description="토픽 계획 조회 결과",
-)
-@inject
-async def get_topic_plan(change_id: ChangeId, plan_use_case=PlanTopicDep) -> TopicPlanResponse:
-    """토픽 계획 조회"""
-    try:
-        plan = await plan_use_case.execute(change_id)
-
-        if plan is None:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Plan '{change_id}' not found",
-            )
-
-        plan_items: list[ResponsePlanItem] = [
-            ResponsePlanItem(
-                name=item.name,
-                action=item.action.value,
-                diff=item.diff,
-                current_config=item.current_config,
-                target_config=item.target_config,
-            )
-            for item in plan.items
-        ]
-
-        # 계약 보강: Repository에서 메타 정보 조회
-        meta = await plan_use_case.get_meta(change_id)
-        created_at: str = (
-            meta.get("created_at", datetime.now(UTC).isoformat())
-            if meta
-            else datetime.now(UTC).isoformat()
-        )
-        status_value: str = (
-            meta.get("status", ("applied" if plan.can_apply else "pending"))
-            if meta
-            else ("applied" if plan.can_apply else "pending")
-        )
-        applied_at: str | None = meta.get("applied_at") if meta else None
-
-        return TopicPlanResponse(
-            change_id=change_id,
-            env=plan.env.value,
-            status=status_value,
-            created_at=created_at,
-            applied_at=applied_at,
-            plan=plan_items,
-        )
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Internal server error: {e!s}",
-        ) from e
-
-
-@router.get(
-    "/{name}",
-    response_model=TopicDetailResponse,
-    status_code=status.HTTP_200_OK,
-    summary="토픽 상세 조회",
-    description="토픽의 상세 정보를 조회합니다 (Kafka 메타데이터 + 사용자 메타데이터).",
-    response_description="토픽 상세 조회 결과",
-)
-@inject
-async def get_topic_detail(name: str, detail_use_case=DetailTopicDep) -> TopicDetailResponse:
-    """토픽 상세 조회"""
-    try:
-        result = await detail_use_case.execute(name)
-
-        if result is None:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Topic '{name}' not found",
-            )
-
-        # Kafka 메타데이터 변환 (dict 형식으로)
-        raw_kafka_metadata = result.kafka_metadata
-
-        # 디버깅: 메타데이터 구조 로깅
-        logger = logging.getLogger(__name__)
-        logger.info(f"Raw Kafka metadata for {name}: {raw_kafka_metadata}")
-
-        # dict 형식으로 변환
-        if raw_kafka_metadata is None:
-            kafka_metadata_dict = {
-                "partition_count": 0,
-                "replication_factor": 0,
-                "config": {},
-            }
-        else:
-            kafka_metadata_dict = {
-                "partition_count": raw_kafka_metadata.get("partition_count", 0),
-                "replication_factor": raw_kafka_metadata.get("replication_factor", 0),
-                "config": raw_kafka_metadata.get("config", {}),
-            }
-
-        # 응답 변환
-        return TopicDetailResponse(
-            name=name,
-            kafka_metadata=kafka_metadata_dict,
-            metadata=result.metadata,
-        )
-    except HTTPException:
-        raise
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,

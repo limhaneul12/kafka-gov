@@ -7,9 +7,7 @@ from dependency_injector import containers, providers
 from app.topic.application.use_cases import (
     TopicBatchApplyUseCase,
     TopicBatchDryRunUseCase,
-    TopicDetailUseCase,
     TopicListUseCase,
-    TopicPlanUseCase,
 )
 from app.topic.domain.repositories.interfaces import (
     IAuditRepository,
@@ -57,17 +55,6 @@ class TopicContainer(containers.DeclarativeContainer):
         topic_repository=topic_repository,
         metadata_repository=metadata_repository,
         audit_repository=audit_repository,
-    )
-
-    detail_use_case: providers.Provider[TopicDetailUseCase] = providers.Factory(
-        TopicDetailUseCase,
-        topic_repository=topic_repository,
-        metadata_repository=metadata_repository,
-    )
-
-    plan_use_case: providers.Provider[TopicPlanUseCase] = providers.Factory(
-        TopicPlanUseCase,
-        metadata_repository=metadata_repository,
     )
 
     list_use_case: providers.Provider[TopicListUseCase] = providers.Factory(

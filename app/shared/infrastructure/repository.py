@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 AuditLogT = TypeVar("AuditLogT", AuditLogModel, SchemaAuditLogModel)
 
 
-async def select_recent_audit_logs(
+async def select_recent_audit_logs[AuditLogT: (AuditLogModel, SchemaAuditLogModel)](
     session: AsyncSession, limit: int, model: type[AuditLogT]
 ) -> list[AuditLogT]:
     query = (

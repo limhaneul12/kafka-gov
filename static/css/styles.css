@@ -838,6 +838,19 @@ body {
     color: var(--error-color);
 }
 
+/* 태그 배지 */
+.tag-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: 500;
+    background-color: rgb(148 163 184 / 0.1);
+    color: var(--secondary-color);
+    border: 1px solid rgb(148 163 184 / 0.2);
+}
+
 /* 정책 카드 */
 .policy-grid {
     display: grid;

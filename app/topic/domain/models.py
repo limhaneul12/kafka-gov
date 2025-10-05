@@ -61,6 +61,17 @@ class DomainTopicMetadata(msgspec.Struct):
     doc: DocumentUrl | None = None
     tags: tuple[str, ...] = ()
 
+    def to_dict(self) -> dict[str, Any]:
+        """Struct 인스턴스를 딕셔너리로 변환"""
+        return {
+            field_name: (
+                getattr(self, field_name).value
+                if hasattr(getattr(self, field_name), "value")
+                else getattr(self, field_name)
+            )
+            for field_name in self.__struct_fields__
+        }
+
 
 class DomainTopicConfig(msgspec.Struct):
     """토픽 설정 값 객체"""
@@ -252,20 +263,6 @@ class DomainTopicPlan(msgspec.Struct):
             "delete_count": action_counts.get("delete_count", 0),
             "violation_count": len(self.violations),
         }
-
-
-class DomainTopicDetail(msgspec.Struct):
-    """토픽 상세 정보 엔티티"""
-
-    name: TopicName
-    kafka_metadata: (
-        KafkaMetadata  # Kafka 메타데이터 (partition_count, replication_factor, config 등)
-    )
-    metadata: DomainTopicMetadata | None = None  # DB 메타데이터 (구조화된 값 객체)
-
-    def __post_init__(self) -> None:
-        if not self.name:
-            raise ValueError("name is required")
 
 
 class DomainTopicApplyResult(msgspec.Struct):

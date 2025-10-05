@@ -133,12 +133,14 @@ class TableRenderer {
         topics.forEach(topic => {
             const rawName = topic.topic_name ?? '';
             const name = this.escapeHtml(rawName);
-            const keySubject = this.escapeHtml(topic.key_schema_subject || '-');
-            const valueSubject = this.escapeHtml(topic.value_schema_subject || '-');
+            const owner = this.escapeHtml(topic.owner || '-');
+            const tags = topic.tags && topic.tags.length > 0 
+                ? topic.tags.map(tag => `<span class="tag-badge">${this.escapeHtml(tag)}</span>`).join(' ')
+                : '<span style="color: var(--text-muted);">-</span>';
+            const partitions = topic.partition_count ?? '-';
+            const replicas = topic.replication_factor ?? '-';
             const rawEnv = topic.environment ?? '-';
             const environment = this.escapeHtml(rawEnv);
-            const source = this.escapeHtml(topic.link_source || '-');
-            const confidence = this.formatConfidence(topic.confidence_score);
             const row = document.createElement('tr');
             row.innerHTML = `
                 <td style="width: 40px;">
@@ -146,24 +148,18 @@ class TableRenderer {
                 </td>
                 <td>
                     <div style="font-weight: 500;">${name}</div>
-                    <div style="font-size: 0.75rem; color: var(--text-muted);">${this.escapeHtml(topic.correlation_id || '')}</div>
                 </td>
+                <td>${owner}</td>
+                <td><span style="font-size: 0.875rem;">${tags}</span></td>
+                <td style="text-align: center;">${partitions}</td>
+                <td style="text-align: center;">${replicas}</td>
                 <td>
                     <span class="status-badge ${this.getEnvClass(environment)}">${environment.toUpperCase()}</span>
                 </td>
-                <td>${keySubject}</td>
-                <td>${valueSubject}</td>
-                <td>${confidence}</td>
-                <td>${source}</td>
                 <td>
-                    <div style="display: flex; gap: 0.5rem;">
-                        <button class="btn-icon" onclick="viewTopicDetail(decodeURIComponent('${encodeURIComponent(rawName)}'))" title="상세 보기">
-                            <i class="fas fa-eye"></i>
-                        </button>
-                        <button class="btn-icon" onclick="deleteTopic(decodeURIComponent('${encodeURIComponent(rawName)}'))" title="삭제" style="color: var(--danger);">
-                            <i class="fas fa-trash"></i>
-                        </button>
-                    </div>
+                    <button class="btn-icon" onclick="deleteTopic(decodeURIComponent('${encodeURIComponent(rawName)}'))" title="삭제" style="color: var(--danger);">
+                        <i class="fas fa-trash"></i>
+                    </button>
                 </td>
             `;
             tbody.appendChild(row);
@@ -192,16 +188,10 @@ class TableRenderer {
             const rawSubject = schema.subject ?? '';
             const subject = this.escapeHtml(rawSubject);
             const environments = schema.environments.length > 0 ? schema.environments.map(env => this.escapeHtml(env)).join(', ') : '-';
-            const topics = schema.topics.length > 0 ? schema.topics.map(topic => this.escapeHtml(topic)).join(', ') : '-';
-            const confidence = this.formatConfidence(schema.average_confidence);
-            const sources = schema.sources.length > 0 ? schema.sources.map(src => this.escapeHtml(src)).join(', ') : '-';
             const row = document.createElement('tr');
             row.innerHTML = `
                 <td>${subject}</td>
                 <td>${environments}</td>
-                <td>${topics}</td>
-                <td>${confidence}</td>
-                <td>${sources}</td>
                 <td>
                     <div style="display: flex; gap: 0.5rem;">
                         <button class="btn-icon analyze-delete-btn" data-subject="${this.escapeHtml(rawSubject)}" title="삭제 영향도 분석">

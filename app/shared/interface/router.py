@@ -8,7 +8,7 @@ from dependency_injector.wiring import Provide, inject
 from fastapi import APIRouter, Depends, Query
 
 from app.container import AppContainer
-from app.shared.interface.schema import ClusterStatusResponse
+from app.shared.interface.schema import BrokerResponse, ClusterStatusResponse
 
 router = APIRouter(prefix="/v1", tags=["shared"])
 
@@ -65,13 +65,13 @@ async def get_cluster_status(
         cluster_id=cluster_status.cluster_id,
         controller_id=cluster_status.controller_id,
         brokers=[
-            {
-                "broker_id": broker.broker_id,
-                "host": broker.host,
-                "port": broker.port,
-                "is_controller": broker.is_controller,
-                "leader_partition_count": broker.leader_partition_count,
-            }
+            BrokerResponse(
+                broker_id=broker.broker_id,
+                host=broker.host,
+                port=broker.port,
+                is_controller=broker.is_controller,
+                leader_partition_count=broker.leader_partition_count,
+            )
             for broker in cluster_status.brokers
         ],
         total_topics=cluster_status.total_topics,

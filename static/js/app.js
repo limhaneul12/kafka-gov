@@ -420,42 +420,27 @@ class KafkaGovApp {
     async loadTopics() {
         try {
             Loading.show();
-
             const envFilter = document.getElementById('topic-env-filter')?.value ?? '';
             const searchFilter = document.getElementById('topic-search')?.value ?? '';
 
-            // 실제 토픽 목록과 상관관계 병합
-            const [topicsData, correlations] = await Promise.all([
-                api.getTopics().catch(() => ({ topics: [] })),
-                api.getAllCorrelations().catch(() => [])
-            ]);
-
+            // 실제 토픽 목록 조회
+            const topicsData = await api.getTopics();
             const topics = topicsData.topics || [];
 
-            // 상관관계 맵 생성
-            const correlationMap = {};
-            correlations.forEach(corr => {
-                correlationMap[corr.topic_name] = corr;
-            });
-
-            // 토픽 + 상관관계 병합
-            const merged = topics.map(topic => ({
+            // 토픽 데이터 매핑
+            const mapped = topics.map(topic => ({
                 topic_name: topic.name,
                 owner: topic.owner,
+                tags: topic.tags || [],
+                partition_count: topic.partition_count,
+                replication_factor: topic.replication_factor,
                 environment: topic.environment,
-                key_schema_subject: correlationMap[topic.name]?.key_schema_subject,
-                value_schema_subject: correlationMap[topic.name]?.value_schema_subject,
-                confidence_score: correlationMap[topic.name]?.confidence_score,
-                link_source: correlationMap[topic.name]?.link_source
             }));
 
-            const filtered = merged.filter((item) => {
+            const filtered = mapped.filter((item) => {
                 const envMatches = !envFilter || item.environment === envFilter;
                 const sf = (searchFilter || '').toLowerCase();
-                const searchMatches = !sf
-                    || item.topic_name.toLowerCase().includes(sf)
-                    || (item.value_schema_subject?.toLowerCase().includes(sf) ?? false)
-                    || (item.key_schema_subject?.toLowerCase().includes(sf) ?? false);
+                const searchMatches = !sf || item.topic_name.toLowerCase().includes(sf);
                 return envMatches && searchMatches;
             });
 
@@ -479,24 +464,18 @@ class KafkaGovApp {
             const typeFilter = document.getElementById('schema-type-filter')?.value ?? '';
             const envFilter = document.getElementById('schema-env-filter')?.value ?? '';
 
-            // 스키마 아티팩트와 상관관계 모두 조회
-            const [artifacts, correlations] = await Promise.all([
-                api.getSchemaArtifacts().catch(() => []),
-                api.getAllCorrelations().catch(() => [])
-            ]);
+            // 스키마 아티팩트 조회
+            const artifacts = await api.getSchemaArtifacts().catch(() => []);
 
             // 스키마별로 그룹핑
             const schemaGroups = {};
             
-            // 1. 아티팩트에서 기본 정보 생성
+            // 아티팩트에서 기본 정보 생성
             artifacts.forEach((artifact) => {
                 if (!schemaGroups[artifact.subject]) {
                     schemaGroups[artifact.subject] = {
                         subject: artifact.subject,
                         environments: new Set(),
-                        topics: new Set(),
-                        confidences: [],
-                        sources: ['upload'],
                         latest_version: artifact.version,
                         schema_type: artifact.schema_type,
                     };
@@ -508,41 +487,16 @@ class KafkaGovApp {
                 }
             });
 
-            // 2. 상관관계에서 토픽 정보 추가
-            correlations.forEach((corr) => {
-                const subject = corr.value_schema_subject || corr.key_schema_subject;
-                if (subject) {
-                    if (!schemaGroups[subject]) {
-                        schemaGroups[subject] = {
-                            subject,
-                            environments: new Set(),
-                            topics: new Set(),
-                            confidences: [],
-                            sources: ['auto'],
-                        };
-                    }
-                    schemaGroups[subject].environments.add(corr.environment);
-                    schemaGroups[subject].topics.add(corr.topic_name);
-                    schemaGroups[subject].confidences.push(corr.confidence_score);
-                }
-            });
-
             // 요약 정보로 변환
             const subjects = Object.values(schemaGroups).map((group) => ({
                 subject: group.subject,
                 environments: Array.from(group.environments),
-                topics: Array.from(group.topics),
-                average_confidence: group.confidences.length > 0 
-                    ? group.confidences.reduce((a, b) => a + b, 0) / group.confidences.length 
-                    : 1.0,
-                sources: group.sources,
                 schema_type: group.schema_type,
             }));
 
             const filtered = subjects.filter((subject) => {
                 const matchesSearch = !searchFilter
-                    || subject.subject.toLowerCase().includes(searchFilter.toLowerCase())
-                    || subject.topics.some((topic) => topic.toLowerCase().includes(searchFilter.toLowerCase()));
+                    || subject.subject.toLowerCase().includes(searchFilter.toLowerCase());
                 
                 // 타입 필터
                 const matchesType = !typeFilter || subject.schema_type === typeFilter;
@@ -1288,46 +1242,6 @@ class KafkaGovApp {
 // =================
 // 전역 함수들 (테이블 액션용)
 // =================
-
-/**
- * 토픽 상세 보기
- */
-async function viewTopicDetail(topicName) {
-    try {
-        Loading.show();
-        const detail = await api.getTopicDetail(topicName);
-        
-        const content = document.getElementById('topic-detail-content');
-        if (content) {
-            const metadata = detail.kafka_metadata || {};
-            content.innerHTML = `
-                <div class="detail-section">
-                    <h4>토픽명</h4>
-                    <p>${topicName}</p>
-                </div>
-                <div class="detail-section">
-                    <h4>파티션 수</h4>
-                    <p>${metadata.partition_count || 0}</p>
-                </div>
-                <div class="detail-section">
-                    <h4>복제 계수</h4>
-                    <p>${metadata.replication_factor || 0}</p>
-                </div>
-                <div class="detail-section">
-                    <h4>설정 (Config)</h4>
-                    <pre>${JSON.stringify(metadata.config || {}, null, 2)}</pre>
-                </div>
-            `;
-        }
-        Modal.show('topic-detail-modal');
-        
-    } catch (error) {
-        console.error('토픽 상세 조회 실패:', error);
-        Toast.error('토픽 상세 정보를 불러올 수 없습니다.');
-    } finally {
-        Loading.hide();
-    }
-}
 
 /**
  * 토픽 삭제
