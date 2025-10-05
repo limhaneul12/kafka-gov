@@ -799,9 +799,31 @@ class KafkaGovApp {
             document.getElementById('yaml-preview-content').innerHTML = summary;
             
             if (errorCount > 0) {
-                Toast.warning(`YAML 파싱 완료: ${errorCount}개 에러 발견. 적용 탭에서 확인하세요.`);
+                Toast.warning(`YAML 파싱 완료: ${errorCount}개 에러 발견. 적용은 진행할 수 없습니다.`);
             } else {
-                Toast.success(`YAML 파싱 완료! ${totalItems}개 토픽 준비됨. 적용 탭으로 이동하세요.`);
+                // YAML 파일 내용을 읽어서 원본 요청 데이터 생성
+                const fileContent = await file.text();
+                const yaml = jsyaml.load(fileContent);
+                
+                // Apply 요청 형식으로 저장 (원본 YAML 데이터)
+                this.currentBatchRequest = {
+                    kind: yaml.kind,
+                    env: yaml.env,
+                    change_id: yaml.change_id,
+                    items: yaml.items
+                };
+                this.currentBatchResult = this.currentBatchRequest;  // Apply API용
+                this.currentBatchPlan = result;  // Dry-Run 결과 (표시용)
+                
+                Toast.success(`YAML 파싱 완료! ${totalItems}개 토픽 준비됨.`);
+                
+                // 배치 모달 열고 적용 탭으로 전환
+                Modal.show('batch-topic-modal');
+                this.switchBatchTab('apply');
+                
+                // 적용 탭에 결과 표시
+                document.getElementById('apply-preview').innerHTML = summary;
+                document.getElementById('apply-batch').style.display = 'block';
             }
             
             // 파일 선택 초기화

@@ -8,6 +8,8 @@ items:
       partitions: 12
       replication_factor: 3
       retention_ms: 604800000
+      min_insync_replicas: 2  # ← 추가
+
     metadata:
       owner: team-commerce
       doc: "https://wiki.example.com"
@@ -19,6 +21,7 @@ items:
       partitions: 12
       replication_factor: 3
       retention_ms: 604800000
+      min_insync_replicas: 2  # ← 추가
     metadata:
       owner: team-commerce
       doc: "https://wiki.example.com"
@@ -30,6 +33,7 @@ items:
       partitions: 12
       replication_factor: 3
       retention_ms: 604800000
+      min_insync_replicas: 2  # ← 추가
     metadata:
       owner: team-commerce
       doc: "https://wiki.example.com"
