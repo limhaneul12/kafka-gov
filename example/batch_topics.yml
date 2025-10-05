@@ -1,0 +1,150 @@
+# Kafka-Gov 토픽 배치 생성 예제
+# 새 프로젝트 시작 시 필요한 모든 토픽을 한 번에 생성하는 예시입니다.
+
+kind: TopicBatch
+env: prod
+change_id: "2025-01-15_project-alpha"
+
+items:
+  # ==========================================
+  # 주문 관련 이벤트 토픽
+  # ==========================================
+  
+  - name: prod.orders.created
+    action: create
+    config:
+      partitions: 12
+      replication_factor: 3
+      retention_ms: 604800000  # 7일
+      min_insync_replicas: 2
+      cleanup_policy: delete
+      max_message_bytes: 1048576  # 1MB
+    metadata:
+      owner: team-commerce
+      doc: "https://wiki.company.com/topics/orders/created"
+      tags: ["orders", "critical", "pii"]
+  
+  - name: prod.orders.updated
+    action: create
+    config:
+      partitions: 12
+      replication_factor: 3
+      retention_ms: 604800000
+      min_insync_replicas: 2
+    metadata:
+      owner: team-commerce
+      doc: "https://wiki.company.com/topics/orders/updated"
+      tags: ["orders", "critical"]
+  
+  - name: prod.orders.cancelled
+    action: create
+    config:
+      partitions: 6
+      replication_factor: 3
+      retention_ms: 2592000000  # 30일
+      min_insync_replicas: 2
+    metadata:
+      owner: team-commerce
+      doc: "https://wiki.company.com/topics/orders/cancelled"
+      tags: ["orders"]
+  
+  # ==========================================
+  # 결제 관련 이벤트 토픽
+  # ==========================================
+  
+  - name: prod.payments.completed
+    action: create
+    config:
+      partitions: 12
+      replication_factor: 3
+      retention_ms: 7776000000  # 90일 (금융 데이터)
+      min_insync_replicas: 2
+      max_message_bytes: 2097152  # 2MB
+    metadata:
+      owner: team-payment
+      doc: "https://wiki.company.com/topics/payments/completed"
+      tags: ["payments", "critical", "pii", "financial"]
+  
+  - name: prod.payments.failed
+    action: create
+    config:
+      partitions: 6
+      replication_factor: 3
+      retention_ms: 7776000000
+      min_insync_replicas: 2
+    metadata:
+      owner: team-payment
+      doc: "https://wiki.company.com/topics/payments/failed"
+      tags: ["payments", "debugging"]
+  
+  # ==========================================
+  # 사용자 이벤트 토픽
+  # ==========================================
+  
+  - name: prod.users.signup
+    action: create
+    config:
+      partitions: 6
+      replication_factor: 3
+      retention_ms: 2592000000  # 30일
+      min_insync_replicas: 2
+    metadata:
+      owner: team-growth
+      doc: "https://wiki.company.com/topics/users/signup"
+      tags: ["users", "events", "pii"]
+  
+  - name: prod.users.profile-updated
+    action: create
+    config:
+      partitions: 6
+      replication_factor: 3
+      retention_ms: 2592000000
+      min_insync_replicas: 2
+    metadata:
+      owner: team-growth
+      doc: "https://wiki.company.com/topics/users/profile-updated"
+      tags: ["users", "events"]
+  
+  # ==========================================
+  # 알림 토픽
+  # ==========================================
+  
+  - name: prod.notifications.email
+    action: create
+    config:
+      partitions: 6
+      replication_factor: 3
+      retention_ms: 86400000  # 1일
+      min_insync_replicas: 2
+    metadata:
+      owner: team-notification
+      doc: "https://wiki.company.com/topics/notifications/email"
+      tags: ["notifications", "transient"]
+  
+  - name: prod.notifications.sms
+    action: create
+    config:
+      partitions: 6
+      replication_factor: 3
+      retention_ms: 86400000  # 1일
+      min_insync_replicas: 2
+    metadata:
+      owner: team-notification
+      doc: "https://wiki.company.com/topics/notifications/sms"
+      tags: ["notifications", "transient"]
+  
+  # ==========================================
+  # 로그/모니터링 토픽
+  # ==========================================
+  
+  - name: prod.logs.application
+    action: create
+    config:
+      partitions: 12
+      replication_factor: 3
+      retention_ms: 604800000  # 7일
+      min_insync_replicas: 2
+    metadata:
+      owner: team-platform
+      doc: "https://wiki.company.com/topics/logs/application"
+      tags: ["logs", "monitoring"]

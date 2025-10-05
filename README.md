@@ -1,55 +1,214 @@
 <div align="center">
-  <img src="https://raw.githubusercontent.com/limhaneul12/kafka-gov/main/image/logo.png" alt="Kafka Gov Logo" width="400"/>
+  <img src="./image/logo.png" alt="Kafka Gov Logo" width="400"/>
   
-  **🛡️ Kafka Topic & Schema Registry Governance Platform**
+  **🛡️ Kafka Governance Platform**
   
   [![Python](https://img.shields.io/badge/Python-3.12+-blue.svg)](https://python.org)
   [![FastAPI](https://img.shields.io/badge/FastAPI-0.117+-green.svg)](https://fastapi.tiangolo.com)
-  [![Confluent Kafka](https://img.shields.io/badge/Confluent_Kafka-2.6.1+-red.svg)](https://docs.confluent.io/platform/current/clients/confluent-kafka-python/html/index.html)
   [![Coverage](https://img.shields.io/badge/Coverage-85%25-brightgreen.svg)](https://github.com/limhaneul12/kafka-gov)
-  [![License](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-  [![pytest](https://img.shields.io/badge/pytest-8.4.2-blue.svg)](https://github.com/limhaneul12/kafka-gov/actions)
-  [![CI](https://github.com/limhaneul12/kafka-gov/workflows/CI/badge.svg)](https://github.com/limhaneul12/kafka-gov/actions)
+  [![License](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
   
-  [🚀 Quick Start](#-quick-start) • [📖 Documentation](#-documentation) • [🤝 Contributing](#-contributing) • [💬 Community](#-community)
+  **"Without knowing who owns a topic and what it's used for, Kafka is just a message queue."**
+  
+  [🚀 Quick Start](#-quick-start) • [✨ Features](#-features) • [📖 Documentation](#-documentation)
 </div>
 
 --- 
 
+## 💡 Why Kafka-Gov?
+
+### The Problem
+
+Existing Kafka UI tools (Kafka-UI, Conduktor, AKHQ) lack critical metadata capabilities:
+
+- **🤔 Who owns this topic?** No ownership tracking across hundreds of topics
+- **📝 What is it for?** Topic names alone don't explain purpose
+- **📚 Where's the docs?** Documentation scattered across wikis and READMs
+- **🔄 Change history?** No audit trail for partition changes or config updates
+- **⚠️ Policy violations?** Can't detect risky configs like `min.insync.replicas=1` in production
+- **🚀 Batch operations?** Manual one-by-one topic creation for new projects
+
+### The Solution
+
+Kafka-Gov transforms Kafka into a **governed enterprise platform**:
+
+| Problem | Solution |
+|---------|----------|
+| 🔍 Unknown ownership | Mandatory `owner`, `team`, `tags` metadata |
+| 📖 Missing documentation | Direct Wiki/Confluence URL linking |
+| 🚫 No policies | Environment-specific validation (naming, replication, ISR) |
+| ⏱️ No audit trail | Automatic logging (who, when, what, why) |
+| 🐌 Manual operations | YAML-based batch create/update/delete |
+| 🔗 Topic-Schema gap | Automatic correlation and impact analysis |
+
+---
+
 ## ✨ Features
 
-### 🎯 **Topic Management**
-- **Batch Operations**: Plan and execute multiple topic changes with dry-run support
-- **Policy Enforcement**: Automated validation against naming conventions and configuration rules
-- **Environment-aware**: DEV/STG/PROD environment separation with different policies
-- **Audit Trail**: Complete history of all topic changes with rollback capabilities
+### 🏷️ Rich Topic Metadata
 
-### 📋 **Schema Registry Governance**
-- **Schema Evolution**: Manage schema versions with compatibility validation
-- **File Upload**: Bulk schema upload (.avsc, .json, .proto, .zip) with auto-registration
-- **Storage Integration**: MinIO-backed schema artifact storage
-- **Schema Management**: Delete impact analysis and safe schema deletion
-- **Schema Sync**: Automatic synchronization from Schema Registry to database
+<img src="./image/topic_channel.png" alt="Topic Management" width="800"/>
 
-### 🔒 **Policy & Governance**
-- **Integrated Policy Engine**: Topic and Schema policies with environment-specific rules
-- **Violation Detection**: Real-time policy violation detection with severity levels (WARNING, ERROR, CRITICAL)
-- **Audit Trail**: Complete audit logging for Topic and Schema operations
-- **Role-Based Access**: User role management (VIEWER, DEVELOPER, ADMIN)
+- **Owner & Team**: Track who owns and maintains each topic
+- **Documentation**: Direct links to Wiki/Confluence docs
+- **Tags**: Flexible classification (`pii`, `critical`, `deprecated`)
+- **At-a-glance**: View partitions, replication, retention instantly
 
-### 📊 **Analysis & Monitoring**
-- **Topic-Schema Correlation**: Automatic linking between topics and schemas
-- **Impact Analysis**: Schema deletion impact analysis with affected topics
-- **Activity Dashboard**: Unified audit activity view across all components
-- **Cluster Status**: Real-time Kafka cluster health monitoring
+### 🚀 YAML-Based Batch Operations
 
-### 🏗️ **Architecture**
-- **Clean Architecture**: Domain-driven design with clear layer separation
-- **Event-Driven**: Domain events for cross-context communication
-- **High Performance**: Async/await throughout with connection pooling
-- **Type Safety**: Python 3.12+ with strict type hints and pyrefly validation
-- **Observability**: Structured logging, metrics, and health checks
-- **Scalability**: Horizontal scaling support with stateless design
+<img src="./image/batch_channel.png" alt="Batch Operations" width="800"/>
+
+**Create/update/delete dozens of topics at once:**
+
+```yaml
+# example/batch_topics.yml
+kind: TopicBatch
+env: prod
+change_id: "2025-01-15_my-project"
+items:
+  - name: prod.orders.created
+    action: create
+    config:
+      partitions: 12
+      replication_factor: 3
+      retention_ms: 604800000
+      min_insync_replicas: 2
+    metadata:
+      owner: team-commerce
+      doc: "https://wiki.company.com/orders"
+      tags: ["orders", "critical"]
+```
+
+**Features:**
+- 🔄 **Dry-Run**: Preview changes before applying
+- ⚠️ **Policy Validation**: Auto-check naming, replication, ISR
+- 🎯 **Parallel Processing**: Transactional batch operations
+- 📋 **YAML Upload**: Instant dry-run via file upload
+
+See [`example/batch_topics.yml`](./example/batch_topics.yml) for a full example.
+
+### 📦 Schema Registry Management
+
+<img src="./image/schema_channel.png" alt="Schema Management" width="800"/>
+
+- **File Upload**: Drag & drop `.avsc`, `.proto`, `.json`, `.zip` files
+- **Auto-Registration**: Automatic Schema Registry registration
+- **Artifact Storage**: Permanent storage in MinIO (S3-compatible)
+- **Topic Linking**: Auto-map schemas to topics (e.g., `prod.orders.created-value`)
+
+<img src="./image/schema_upload.png" alt="Schema Upload" width="600"/>
+
+### 🛡️ Environment-Specific Policies
+
+| Policy | DEV | STG | PROD |
+|--------|-----|-----|------|
+| `min.insync.replicas` | ≥ 1 | ≥ 2 | ≥ 2 ⚠️ |
+| `replication.factor` | ≥ 1 | ≥ 2 | ≥ 3 ⚠️ |
+| Naming | `{env}.*` | `{env}.*` | `{env}.*` ⚠️ |
+| `tmp` prefix | ✅ Allow | ⚠️ Warn | 🚫 Block |
+
+**Violations block dry-run:**
+```
+❌ [ERROR] prod.tmp.test: 'tmp' prefix forbidden in prod
+❌ [ERROR] prod.orders: min.insync.replicas must be >= 2 (current: 1)
+```
+
+### 📊 Complete Audit Trail
+
+<img src="./image/history.png" alt="Audit History" width="800"/>
+
+- **Who**: Actor and team
+- **When**: UTC timestamp
+- **What**: Before/after config snapshots
+- **Why**: Change ID linking to deployment
+- **Result**: Success/partial/failed with details
+
+---
+
+## 🚀 Quick Start
+
+```bash
+# Clone repository
+git clone https://github.com/limhaneul12/kafka-gov.git
+cd kafka-gov
+
+# Configure environment
+cp .env.example .env
+# Edit .env with your Kafka connection details
+
+# Start all services
+docker-compose up -d
+
+# Access application
+open http://localhost:8000
+```
+
+<img src="./image/main.png" alt="Main Dashboard" width="800"/>
+
+**Endpoints:**
+- Web UI: http://localhost:8000
+- API Docs: http://localhost:8000/docs
+- Health: http://localhost:8000/health
+
+**Upload your first batch:**
+```bash
+curl -X POST "http://localhost:8000/api/v1/topics/batch/upload" \
+  -F "file=@example/batch_topics.yml"
+```
+
+Result: Dry-run preview → Review violations → Click "Apply Changes"
+
+---
+
+## 📖 Documentation
+
+### Creating Topics
+
+**1. Write YAML file** (`my-topics.yml`):
+```yaml
+kind: TopicBatch
+env: prod
+change_id: "2025-01-15_my-project"
+items:
+  - name: prod.events.user-signup
+    action: create
+    config:
+      partitions: 6
+      replication_factor: 3
+      min_insync_replicas: 2
+    metadata:
+      owner: team-growth
+      tags: ["events"]
+```
+
+**2. Upload via Web UI:**
+- Topics tab → Batch Operations → Upload YAML
+- Review dry-run results
+- Apply changes
+
+**3. Or use API:**
+```bash
+curl -X POST "http://localhost:8000/api/v1/topics/batch/upload" \
+  -F "file=@my-topics.yml"
+```
+
+### Updating Topics
+
+```yaml
+- name: prod.events.user-signup
+  action: alter  # change to 'alter'
+  config:
+    partitions: 12  # increase partitions
+```
+
+### Deleting Topics
+
+```yaml
+- name: prod.deprecated.old-topic
+  action: delete
+```
+
+---
 
 ## 🏗️ Architecture
 
@@ -68,60 +227,10 @@ app/
 **Key Principles:**
 - **Clean Architecture**: Domain → Application → Infrastructure → Interface
 - **Event-Driven**: Domain events for cross-context communication
-- **Type Safety**: Python 3.12+ with strict typing and pyrefly validation
+- **Type Safety**: Python 3.12+ with strict typing and msgspec validation
 - **DI Container**: Hierarchical dependency injection with `dependency-injector`
-
-### Prerequisites
-- Python 3.12+
-- Docker & Docker Compose
-- Kafka cluster with Schema Registry
-- MySQL/PostgreSQL database
-
-### Installation
-
-1. **Clone the repository**
-   ```bash
-   git clone https://github.com/limhaneul12/kafka-gov.git
-   cd kafka-gov
-   ```
-
-2. **Set up environment**
-   ```bash
-   cp .env.example .env
-   # Edit .env with your configuration
-   ```
-
-3. **Install dependencies**
-   ```bash
-   # Using uv (recommended)
-   uv sync
-   
-   # Or using pip
-   pip install -r requirements.txt
-   ```
-
-4. **Start with Docker Compose**
-   ```bash
-   docker-compose up -d
-   ```
-
-5. **Access the application**
-   - API: http://localhost:8000
-   - Swagger UI: http://localhost:8000/docs
-   - Health Check: http://localhost:8000/health
-
-### Quick Start Example
-
-```bash
-# Start services
-docker-compose up -d
-
-# Access Swagger UI
-open http://localhost:8000/docs
-
-# Health check
-curl http://localhost:8000/health
-```
+- **High Performance**: Async/await throughout with connection pooling
+- **Observability**: Structured logging, metrics, and health checks
 
 ## 🛠️ Tech Stack
 
@@ -141,124 +250,100 @@ curl http://localhost:8000/health
 | **Package Manager** | uv (ultra-fast) |
 | **Main Libraries** | confluent-kafka, aiomysql, httpx, orjson |
 
-## 📖 Documentation
+---
 
-### 🔧 Configuration
+## ⚙️ Configuration
 
-Key environment variables:
+Key environment variables (`.env`):
 
 ```bash
-# Kafka Configuration
 KAFKA_BOOTSTRAP_SERVERS=localhost:9092
 SCHEMA_REGISTRY_URL=http://localhost:8081
-
-# Database
 DATABASE_URL=mysql+aiomysql://user:pass@localhost/kafka_gov
-
-# Storage
 MINIO_ENDPOINT=localhost:9000
-MINIO_ACCESS_KEY=minioadmin
-MINIO_SECRET_KEY=minioadmin
-
-# Authentication
-SECRET_KEY=your-secret-key-here
-JWT_ALGORITHM=HS256
-JWT_EXPIRE_MINUTES=1800
 ```
 
-### 🛡️ API Endpoints
+See [`.env.example`](.env.example) for all options.
 
-#### Topic Management (`/api/v1/topics`)
-```
-POST   /batch/dry-run                          # Plan topic changes (dry-run)
-POST   /batch/apply                            # Apply topic changes
-GET    /plan/{change_id}                       # Get plan by change ID
-GET    /detail/{topic_name}                    # Get topic details
-GET    /list                                   # List all topics
-DELETE /bulk-delete                            # Bulk delete topics
-```
+---
 
-#### Schema Registry (`/api/v1/schemas`)
-```
-POST   /batch/dry-run                          # Plan schema changes (dry-run)
-POST   /batch/apply                            # Apply schema changes
-POST   /upload                                 # Upload schema files (.avsc, .json, .proto, .zip)
-GET    /plan/{change_id}                       # Get schema plan
-POST   /sync                                   # Sync from Schema Registry to DB
-POST   /delete/analyze                         # Analyze schema deletion impact
-DELETE /delete/{subject}                       # Delete schema (with force option)
-GET    /list                                   # List all schemas
-```
+## 🔌 API Reference
 
-#### Analysis & Correlation (`/api/v1/analysis`)
-```
-GET    /correlation/by-schema/{subject}        # Get topics using a schema
-GET    /correlation/by-topic/{topic_name}      # Get schema correlation for topic
-POST   /correlation/link                       # Manually link topic to schema
-GET    /impact/schema/{subject}                # Get schema impact analysis
-```
+**Topics**
+- `POST /api/v1/topics/batch/upload` - Upload YAML & dry-run
+- `POST /api/v1/topics/batch/apply` - Apply changes
+- `GET /api/v1/topics` - List topics
+- `DELETE /api/v1/topics/bulk-delete` - Bulk delete
 
-#### Shared (`/api/v1`)
-```
-GET    /cluster/status                         # Kafka cluster status
-GET    /audit/activities                       # Recent audit activities
-GET    /audit/activity/{activity_id}           # Get activity detail
-```
+**Schemas**
+- `POST /api/v1/schemas/upload` - Upload schema files
+- `POST /api/v1/schemas/sync` - Sync from Schema Registry
+- `GET /api/v1/schemas` - List schemas
 
-#### System
-```
-GET    /health                                 # Health check
-GET    /docs                                   # Swagger UI
-GET    /redoc                                  # ReDoc
-```
+**Analysis**
+- `GET /api/v1/analysis/correlation/by-schema/{subject}` - Topics using schema
+- `GET /api/v1/analysis/impact/schema/{subject}` - Impact analysis
+
+**System**
+- `GET /health` - Health check
+- `GET /docs` - Swagger UI
+
+See full API docs at http://localhost:8000/docs
+
+---
 
 ## 🚀 Deployment
 
+**Docker Compose (Recommended)**
 ```bash
-# Build and run with Docker Compose
 docker-compose up -d
+```
 
-# Or build production image
+**Production**
+```bash
 docker build -t kafka-gov:latest .
 docker run -d -p 8000:8000 --env-file .env.prod kafka-gov:latest
 ```
 
-
+---
 
 ## 🤝 Contributing
 
-Contributions are welcome! Please:
+Contributions welcome! Please:
 
-1. Fork the repository
-2. Create a feature branch
-3. Run tests: `uv run pytest --cov=app`
-4. Submit a pull request
+1. Fork repository
+2. Create feature branch: `git checkout -b feature/my-feature`
+3. Write tests: `uv run pytest --cov=app`
+4. Commit: `git commit -m 'feat: Add feature'`
+5. Push and create Pull Request
 
-**Standards**: Python 3.12+, 80%+ test coverage, Clean Architecture
+**Standards**: Python 3.12+, 80%+ test coverage, Clean Architecture, Ruff linting
 
-## 💬 Community
-
-- **Issues**: [GitHub Issues](https://github.com/limhaneul12/kafka-gov/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/limhaneul12/kafka-gov/discussions)
-- **Security**: [Security Policy](SECURITY.md)
+---
 
 ## 📄 License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+MIT License - see [LICENSE](./LICENSE) file for details.
+
+---
 
 ## 🙏 Acknowledgments
 
-- [FastAPI](https://fastapi.tiangolo.com/) for the excellent async web framework
-- [Confluent](https://www.confluent.io/) for Kafka Python client and Schema Registry
-- [SQLAlchemy](https://www.sqlalchemy.org/) for async database ORM
-- [Pydantic](https://pydantic.dev/) for data validation
-- [msgspec](https://jcristharif.com/msgspec/) for high-performance serialization
-- [dependency-injector](https://python-dependency-injector.ets-labs.org/) for DI container
-- [uv](https://github.com/astral-sh/uv) for ultra-fast package management
-- [pyrefly](https://github.com/pyrefly-labs/pyrefly) for advanced type checking
+Built with:
+- [FastAPI](https://fastapi.tiangolo.com/) - Async web framework
+- [Confluent Kafka](https://www.confluent.io/) - Python client
+- [SQLAlchemy](https://www.sqlalchemy.org/) - Async ORM
+- [msgspec](https://jcristharif.com/msgspec/) - High-performance serialization
+- [uv](https://github.com/astral-sh/uv) - Fast package manager
 
 ---
 
 <div align="center">
-  <strong>Built with ❤️ for the Kafka community</strong>
+  
+**Make Kafka safer and more efficient** 🚀
+
+Made with ❤️ by developers, for developers
+
+⭐ **Star if you find this useful!** ⭐
+
 </div>
