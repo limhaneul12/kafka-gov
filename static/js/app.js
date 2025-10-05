@@ -738,42 +738,70 @@ class KafkaGovApp {
     }
 
     /**
-     * YAML 파일 업로드 처리 (백엔드로 전송 및 즉시 적용)
+     * YAML 파일 업로드 처리 (백엔드로 전송 및 Dry-Run)
      */
     async handleYAMLFileUpload(event) {
         const file = event.target.files[0];
         if (!file) return;
 
-        if (!confirm('YAML 파일을 업로드하고 즉시 적용하시겠습니까?')) {
-            event.target.value = ''; // 파일 선택 초기화
-            return;
-        }
-
         try {
             Loading.show();
             
-            // 백엔드로 YAML 파일 전송 (안전한 파싱 및 즉시 적용)
+            // 백엔드로 YAML 파일 전송 (파싱 및 Dry-Run)
             const result = await api.topicBatchUpload(file);
+            
+            // Dry-Run 결과 파싱
+            const totalItems = result.summary?.total_items || 0;
+            const createCount = result.summary?.create_count || 0;
+            const alterCount = result.summary?.alter_count || 0;
+            const deleteCount = result.summary?.delete_count || 0;
+            const violationCount = result.summary?.violation_count || 0;
+            const errorCount = result.violations?.filter(v => v.severity === 'error').length || 0;
+            const warningCount = violationCount - errorCount;
             
             // 결과 표시
             const summary = `
-                <div class="apply-result">
-                    <h4>적용 완료</h4>
-                    <p><strong>적용됨:</strong> ${result.applied?.length || 0}개</p>
-                    <p><strong>건너뜀:</strong> ${result.skipped?.length || 0}개</p>
-                    <p><strong>실패:</strong> ${result.failed?.length || 0}개</p>
-                    <p><strong>요약:</strong> ${result.summary || ''}</p>
+                <div class="dry-run-result">
+                    <h4>파싱 결과 미리보기</h4>
+                    <div class="summary-section">
+                        <p><strong>적용됨:</strong> ${totalItems}개 토픽</p>
+                        <ul style="margin-left: 20px;">
+                            ${createCount > 0 ? `<li>생성: ${createCount}개</li>` : ''}
+                            ${alterCount > 0 ? `<li>수정: ${alterCount}개</li>` : ''}
+                            ${deleteCount > 0 ? `<li>삭제: ${deleteCount}개</li>` : ''}
+                        </ul>
+                    </div>
+                    <div class="violations-section" style="margin-top: 10px;">
+                        <p><strong>건너뜀:</strong> 0개</p>
+                        <p><strong>실패:</strong> ${errorCount}개 (에러)</p>
+                        ${warningCount > 0 ? `<p><strong>경고:</strong> ${warningCount}개</p>` : ''}
+                    </div>
+                    ${result.violations && result.violations.length > 0 ? `
+                        <div class="violations-details" style="margin-top: 15px; padding: 10px; background: #fff3cd; border-radius: 4px;">
+                            <strong>정책 위반 상세:</strong>
+                            <ul style="margin: 5px 0 0 20px;">
+                                ${result.violations.map(v => `
+                                    <li style="color: ${v.severity === 'error' ? 'red' : 'orange'};">
+                                        [${v.severity.toUpperCase()}] ${v.name}: ${v.message}
+                                    </li>
+                                `).join('')}
+                            </ul>
+                        </div>
+                    ` : ''}
+                    <div style="margin-top: 15px; padding: 10px; background: #d1ecf1; border-radius: 4px;">
+                        <strong>📌 다음 단계:</strong> 
+                        <p style="margin: 5px 0 0;">결과를 확인한 후 "2. 적용" 탭에서 실제 적용을 진행하세요.</p>
+                    </div>
                 </div>
             `;
             
             document.getElementById('yaml-preview').style.display = 'block';
             document.getElementById('yaml-preview-content').innerHTML = summary;
             
-            Toast.success(`YAML 배치 작업이 완료되었습니다! ${result.summary || ''}`);
-            
-            // 토픽 목록 새로고침
-            if (this.currentTab === 'topics') {
-                await this.loadTopics();
+            if (errorCount > 0) {
+                Toast.warning(`YAML 파싱 완료: ${errorCount}개 에러 발견. 적용 탭에서 확인하세요.`);
+            } else {
+                Toast.success(`YAML 파싱 완료! ${totalItems}개 토픽 준비됨. 적용 탭으로 이동하세요.`);
             }
             
             // 파일 선택 초기화
