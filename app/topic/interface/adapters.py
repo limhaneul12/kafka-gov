@@ -173,18 +173,12 @@ def safe_convert_plan_to_response(
 
 # ===== Kafka 메타데이터 변환 유틸 =====
 def _to_int(val: object) -> int | None:
-    if val is None:
-        return None
-    if isinstance(val, int):
-        return val
-    if isinstance(val, str):
-        try:
-            return int(val)
-        except Exception:
-            return None
+    """안전한 정수 변환"""
+    if val is None or isinstance(val, int):
+        return val  # type: ignore[return-value]
     try:
         return int(val)  # type: ignore[arg-type]
-    except Exception:
+    except (ValueError, TypeError):
         return None
 
 

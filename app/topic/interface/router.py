@@ -180,10 +180,9 @@ async def bulk_delete_topics(
                 logging.getLogger(__name__).error(f"Failed to delete topic {name}: {e}")
                 return (name, False)
 
-        # 모든 토픽을 병렬로 삭제
-        results: list[tuple[str, bool]] = list(
-            await asyncio.gather(*[delete_single_topic(name) for name in topic_names])
-        )
+        # 모든 토픽을 병렬로 삭제 (gather는 이미 리스트 반환)
+        results_tuple = await asyncio.gather(*[delete_single_topic(name) for name in topic_names])
+        results: list[tuple[str, bool]] = list(results_tuple)
 
         # 결과 분류
         succeeded: list[str] = [name for name, success in results if success]

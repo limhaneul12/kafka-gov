@@ -4,12 +4,14 @@ import logging
 from collections.abc import Callable
 from contextlib import AbstractAsyncContextManager
 from datetime import datetime
-from typing import TypeVar
+from typing import Any, TypeVar
 
-from sqlalchemy import desc, select
+from sqlalchemy import desc, literal, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.sql.selectable import Select
 
 from app.schema.infrastructure.models import SchemaAuditLogModel
+from app.shared.constants import ACTION_MESSAGES, ActivityType, AuditStatus
 from app.shared.domain.models import AuditActivity
 from app.shared.domain.repositories import IAuditActivityRepository
 from app.topic.infrastructure.models import AuditLogModel
@@ -18,19 +20,47 @@ logger = logging.getLogger(__name__)
 
 # TypeVar for audit log models
 AuditLogT = TypeVar("AuditLogT", AuditLogModel, SchemaAuditLogModel)
+ModelsToQuery = list[tuple[type[AuditLogModel] | type[SchemaAuditLogModel], str]]
 
 
-async def select_recent_audit_logs[AuditLogT: (AuditLogModel, SchemaAuditLogModel)](
-    session: AsyncSession, limit: int, model: type[AuditLogT]
-) -> list[AuditLogT]:
-    query = (
-        select(model)
-        .where(model.status == "COMPLETED")
-        .order_by(desc(model.timestamp))
-        .limit(limit)
-    )
-    result = await session.execute(query)
-    return list(result.scalars().all())
+def _subquery_log_model[AuditLogT: (AuditLogModel, SchemaAuditLogModel)](
+    model: type[AuditLogT], activity_type: str
+) -> Select[Any]:
+    """활동 로그 서브쿼리 생성 (모델별)
+
+    Args:
+        model: Audit 로그 모델 클래스
+        activity_type: 활동 타입 ("topic" or "schema")
+
+    Returns:
+        SQLAlchemy Select 쿼리 객체
+    """
+    return select(
+        model.action,
+        model.target,
+        model.actor,
+        model.timestamp,
+        model.message,
+        model.snapshot,
+        literal(activity_type).label("activity_type"),
+    ).where(model.status == AuditStatus.COMPLETED)
+
+
+def _get_models_to_query(activity_type: str | None) -> ModelsToQuery:
+    """조회할 모델과 활동 타입 결정
+
+    Args:
+        activity_type: 필터링할 활동 타입 (None이면 전체)
+
+    Returns:
+        (모델 클래스, 활동 타입) 튜플 리스트
+    """
+    models: ModelsToQuery = []
+    if not activity_type or activity_type == ActivityType.TOPIC:
+        models.append((AuditLogModel, ActivityType.TOPIC))
+    if not activity_type or activity_type == ActivityType.SCHEMA:
+        models.append((SchemaAuditLogModel, ActivityType.SCHEMA))
+    return models
 
 
 class MySQLAuditActivityRepository(IAuditActivityRepository):
@@ -42,69 +72,45 @@ class MySQLAuditActivityRepository(IAuditActivityRepository):
         self.session_factory = session_factory
 
     async def get_recent_activities(self, limit: int) -> list[AuditActivity]:
-        """최근 활동 조회 (Topic + Schema 통합)"""
+        """최근 활동 조회 (Topic + Schema 통합) - UNION 쿼리 최적화"""
         async with self.session_factory() as session:
-            topic_logs = await select_recent_audit_logs(session, limit, AuditLogModel)
+            # Topic 로그 서브쿼리
+            topic_query = _subquery_log_model(AuditLogModel, ActivityType.TOPIC).limit(limit)
 
-            # Schema Audit 조회
-            schema_logs = await select_recent_audit_logs(session, limit, SchemaAuditLogModel)
-
-            # AuditActivity 도메인 모델로 변환
-            activities: list[AuditActivity] = [
-                AuditActivity(
-                    activity_type="topic",
-                    action=log.action,
-                    target=log.target,
-                    message=log.message or self._format_topic_message(log.action),
-                    actor=log.actor,
-                    timestamp=log.timestamp,
-                    metadata=log.snapshot or {},
-                )
-                for log in topic_logs
-            ]
-
-            activities.extend(
-                AuditActivity(
-                    activity_type="schema",
-                    action=log.action,
-                    target=log.target,
-                    message=log.message or self._format_schema_message(log.action),
-                    actor=log.actor,
-                    timestamp=log.timestamp,
-                    metadata=log.snapshot or {},
-                )
-                for log in schema_logs
+            # Schema 로그 서브쿼리
+            schema_query = _subquery_log_model(SchemaAuditLogModel, ActivityType.SCHEMA).limit(
+                limit
             )
 
-            # 시간 역순 정렬
-            activities.sort(key=lambda x: x.timestamp, reverse=True)
+            # UNION ALL로 통합하고 timestamp 기준 정렬
+            combined_query = (
+                topic_query.union_all(schema_query).order_by(desc("timestamp")).limit(limit)
+            )
 
-            return activities[:limit]
+            result = await session.execute(combined_query)
+            rows = result.fetchall()
 
-    @staticmethod
-    def _format_topic_message(action: str) -> str:
-        """토픽 활동 메시지 포맷"""
-        action_map = {
-            "CREATE": "생성됨",
-            "UPDATE": "수정됨",
-            "DELETE": "삭제됨",
-            "DRY_RUN": "검증됨",
-            "APPLY": "적용됨",
-        }
-        return action_map.get(action, action)
+            # 도메인 모델로 변환
+            return [self._row_to_activity(row) for row in rows]
 
     @staticmethod
-    def _format_schema_message(action: str) -> str:
-        """스키마 활동 메시지 포맷"""
-        action_map = {
-            "REGISTER": "등록됨",
-            "UPLOAD": "업로드됨",
-            "UPDATE": "업데이트됨",
-            "DELETE": "삭제됨",
-            "DRY_RUN": "검증됨",
-            "APPLY": "적용됨",
-        }
-        return action_map.get(action, action)
+    def _row_to_activity(row) -> AuditActivity:
+        """DB Row → AuditActivity 변환"""
+        activity_type = row.activity_type
+        action = row.action
+        message = (
+            row.message or ACTION_MESSAGES.get(activity_type, {}).get(action, action) or action
+        )
+
+        return AuditActivity(
+            activity_type=activity_type,
+            action=action,
+            target=row.target,
+            message=str(message),  # 명시적 문자열 변환
+            actor=row.actor,
+            timestamp=row.timestamp,
+            metadata=row.snapshot or {},
+        )
 
     async def get_activity_history(
         self,
@@ -115,88 +121,70 @@ class MySQLAuditActivityRepository(IAuditActivityRepository):
         actor: str | None = None,
         limit: int = 100,
     ) -> list[AuditActivity]:
-        """활동 히스토리 조회 (필터링 지원)"""
+        """활동 히스토리 조회 (필터링 지원) - 개선된 쿼리"""
         async with self.session_factory() as session:
-            # 토픽 활동 조회
-            topic_activities = []
-            if not activity_type or activity_type == "topic":
-                topic_query = select(AuditLogModel).where(AuditLogModel.status == "COMPLETED")
+            # 조회할 모델과 타입 결정
+            models_to_query: ModelsToQuery = _get_models_to_query(activity_type)
 
-                # 날짜 필터
-                if from_date:
-                    topic_query = topic_query.where(AuditLogModel.timestamp >= from_date)
-                if to_date:
-                    topic_query = topic_query.where(AuditLogModel.timestamp <= to_date)
+            # 각 모델별로 필터링된 쿼리 생성
+            queries = [
+                self._build_filtered_query(
+                    model=model,
+                    activity_type=act_type,
+                    from_date=from_date,
+                    to_date=to_date,
+                    action=action,
+                    actor=actor,
+                    limit=limit,
+                )
+                for model, act_type in models_to_query
+            ]
 
-                # 액션 필터
-                if action:
-                    topic_query = topic_query.where(AuditLogModel.action == action)
+            # 쿼리가 없으면 빈 리스트 반환
+            if not queries:
+                return []
 
-                # 수행자 필터
-                if actor:
-                    topic_query = topic_query.where(AuditLogModel.actor.like(f"%{actor}%"))
-
-                topic_query = topic_query.order_by(desc(AuditLogModel.timestamp)).limit(limit)
-
-                result = await session.execute(topic_query)
-                topic_logs = result.scalars().all()
-
-                topic_activities = [
-                    AuditActivity(
-                        activity_type="topic",
-                        action=log.action,
-                        target=log.target,
-                        message=log.message or self._format_topic_message(log.action),
-                        actor=log.actor,
-                        timestamp=log.timestamp,
-                        metadata=log.snapshot or {},
-                    )
-                    for log in topic_logs
-                ]
-
-            # 스키마 활동 조회
-            schema_activities = []
-            if not activity_type or activity_type == "schema":
-                schema_query = select(SchemaAuditLogModel).where(
-                    SchemaAuditLogModel.status == "COMPLETED"
+            # 단일 쿼리면 그대로, 복수면 UNION
+            if len(queries) == 1:
+                final_query = queries[0].order_by(desc("timestamp")).limit(limit)
+            else:
+                final_query = (
+                    queries[0].union_all(queries[1]).order_by(desc("timestamp")).limit(limit)
                 )
 
-                # 날짜 필터
-                if from_date:
-                    schema_query = schema_query.where(SchemaAuditLogModel.timestamp >= from_date)
-                if to_date:
-                    schema_query = schema_query.where(SchemaAuditLogModel.timestamp <= to_date)
+            result = await session.execute(final_query)
+            rows = result.fetchall()
 
-                # 액션 필터
-                if action:
-                    schema_query = schema_query.where(SchemaAuditLogModel.action == action)
+            return [self._row_to_activity(row) for row in rows]
 
-                # 수행자 필터
-                if actor:
-                    schema_query = schema_query.where(SchemaAuditLogModel.actor.like(f"%{actor}%"))
+    @staticmethod
+    def _build_filtered_query(
+        model,
+        activity_type: str,
+        from_date: datetime | None,
+        to_date: datetime | None,
+        action: str | None,
+        actor: str | None,
+        limit: int,
+    ):
+        """필터가 적용된 쿼리 빌드"""
+        query = select(
+            model.action,
+            model.target,
+            model.actor,
+            model.timestamp,
+            model.message,
+            model.snapshot,
+            literal(activity_type).label("activity_type"),
+        ).where(model.status == AuditStatus.COMPLETED)
 
-                schema_query = schema_query.order_by(desc(SchemaAuditLogModel.timestamp)).limit(
-                    limit
-                )
+        if from_date:
+            query = query.where(model.timestamp >= from_date)
+        if to_date:
+            query = query.where(model.timestamp <= to_date)
+        if action:
+            query = query.where(model.action == action)
+        if actor:
+            query = query.where(model.actor.like(f"%{actor}%"))
 
-                result = await session.execute(schema_query)
-                schema_logs = result.scalars().all()
-
-                schema_activities = [
-                    AuditActivity(
-                        activity_type="schema",
-                        action=log.action,
-                        target=log.target,
-                        message=log.message or self._format_schema_message(log.action),
-                        actor=log.actor,
-                        timestamp=log.timestamp,
-                        metadata=log.snapshot or {},
-                    )
-                    for log in schema_logs
-                ]
-
-            # 병합 및 정렬
-            all_activities = topic_activities + schema_activities
-            all_activities.sort(key=lambda x: x.timestamp, reverse=True)
-
-            return all_activities[:limit]
+        return query.limit(limit)

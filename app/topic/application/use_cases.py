@@ -7,6 +7,8 @@ import uuid
 from collections import defaultdict
 from typing import Any
 
+from app.shared.constants import AuditAction, AuditStatus, AuditTarget, MethodType
+
 from ..domain.models import (
     ChangeId,
     DomainTopicApplyResult,
@@ -45,10 +47,10 @@ class TopicBatchDryRunUseCase:
         # 감사 로그 기록
         await self.audit_repository.log_topic_operation(
             change_id=batch.change_id,
-            action="DRY_RUN",
-            target="BATCH",
+            action=AuditAction.DRY_RUN,
+            target=AuditTarget.BATCH,
             actor=actor,
-            status="STARTED",
+            status=AuditStatus.STARTED,
             message=f"Dry-run started for {len(batch.specs)} topics",
         )
 
@@ -62,10 +64,10 @@ class TopicBatchDryRunUseCase:
             # 감사 로그 기록
             await self.audit_repository.log_topic_operation(
                 change_id=batch.change_id,
-                action="DRY_RUN",
-                target="BATCH",
+                action=AuditAction.DRY_RUN,
+                target=AuditTarget.BATCH,
                 actor=actor,
-                status="COMPLETED",
+                status=AuditStatus.COMPLETED,
                 message=f"Dry-run completed: {len(plan.items)} items, {len(plan.violations)} violations",
                 snapshot={"plan_summary": plan.summary()},
             )
@@ -76,10 +78,10 @@ class TopicBatchDryRunUseCase:
             # 감사 로그 기록
             await self.audit_repository.log_topic_operation(
                 change_id=batch.change_id,
-                action="DRY_RUN",
-                target="BATCH",
+                action=AuditAction.DRY_RUN,
+                target=AuditTarget.BATCH,
                 actor=actor,
-                status="FAILED",
+                status=AuditStatus.FAILED,
                 message=f"Dry-run failed: {e!s}",
             )
             raise
@@ -106,10 +108,10 @@ class TopicBatchApplyUseCase:
         # 감사 로그 기록
         await self.audit_repository.log_topic_operation(
             change_id=batch.change_id,
-            action="APPLY",
-            target="BATCH",
+            action=AuditAction.APPLY,
+            target=AuditTarget.BATCH,
             actor=actor,
-            status="STARTED",
+            status=AuditStatus.STARTED,
             message=f"Apply started for {len(batch.specs)} topics",
         )
 
@@ -140,7 +142,7 @@ class TopicBatchApplyUseCase:
 
             # 단일 vs 배치 판단
             is_single = len(batch.specs) == 1
-            method = "SINGLE" if is_single else "BATCH"
+            method = MethodType.SINGLE if is_single else MethodType.BATCH
 
             # 액션별로 그룹화 (스냅샷용)
             actions_map: defaultdict[str, list[str]] = defaultdict(list)
@@ -154,12 +156,13 @@ class TopicBatchApplyUseCase:
                 spec = batch.specs[0]
                 action_str = spec.action.value.upper()
 
+                # 실패 딕셔너리로 변환하여 O(n) → O(1)
+                failed_dict = {f["name"]: f["error"] for f in failed}
+
                 if spec.name in applied:
                     message = f"토픽 {action_str}: {spec.name}"
-                elif spec.name in [f["name"] for f in failed]:
-                    error_msg = next(
-                        (f["error"] for f in failed if f["name"] == spec.name), "알 수 없는 오류"
-                    )
+                elif spec.name in failed_dict:
+                    error_msg = failed_dict[spec.name]
                     message = f"토픽 {action_str} 실패: {spec.name} - {error_msg}"
                 else:
                     message = f"토픽 {action_str}: {spec.name}"
@@ -171,15 +174,15 @@ class TopicBatchApplyUseCase:
                     [f"{len(topics)}개 {action}" for action, topics in actions_map.items()]
                 )
                 message = f"배치 작업 완료: {action_summary}"
-                target = "BATCH"
+                target = AuditTarget.BATCH
 
             # 감사 로그 기록
             await self.audit_repository.log_topic_operation(
                 change_id=batch.change_id,
-                action="APPLY",
+                action=AuditAction.APPLY,
                 target=target,
                 actor=actor,
-                status="COMPLETED",
+                status=AuditStatus.COMPLETED,
                 message=message,
                 snapshot={
                     "method": method,
@@ -196,10 +199,10 @@ class TopicBatchApplyUseCase:
             # 감사 로그 기록
             await self.audit_repository.log_topic_operation(
                 change_id=batch.change_id,
-                action="APPLY",
-                target="BATCH",
+                action=AuditAction.APPLY,
+                target=AuditTarget.BATCH,
                 actor=actor,
-                status="FAILED",
+                status=AuditStatus.FAILED,
                 message=f"Apply failed: {e!s}",
             )
             raise
@@ -244,7 +247,7 @@ class TopicBatchApplyUseCase:
 
                     failed.append({"name": name, "error": error_msg, "action": "CREATE"})
                     await self._log_topic_operation(
-                        name, "CREATE", actor, change_id, "FAILED", error_msg
+                        name, AuditAction.CREATE, actor, change_id, AuditStatus.FAILED, error_msg
                     )
 
         # 토픽 삭제
@@ -260,7 +263,7 @@ class TopicBatchApplyUseCase:
                 else:
                     failed.append({"name": name, "error": str(error), "action": "DELETE"})
                     await self._log_topic_operation(
-                        name, "DELETE", actor, change_id, "FAILED", str(error)
+                        name, AuditAction.DELETE, actor, change_id, AuditStatus.FAILED, str(error)
                     )
 
         # 토픽 설정 변경

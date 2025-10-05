@@ -14,6 +14,7 @@ from typing import Any
 import orjson
 
 from app.analysis.domain.repositories import ICorrelationRepository
+from app.shared.constants import AuditAction, AuditStatus, AuditTarget
 from app.shared.domain.events import SchemaRegisteredEvent
 from app.shared.domain.policy_types import DomainPolicySeverity
 from app.shared.infrastructure.event_bus import get_event_bus
@@ -64,10 +65,10 @@ class SchemaBatchDryRunUseCase:
     async def execute(self, batch: DomainSchemaBatch, actor: str) -> DomainSchemaPlan:
         await self.audit_repository.log_operation(
             change_id=batch.change_id,
-            action="DRY_RUN",
-            target="BATCH",
+            action=AuditAction.DRY_RUN,
+            target=AuditTarget.BATCH,
             actor=actor,
-            status="STARTED",
+            status=AuditStatus.STARTED,
             message=f"Schema dry-run started for {len(batch.specs)} subjects",
         )
 
@@ -81,10 +82,10 @@ class SchemaBatchDryRunUseCase:
             await self.metadata_repository.save_plan(plan, actor)
             await self.audit_repository.log_operation(
                 change_id=batch.change_id,
-                action="DRY_RUN",
-                target="BATCH",
+                action=AuditAction.DRY_RUN,
+                target=AuditTarget.BATCH,
                 actor=actor,
-                status="COMPLETED",
+                status=AuditStatus.COMPLETED,
                 message="Schema dry-run completed",
                 snapshot={"summary": plan.summary()},
             )
@@ -92,10 +93,10 @@ class SchemaBatchDryRunUseCase:
         except Exception as exc:
             await self.audit_repository.log_operation(
                 change_id=batch.change_id,
-                action="DRY_RUN",
-                target="BATCH",
+                action=AuditAction.DRY_RUN,
+                target=AuditTarget.BATCH,
                 actor=actor,
-                status="FAILED",
+                status=AuditStatus.FAILED,
                 message=f"Schema dry-run failed: {exc!s}",
             )
             raise
@@ -137,10 +138,10 @@ class SchemaBatchApplyUseCase:
         audit_id = str(uuid.uuid4())
         await self.audit_repository.log_operation(
             change_id=batch.change_id,
-            action="APPLY",
-            target="BATCH",
+            action=AuditAction.APPLY,
+            target=AuditTarget.BATCH,
             actor=actor,
-            status="STARTED",
+            status=AuditStatus.STARTED,
             message=f"Schema apply started for {len(batch.specs)} subjects",
         )
 
@@ -190,10 +191,10 @@ class SchemaBatchApplyUseCase:
             await self.metadata_repository.save_apply_result(result, actor)
             await self.audit_repository.log_operation(
                 change_id=batch.change_id,
-                action="APPLY",
-                target="BATCH",
+                action=AuditAction.APPLY,
+                target=AuditTarget.BATCH,
                 actor=actor,
-                status="COMPLETED",
+                status=AuditStatus.COMPLETED,
                 message="Schema apply completed",
                 snapshot={"summary": result.summary()},
             )
@@ -202,10 +203,10 @@ class SchemaBatchApplyUseCase:
         except Exception as exc:
             await self.audit_repository.log_operation(
                 change_id=batch.change_id,
-                action="APPLY",
-                target="BATCH",
+                action=AuditAction.APPLY,
+                target=AuditTarget.BATCH,
                 actor=actor,
-                status="FAILED",
+                status=AuditStatus.FAILED,
                 message=f"Schema apply failed: {exc!s}",
             )
             raise
@@ -318,10 +319,10 @@ class SchemaUploadUseCase:
 
         await self.audit_repository.log_operation(
             change_id=change_id,
-            action="UPLOAD",
-            target="FILES",
+            action=AuditAction.UPLOAD,
+            target=AuditTarget.FILES,
             actor=actor,
-            status="STARTED",
+            status=AuditStatus.STARTED,
             message=f"Schema upload started: {len(files)} files",
         )
 
@@ -353,10 +354,10 @@ class SchemaUploadUseCase:
 
             await self.audit_repository.log_operation(
                 change_id=change_id,
-                action="REGISTER",
-                target=artifacts[0].subject if artifacts else "UNKNOWN",
+                action=AuditAction.REGISTER,
+                target=artifacts[0].subject if artifacts else AuditTarget.UNKNOWN,
                 actor=actor,
-                status="COMPLETED",
+                status=AuditStatus.COMPLETED,
                 message=f"스키마 등록 완료: {schema_details}",
                 snapshot={
                     "summary": result.summary(),
@@ -376,10 +377,10 @@ class SchemaUploadUseCase:
         except Exception as exc:
             await self.audit_repository.log_operation(
                 change_id=change_id,
-                action="UPLOAD",
-                target="FILES",
+                action=AuditAction.UPLOAD,
+                target=AuditTarget.FILES,
                 actor=actor,
-                status="FAILED",
+                status=AuditStatus.FAILED,
                 message=f"Schema upload failed: {exc!s}",
             )
             raise
@@ -670,10 +671,10 @@ class SchemaSyncUseCase:
 
         await self.audit_repository.log_operation(
             change_id=change_id,
-            action="SYNC",
-            target="SCHEMA_REGISTRY",
+            action=AuditAction.SYNC,
+            target=AuditTarget.SCHEMA_REGISTRY,
             actor=actor,
-            status="STARTED",
+            status=AuditStatus.STARTED,
             message="Schema synchronization started",
         )
 
@@ -684,10 +685,10 @@ class SchemaSyncUseCase:
             if not all_subjects:
                 await self.audit_repository.log_operation(
                     change_id=change_id,
-                    action="SYNC",
-                    target="SCHEMA_REGISTRY",
+                    action=AuditAction.SYNC,
+                    target=AuditTarget.SCHEMA_REGISTRY,
                     actor=actor,
-                    status="COMPLETED",
+                    status=AuditStatus.COMPLETED,
                     message="No schemas found in Schema Registry",
                 )
                 return {"total": 0, "added": 0, "updated": 0}
@@ -726,10 +727,10 @@ class SchemaSyncUseCase:
 
             await self.audit_repository.log_operation(
                 change_id=change_id,
-                action="SYNC",
-                target="SCHEMA_REGISTRY",
+                action=AuditAction.SYNC,
+                target=AuditTarget.SCHEMA_REGISTRY,
                 actor=actor,
-                status="COMPLETED",
+                status=AuditStatus.COMPLETED,
                 message=f"Schema synchronization completed: {result['total']} total, {result['added']} added",
                 snapshot=result,
             )
@@ -739,10 +740,10 @@ class SchemaSyncUseCase:
         except Exception as exc:
             await self.audit_repository.log_operation(
                 change_id=change_id,
-                action="SYNC",
-                target="SCHEMA_REGISTRY",
+                action=AuditAction.SYNC,
+                target=AuditTarget.SCHEMA_REGISTRY,
                 actor=actor,
-                status="FAILED",
+                status=AuditStatus.FAILED,
                 message=f"Schema synchronization failed: {exc!s}",
             )
             raise

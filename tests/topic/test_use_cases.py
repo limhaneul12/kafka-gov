@@ -239,3 +239,43 @@ class TestTopicBatchApplyUseCase:
 
         assert len(result.applied) == 1
         mock_topic_repository.create_partitions.assert_called_once()
+
+
+class TestApplyUseCaseOptimizations:
+    """Apply UseCase 최적화 검증 테스트"""
+
+    @pytest.mark.asyncio
+    async def test_failed_dict_optimization(
+        self,
+        mock_topic_repository,
+        mock_metadata_repository,
+        mock_audit_repository,
+    ):
+        """실패 목록을 딕셔너리로 변환하여 O(1) 조회 성능 확인"""
+        use_case = TopicBatchApplyUseCase(
+            mock_topic_repository,
+            mock_metadata_repository,
+            mock_audit_repository,
+        )
+
+        # 단일 토픽 실패 시나리오
+        batch = create_topic_batch(
+            specs=(create_topic_spec(name="dev.fail.topic", action=DomainTopicAction.CREATE),),
+        )
+
+        mock_topic_repository.describe_topics.return_value = {}
+        mock_topic_repository.create_topics.return_value = {
+            "dev.fail.topic": Exception("Creation failed")
+        }
+
+        result = await use_case.execute(batch, actor="test-user")
+
+        # 실패 항목이 있어야 함
+        assert len(result.failed) == 1
+        assert result.failed[0]["name"] == "dev.fail.topic"
+        assert "Creation failed" in result.failed[0]["error"]
+
+        # 감사 로그에 실패 메시지 포함 확인
+        audit_calls = mock_audit_repository.log_topic_operation.call_args_list
+        completed_call = [c for c in audit_calls if "COMPLETED" in str(c)][-1]
+        assert "실패" in str(completed_call) or "FAILED" in str(completed_call)
