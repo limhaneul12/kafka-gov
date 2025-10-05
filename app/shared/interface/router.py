@@ -1,7 +1,6 @@
-"""Shared Interface Router - 공통 API 엔드포인트"""
+"""Shared Interface Router"""
 
-from __future__ import annotations
-
+from datetime import datetime
 from typing import Any
 
 from dependency_injector.wiring import Provide, inject
@@ -31,6 +30,57 @@ async def get_recent_activities(
     activities = await use_case.execute(limit=limit)
 
     # msgspec.Struct를 dict로 변환 (FastAPI가 자동으로 JSON 직렬화)
+    result: list[dict[str, Any]] = []
+    for activity in activities:
+        activity_dict: dict[str, Any] = {
+            "activity_type": activity.activity_type,
+            "action": activity.action,
+            "target": activity.target,
+            "message": activity.message,
+            "actor": activity.actor,
+            "timestamp": activity.timestamp.isoformat(),
+            "metadata": activity.metadata,
+        }
+        result.append(activity_dict)
+
+    return result
+
+
+@router.get("/audit/history")
+@inject
+async def get_activity_history(
+    use_case=Depends(Provide[AppContainer.infrastructure_container.get_activity_history_use_case]),
+    from_date: datetime | None = Query(default=None, description="시작 날짜/시간 (ISO 8601)"),
+    to_date: datetime | None = Query(default=None, description="종료 날짜/시간 (ISO 8601)"),
+    activity_type: str | None = Query(default=None, description="활동 타입 (topic/schema)"),
+    action: str | None = Query(default=None, description="액션 타입"),
+    actor: str | None = Query(default=None, description="수행자"),
+    limit: int = Query(default=100, ge=1, le=500, description="최대 조회 개수"),
+) -> list[dict[str, Any]]:
+    """
+    활동 히스토리 조회 (필터링 지원)
+
+    Args:
+        from_date: 시작 날짜/시간
+        to_date: 종료 날짜/시간
+        activity_type: 활동 타입 필터
+        action: 액션 필터
+        actor: 수행자 필터
+        limit: 최대 조회 개수 (1-500)
+
+    Returns:
+        필터링된 활동 목록 (시간 역순)
+    """
+    activities = await use_case.execute(
+        from_date=from_date,
+        to_date=to_date,
+        activity_type=activity_type,
+        action=action,
+        actor=actor,
+        limit=limit,
+    )
+
+    # msgspec.Struct를 dict로 변환
     result: list[dict[str, Any]] = []
     for activity in activities:
         activity_dict: dict[str, Any] = {

@@ -33,6 +33,10 @@
                         <i class="fas fa-code"></i>
                         스키마 관리
                     </a>
+                    <a href="#history" class="nav-link" data-tab="history">
+                        <i class="fas fa-history"></i>
+                        활동 히스토리
+                    </a>
                 </nav>
                 <div class="user-menu">
                     <div class="user-actions">
@@ -243,6 +247,92 @@
                             </tr>
                         </thead>
                         <tbody id="schemas-table-body">
+                            <!-- 동적으로 생성 -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- 활동 히스토리 탭 -->
+            <div id="history" class="tab-content">
+                <div class="page-header">
+                    <h1>활동 히스토리</h1>
+                    <p>토픽과 스키마의 모든 활동 기록을 조회할 수 있습니다</p>
+                </div>
+
+                <div class="filters">
+                    <div class="filter-group">
+                        <label>
+                            <i class="fas fa-calendar"></i>
+                            시작 날짜/시간
+                        </label>
+                        <input type="datetime-local" id="history-from-date">
+                    </div>
+                    <div class="filter-group">
+                        <label>
+                            <i class="fas fa-calendar"></i>
+                            종료 날짜/시간
+                        </label>
+                        <input type="datetime-local" id="history-to-date">
+                    </div>
+                    <div class="filter-group">
+                        <label>
+                            <i class="fas fa-server"></i>
+                            타입
+                        </label>
+                        <select id="history-type-filter">
+                            <option value="">전체</option>
+                            <option value="topic">토픽</option>
+                            <option value="schema">스키마</option>
+                        </select>
+                    </div>
+                    <div class="filter-group">
+                        <label>
+                            <i class="fas fa-bolt"></i>
+                            액션
+                        </label>
+                        <select id="history-action-filter">
+                            <option value="">전체</option>
+                            <option value="CREATE">생성</option>
+                            <option value="UPDATE">수정</option>
+                            <option value="ALTER">변경</option>
+                            <option value="DELETE">삭제</option>
+                            <option value="REGISTER">등록</option>
+                            <option value="UPLOAD">업로드</option>
+                        </select>
+                    </div>
+                    <div class="filter-group">
+                        <label>
+                            <i class="fas fa-user"></i>
+                            수행자
+                        </label>
+                        <input type="text" id="history-actor-filter" placeholder="팀명 또는 사용자...">
+                    </div>
+                    <div class="filter-group">
+                        <button class="btn btn-primary" id="search-history-btn">
+                            <i class="fas fa-search"></i>
+                            검색
+                        </button>
+                        <button class="btn btn-secondary" id="reset-history-btn">
+                            <i class="fas fa-redo"></i>
+                            초기화
+                        </button>
+                    </div>
+                </div>
+
+                <div class="table-container">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>날짜/시간</th>
+                                <th>타입</th>
+                                <th>액션</th>
+                                <th>대상</th>
+                                <th>수행자</th>
+                                <th>메시지</th>
+                            </tr>
+                        </thead>
+                        <tbody id="history-table-body">
                             <!-- 동적으로 생성 -->
                         </tbody>
                     </table>
@@ -469,6 +559,11 @@ items:
                     <div class="form-group">
                         <label for="schema-change-id">변경 ID</label>
                         <input type="text" id="schema-change-id" placeholder="예: 2025-09-30_001" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="schema-owner">소유 팀 *</label>
+                        <input type="text" id="schema-owner" placeholder="예: team-data-platform" required>
+                        <small>스키마를 관리하는 팀 이름을 입력하세요</small>
                     </div>
                     <div class="form-group">
                         <label for="schema-files">스키마 파일</label>

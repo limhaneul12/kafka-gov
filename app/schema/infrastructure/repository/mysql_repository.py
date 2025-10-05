@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 from collections.abc import Callable
 from contextlib import AbstractAsyncContextManager
+from typing import Any
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -365,4 +366,34 @@ class MySQLSchemaMetadataRepository(ISchemaMetadataRepository):
 
             except Exception as e:
                 logger.error(f"Failed to delete artifacts for subject {subject}: {e}")
+                raise
+
+    async def save_schema_metadata(self, subject: str, metadata: dict[str, Any]) -> None:
+        """스키마 메타데이터 저장"""
+        async with self.session_factory() as session:
+            try:
+                # 기존 메타데이터 조회
+                stmt = select(SchemaMetadataModel).where(SchemaMetadataModel.subject == subject)
+                result = await session.execute(stmt)
+                existing = result.scalar_one_or_none()
+
+                if existing:
+                    # 업데이트
+                    existing.owner = metadata.get("owner", existing.owner)
+                    existing.updated_by = metadata.get("updated_by", "system")
+                else:
+                    # 새로 생성
+                    metadata_model = SchemaMetadataModel(
+                        subject=subject,
+                        owner=metadata.get("owner"),
+                        created_by=metadata.get("created_by", "system"),
+                        updated_by=metadata.get("updated_by", "system"),
+                    )
+                    session.add(metadata_model)
+
+                await session.flush()
+                logger.info(f"Schema metadata saved: {subject}")
+
+            except Exception as e:
+                logger.error(f"Failed to save schema metadata {subject}: {e}")
                 raise

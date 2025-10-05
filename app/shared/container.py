@@ -5,7 +5,11 @@ from __future__ import annotations
 from dependency_injector import containers, providers
 
 from app.schema.infrastructure.storage.minio_adapter import create_minio_client
-from app.shared.application.use_cases import GetClusterStatusUseCase, GetRecentActivitiesUseCase
+from app.shared.application.use_cases import (
+    GetActivityHistoryUseCase,
+    GetClusterStatusUseCase,
+    GetRecentActivitiesUseCase,
+)
 from app.shared.infrastructure.cluster_repository import KafkaClusterRepository
 from app.shared.infrastructure.repository import MySQLAuditActivityRepository
 
@@ -66,6 +70,11 @@ class InfrastructureContainer(containers.DeclarativeContainer):
     # Use Cases
     get_recent_activities_use_case = providers.Factory(
         GetRecentActivitiesUseCase,
+        audit_repository=audit_activity_repository,
+    )
+
+    get_activity_history_use_case = providers.Factory(
+        GetActivityHistoryUseCase,
         audit_repository=audit_activity_repository,
     )
 

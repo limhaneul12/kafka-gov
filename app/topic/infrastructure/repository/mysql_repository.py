@@ -235,7 +235,7 @@ class MySQLTopicMetadataRepository(ITopicMetadataRepository):
                 return {
                     "owner": metadata_model.owner,
                     "doc": metadata_model.doc,
-                    "tags": metadata_model.tags or {},
+                    "tags": metadata_model.tags if metadata_model.tags is not None else [],
                     "config": metadata_model.config or {},
                     "created_by": metadata_model.created_by,
                     "updated_by": metadata_model.updated_by,
@@ -260,9 +260,9 @@ class MySQLTopicMetadataRepository(ITopicMetadataRepository):
                     # 업데이트 후 merge 적용
                     existing.owner = metadata.get("owner")
                     existing.doc = metadata.get("doc")
-                    existing.tags = metadata.get("tags", {})
+                    existing.tags = metadata.get("tags", [])
                     existing.config = metadata.get("config", {})
-                    existing.updated_by = "system"
+                    existing.updated_by = metadata.get("updated_by", "system")
                     await session.merge(existing)
                 else:
                     # 새로 생성 - merge로 upsert
@@ -270,10 +270,10 @@ class MySQLTopicMetadataRepository(ITopicMetadataRepository):
                         topic_name=name,
                         owner=metadata.get("owner"),
                         doc=metadata.get("doc"),
-                        tags=metadata.get("tags", {}),
+                        tags=metadata.get("tags", []),
                         config=metadata.get("config", {}),
-                        created_by="system",
-                        updated_by="system",
+                        created_by=metadata.get("created_by", "system"),
+                        updated_by=metadata.get("updated_by", "system"),
                     )
                     await session.merge(metadata_model)
 
@@ -282,4 +282,23 @@ class MySQLTopicMetadataRepository(ITopicMetadataRepository):
 
             except Exception as e:
                 logger.error(f"Failed to save topic metadata {name}: {e}")
+                raise
+
+    async def delete_topic_metadata(self, name: TopicName) -> None:
+        """토픽 메타데이터 삭제"""
+        async with self.session_factory() as session:
+            try:
+                stmt = select(TopicMetadataModel).where(TopicMetadataModel.topic_name == name)
+                result = await session.execute(stmt)
+                metadata_model = await self._maybe_await(result.scalar_one_or_none())
+
+                if metadata_model:
+                    await session.delete(metadata_model)
+                    await session.flush()
+                    logger.info(f"Topic metadata deleted: {name}")
+                else:
+                    logger.info(f"No metadata found to delete for topic: {name}")
+
+            except Exception as e:
+                logger.error(f"Failed to delete topic metadata {name}: {e}")
                 raise

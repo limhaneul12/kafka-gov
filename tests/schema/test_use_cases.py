@@ -537,6 +537,7 @@ class TestSchemaUploadUseCase:
         result = await use_case.execute(
             env=DomainEnvironment.DEV,
             change_id="upload-001",
+            owner="test-team",
             files=files,
             actor="test-user",
         )
@@ -574,6 +575,7 @@ class TestSchemaUploadUseCase:
         result = await use_case.execute(
             env=DomainEnvironment.DEV,
             change_id="upload-002",
+            owner="test-team",
             files=files,
             actor="test-user",
         )
@@ -608,6 +610,7 @@ class TestSchemaUploadUseCase:
         result = await use_case.execute(
             env=DomainEnvironment.DEV,
             change_id="upload-003",
+            owner="test-team",
             files=files,
             actor="test-user",
         )
@@ -634,6 +637,7 @@ class TestSchemaUploadUseCase:
             await use_case.execute(
                 env=DomainEnvironment.DEV,
                 change_id="upload-004",
+                owner="test-team",
                 files=[],
                 actor="test-user",
             )
@@ -661,6 +665,7 @@ class TestSchemaUploadUseCase:
             await use_case.execute(
                 env=DomainEnvironment.DEV,
                 change_id="upload-005",
+                owner="test-team",
                 files=files,
                 actor="test-user",
             )
@@ -690,6 +695,7 @@ class TestSchemaUploadUseCase:
             await use_case.execute(
                 env=DomainEnvironment.DEV,
                 change_id="upload-006",
+                owner="test-team",
                 files=files,
                 actor="test-user",
             )
@@ -717,6 +723,7 @@ class TestSchemaUploadUseCase:
             await use_case.execute(
                 env=DomainEnvironment.DEV,
                 change_id="upload-007",
+                owner="test-team",
                 files=files,
                 actor="test-user",
             )
@@ -744,6 +751,7 @@ class TestSchemaUploadUseCase:
             await use_case.execute(
                 env=DomainEnvironment.DEV,
                 change_id="upload-008",
+                owner="test-team",
                 files=files,
                 actor="test-user",
             )
@@ -777,6 +785,7 @@ class TestSchemaUploadUseCase:
         result = await use_case.execute(
             env=DomainEnvironment.DEV,
             change_id="upload-009",
+            owner="test-team",
             files=files,
             actor="test-user",
         )

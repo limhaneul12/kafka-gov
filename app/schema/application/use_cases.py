@@ -309,6 +309,7 @@ class SchemaUploadUseCase:
         *,
         env: DomainEnvironment,
         change_id: ChangeId,
+        owner: str,
         files: list[Any],  # FastAPI UploadFile 객체들
         actor: str,
     ) -> DomainSchemaUploadResult:
@@ -330,7 +331,9 @@ class SchemaUploadUseCase:
 
             # 2. 파일 처리 및 업로드 (MinIO + Schema Registry)
             artifact_results = [
-                await self._process_and_upload_file(file_info, env, change_id, upload_id, actor)
+                await self._process_and_upload_file(
+                    file_info, env, change_id, upload_id, owner, actor
+                )
                 for file_info in validated_files
             ]
             artifacts: list[DomainSchemaArtifact] = [
@@ -431,6 +434,7 @@ class SchemaUploadUseCase:
         env: DomainEnvironment,
         change_id: ChangeId,
         upload_id: str,
+        owner: str,
         actor: str,
     ) -> DomainSchemaArtifact | None:
         """개별 파일 처리 및 업로드"""
@@ -442,7 +446,7 @@ class SchemaUploadUseCase:
         if extension == ".zip":
             return await self._process_zip_file(file_info, env, change_id, upload_id)
 
-        return await self._process_schema_file(file_info, env, change_id, upload_id, actor)
+        return await self._process_schema_file(file_info, env, change_id, upload_id, owner, actor)
 
     async def _process_zip_file(
         self, file_info: dict[str, Any], env: DomainEnvironment, change_id: ChangeId, upload_id: str
@@ -497,6 +501,7 @@ class SchemaUploadUseCase:
         env: DomainEnvironment,
         change_id: ChangeId,
         upload_id: str,
+        owner: str,
         actor: str,
     ) -> DomainSchemaArtifact | None:
         """스키마 파일 처리 및 Schema Registry 자동 등록"""
@@ -549,6 +554,12 @@ class SchemaUploadUseCase:
 
             # Schema Registry에 등록
             version = await self.registry_repository.register_schema(schema_spec)
+
+            # 스키마 메타데이터 저장 (owner 포함)
+            await self.metadata_repository.save_schema_metadata(
+                subject=subject_name,
+                metadata={"owner": owner, "created_by": actor, "updated_by": actor},
+            )
 
             # 등록 성공 시 이벤트 발행
             await self._publish_schema_registered_event(

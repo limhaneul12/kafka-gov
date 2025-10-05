@@ -268,7 +268,16 @@ class KafkaTopicAdapter(ITopicRepository):
                     }
 
                 except Exception as e:
-                    logger.error(f"Failed to get config for topic {name}: {e}")
+                    # 토픽이 조회 중 삭제되었거나 권한이 없는 경우
+                    error_str = str(e)
+                    if "UNKNOWN_TOPIC_OR_PART" in error_str:
+                        logger.warning(
+                            f"Topic {name} was deleted or is inaccessible during config fetch. "
+                            "Returning basic metadata only."
+                        )
+                    else:
+                        logger.error(f"Failed to get config for topic {name}: {e}")
+
                     # 기본 정보만 반환
                     results[name] = {
                         "partition_count": len(topic_metadata.partitions),

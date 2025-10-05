@@ -119,6 +119,7 @@ async def schema_batch_apply(
 async def upload_schemas(
     env: Annotated[Environment, Form(..., description="업로드 대상 환경")],
     change_id: Annotated[ChangeId, Form(..., description="변경 ID")],
+    owner: Annotated[str, Form(..., description="소유 팀")],
     files: Annotated[list[UploadFile], File(..., description="업로드할 스키마 파일 목록")],
     upload_use_case=UploadUseCase,
 ) -> SchemaUploadResponse:
@@ -133,6 +134,7 @@ async def upload_schemas(
         result = await upload_use_case.execute(
             env=DomainEnvironment(env.value),
             change_id=change_id,
+            owner=owner,
             files=files,
             actor=DEFAULT_USER,
         )

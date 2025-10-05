@@ -296,6 +296,21 @@ class KafkaGovApp {
         document.getElementById('bulk-delete-topics-btn')?.addEventListener('click', () => {
             this.handleBulkDeleteTopics();
         });
+
+        // 히스토리 검색 버튼
+        document.getElementById('search-history-btn')?.addEventListener('click', () => {
+            this.loadHistory();
+        });
+
+        // 히스토리 초기화 버튼
+        document.getElementById('reset-history-btn')?.addEventListener('click', () => {
+            document.getElementById('history-from-date').value = '';
+            document.getElementById('history-to-date').value = '';
+            document.getElementById('history-type-filter').value = '';
+            document.getElementById('history-action-filter').value = '';
+            document.getElementById('history-actor-filter').value = '';
+            this.loadHistory();
+        });
     }
 
     /**
@@ -341,6 +356,9 @@ class KafkaGovApp {
                 break;
             case 'schemas':
                 await this.loadSchemas();
+                break;
+            case 'history':
+                await this.loadHistory();
                 break;
         }
     }
@@ -511,6 +529,38 @@ class KafkaGovApp {
         } catch (error) {
             console.error('스키마 로드 실패:', error);
             Toast.error(`스키마 목록 조회 실패: ${error.message}`);
+        } finally {
+            Loading.hide();
+        }
+    }
+
+    /**
+     * 활동 히스토리 로드
+     */
+    async loadHistory() {
+        try {
+            Loading.show();
+
+            const fromDate = document.getElementById('history-from-date')?.value;
+            const toDate = document.getElementById('history-to-date')?.value;
+            const activityType = document.getElementById('history-type-filter')?.value;
+            const action = document.getElementById('history-action-filter')?.value;
+            const actor = document.getElementById('history-actor-filter')?.value;
+
+            const filters = {};
+            if (fromDate) filters.from_date = new Date(fromDate).toISOString();
+            if (toDate) filters.to_date = new Date(toDate).toISOString();
+            if (activityType) filters.activity_type = activityType;
+            if (action) filters.action = action;
+            if (actor) filters.actor = actor;
+            filters.limit = 100;
+
+            const activities = await api.getActivityHistory(filters);
+            
+            TableRenderer.renderHistoryTable(activities);
+        } catch (error) {
+            console.error('히스토리 로드 실패:', error);
+            Toast.error(`활동 히스토리 조회 실패: ${error.message}`);
         } finally {
             Loading.hide();
         }
@@ -1125,15 +1175,22 @@ class KafkaGovApp {
             // 파일 업로드
             const env = document.getElementById('schema-env')?.value;
             const changeId = document.getElementById('schema-change-id')?.value;
+            const owner = document.getElementById('schema-owner')?.value;
 
             if (!env || !changeId) {
                 Toast.warning('환경과 변경 ID를 입력해주세요.');
                 return;
             }
 
+            if (!owner) {
+                Toast.warning('소유 팀을 입력해주세요.');
+                return;
+            }
+
             const result = await api.uploadSchemaFiles({
                 env,
                 changeId,
+                owner,
                 files: this.selectedFiles,
             });
             

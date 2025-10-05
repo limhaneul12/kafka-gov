@@ -238,6 +238,68 @@ class TableRenderer {
         };
         return classes[status?.toLowerCase()] || 'success';
     }
+
+    /**
+     * 히스토리 테이블 렌더링
+     */
+    static renderHistoryTable(activities) {
+        const tbody = document.getElementById('history-table-body');
+        tbody.innerHTML = '';
+
+        if (!activities || activities.length === 0) {
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="6" style="text-align: center; padding: 2rem; color: var(--text-muted);">
+                        활동 내역이 없습니다. 검색 조건을 변경해주세요.
+                    </td>
+                </tr>
+            `;
+            return;
+        }
+
+        activities.forEach(activity => {
+            const timestamp = new Date(activity.timestamp).toLocaleString('ko-KR', {
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit'
+            });
+            
+            const typeColor = activity.activity_type === 'topic' ? 'primary' : 'info';
+            const actionBadge = this.getActionBadge(activity.action);
+            
+            const row = document.createElement('tr');
+            row.innerHTML = `
+                <td>${this.escapeHtml(timestamp)}</td>
+                <td><span class="status-badge ${typeColor}">${this.escapeHtml(activity.activity_type.toUpperCase())}</span></td>
+                <td>${actionBadge}</td>
+                <td>${this.escapeHtml(activity.target)}</td>
+                <td>${this.escapeHtml(activity.actor || '-')}</td>
+                <td>${this.escapeHtml(activity.message || '-')}</td>
+            `;
+            tbody.appendChild(row);
+        });
+    }
+
+    /**
+     * 액션 배지 생성
+     */
+    static getActionBadge(action) {
+        const badgeClass = {
+            CREATE: 'success',
+            REGISTER: 'success',
+            UPLOAD: 'success',
+            UPDATE: 'warning',
+            ALTER: 'warning',
+            DELETE: 'error',
+            DRY_RUN: 'info',
+            APPLY: 'success'
+        };
+        const className = badgeClass[action] || 'info';
+        return `<span class="status-badge ${className}">${this.escapeHtml(action)}</span>`;
+    }
 }
 
 // =================

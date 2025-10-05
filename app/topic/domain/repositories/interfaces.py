@@ -103,6 +103,11 @@ class ITopicMetadataRepository(ABC):
         """토픽 메타데이터 저장"""
         ...
 
+    @abstractmethod
+    async def delete_topic_metadata(self, name: TopicName) -> None:
+        """토픽 메타데이터 삭제"""
+        ...
+
 
 class IAuditRepository(ABC):
     """감사 로그 리포지토리 인터페이스"""

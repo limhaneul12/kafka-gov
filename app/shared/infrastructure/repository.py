@@ -3,6 +3,7 @@
 import logging
 from collections.abc import Callable
 from contextlib import AbstractAsyncContextManager
+from datetime import datetime
 from typing import TypeVar
 
 from sqlalchemy import desc, select
@@ -104,3 +105,98 @@ class MySQLAuditActivityRepository(IAuditActivityRepository):
             "APPLY": "적용됨",
         }
         return action_map.get(action, action)
+
+    async def get_activity_history(
+        self,
+        from_date: datetime | None = None,
+        to_date: datetime | None = None,
+        activity_type: str | None = None,
+        action: str | None = None,
+        actor: str | None = None,
+        limit: int = 100,
+    ) -> list[AuditActivity]:
+        """활동 히스토리 조회 (필터링 지원)"""
+        async with self.session_factory() as session:
+            # 토픽 활동 조회
+            topic_activities = []
+            if not activity_type or activity_type == "topic":
+                topic_query = select(AuditLogModel).where(AuditLogModel.status == "COMPLETED")
+
+                # 날짜 필터
+                if from_date:
+                    topic_query = topic_query.where(AuditLogModel.timestamp >= from_date)
+                if to_date:
+                    topic_query = topic_query.where(AuditLogModel.timestamp <= to_date)
+
+                # 액션 필터
+                if action:
+                    topic_query = topic_query.where(AuditLogModel.action == action)
+
+                # 수행자 필터
+                if actor:
+                    topic_query = topic_query.where(AuditLogModel.actor.like(f"%{actor}%"))
+
+                topic_query = topic_query.order_by(desc(AuditLogModel.timestamp)).limit(limit)
+
+                result = await session.execute(topic_query)
+                topic_logs = result.scalars().all()
+
+                topic_activities = [
+                    AuditActivity(
+                        activity_type="topic",
+                        action=log.action,
+                        target=log.target,
+                        message=log.message or self._format_topic_message(log.action),
+                        actor=log.actor,
+                        timestamp=log.timestamp,
+                        metadata=log.snapshot or {},
+                    )
+                    for log in topic_logs
+                ]
+
+            # 스키마 활동 조회
+            schema_activities = []
+            if not activity_type or activity_type == "schema":
+                schema_query = select(SchemaAuditLogModel).where(
+                    SchemaAuditLogModel.status == "COMPLETED"
+                )
+
+                # 날짜 필터
+                if from_date:
+                    schema_query = schema_query.where(SchemaAuditLogModel.timestamp >= from_date)
+                if to_date:
+                    schema_query = schema_query.where(SchemaAuditLogModel.timestamp <= to_date)
+
+                # 액션 필터
+                if action:
+                    schema_query = schema_query.where(SchemaAuditLogModel.action == action)
+
+                # 수행자 필터
+                if actor:
+                    schema_query = schema_query.where(SchemaAuditLogModel.actor.like(f"%{actor}%"))
+
+                schema_query = schema_query.order_by(desc(SchemaAuditLogModel.timestamp)).limit(
+                    limit
+                )
+
+                result = await session.execute(schema_query)
+                schema_logs = result.scalars().all()
+
+                schema_activities = [
+                    AuditActivity(
+                        activity_type="schema",
+                        action=log.action,
+                        target=log.target,
+                        message=log.message or self._format_schema_message(log.action),
+                        actor=log.actor,
+                        timestamp=log.timestamp,
+                        metadata=log.snapshot or {},
+                    )
+                    for log in schema_logs
+                ]
+
+            # 병합 및 정렬
+            all_activities = topic_activities + schema_activities
+            all_activities.sort(key=lambda x: x.timestamp, reverse=True)
+
+            return all_activities[:limit]

@@ -217,10 +217,11 @@ class ApiClient {
     /**
      * 스키마 파일 업로드
      */
-    async uploadSchemaFiles({ env, changeId, files }) {
+    async uploadSchemaFiles({ env, changeId, owner, files }) {
         const formData = new FormData();
         formData.append('env', env);
         formData.append('change_id', changeId);
+        formData.append('owner', owner);
         for (const file of files) {
             formData.append('files', file);
         }
@@ -275,6 +276,23 @@ class ApiClient {
      */
     async getRecentActivities(limit = 20) {
         return this.get(`/audit/recent?limit=${limit}`);
+    }
+
+    /**
+     * 활동 히스토리 조회 (필터링 지원)
+     */
+    async getActivityHistory(filters = {}) {
+        const params = new URLSearchParams();
+        
+        if (filters.from_date) params.append('from_date', filters.from_date);
+        if (filters.to_date) params.append('to_date', filters.to_date);
+        if (filters.activity_type) params.append('activity_type', filters.activity_type);
+        if (filters.action) params.append('action', filters.action);
+        if (filters.actor) params.append('actor', filters.actor);
+        if (filters.limit) params.append('limit', filters.limit);
+        
+        const queryString = params.toString();
+        return this.get(`/audit/history${queryString ? '?' + queryString : ''}`);
     }
 
     // =================

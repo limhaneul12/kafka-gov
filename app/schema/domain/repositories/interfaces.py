@@ -77,6 +77,10 @@ class ISchemaMetadataRepository(ABC):
     async def delete_artifact_by_subject(self, subject: SubjectName) -> None:
         """Subject별 아티팩트 삭제"""
 
+    @abstractmethod
+    async def save_schema_metadata(self, subject: SubjectName, metadata: dict[str, Any]) -> None:
+        """스키마 메타데이터 저장"""
+
 
 class ISchemaAuditRepository(ABC):
     """감사 로그 리포지토리"""

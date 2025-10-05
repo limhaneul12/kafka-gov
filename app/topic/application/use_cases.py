@@ -22,6 +22,9 @@ from ..domain.repositories.interfaces import (
 )
 from ..domain.services import TopicPlannerService
 
+KafkaMetaDescription = dict[TopicName, dict[str, Any]]
+TopicDescription = list[dict[str, Any]]
+
 
 class TopicBatchDryRunUseCase:
     """토픽 배치 Dry-Run 유스케이스"""
@@ -135,22 +138,33 @@ class TopicBatchApplyUseCase:
             # 결과 저장
             await self.metadata_repository.save_apply_result(result, actor)
 
-            # 액션별로 그룹화 (메타데이터용)
+            # 단일 vs 배치 판단
+            is_single = len(batch.specs) == 1
+            method = "SINGLE" if is_single else "BATCH"
+
+            # 액션별로 그룹화 (스냅샷용)
             actions_map: defaultdict[str, list[str]] = defaultdict(list)
             for spec in batch.specs:
                 if spec.name in applied:
                     actions_map[spec.action.value.upper()].append(spec.name)
 
-            # 단일 vs 배치 판단
-            is_single = len(batch.specs) == 1
-            method = "SINGLE" if is_single else "BATCH"
-
-            # 메시지 생성
-            if is_single and actions_map:
+            # 메시지 및 대상 생성
+            if is_single:
                 # 단일 작업
-                action, topics = next(iter(actions_map.items()))
-                message = f"토픽 {action}: {topics[0]}"
-                target = topics[0]
+                spec = batch.specs[0]
+                action_str = spec.action.value.upper()
+
+                if spec.name in applied:
+                    message = f"토픽 {action_str}: {spec.name}"
+                elif spec.name in [f["name"] for f in failed]:
+                    error_msg = next(
+                        (f["error"] for f in failed if f["name"] == spec.name), "알 수 없는 오류"
+                    )
+                    message = f"토픽 {action_str} 실패: {spec.name} - {error_msg}"
+                else:
+                    message = f"토픽 {action_str}: {spec.name}"
+
+                target = spec.name
             else:
                 # 배치 작업
                 action_summary = ", ".join(
@@ -170,7 +184,7 @@ class TopicBatchApplyUseCase:
                 snapshot={
                     "method": method,
                     "total_count": len(applied),
-                    "actions": actions_map,
+                    "actions": dict(actions_map),  # defaultdict를 dict로 변환
                     "apply_summary": result.summary(),
                 },
             )
@@ -241,6 +255,8 @@ class TopicBatchApplyUseCase:
                 if error is None:
                     applied.append(name)
                     await self._log_topic_operation(name, "DELETE", actor, change_id, "SUCCESS")
+                    # 메타데이터도 삭제
+                    await self._delete_topic_metadata(name)
                 else:
                     failed.append({"name": name, "error": str(error), "action": "DELETE"})
                     await self._log_topic_operation(
@@ -326,19 +342,39 @@ class TopicBatchApplyUseCase:
                 "topic_name": spec.name,
                 "owner": spec.metadata.owner if spec.metadata else None,
                 "doc": spec.metadata.doc if spec.metadata else None,
-                "tags": {"tags": spec.metadata.tags}
-                if spec.metadata and spec.metadata.tags
-                else None,
+                "tags": list(spec.metadata.tags) if spec.metadata and spec.metadata.tags else [],
                 "config": spec.config.to_dict() if spec.config else None,
                 "created_by": actor,
                 "updated_by": actor,
             }
 
+            logger = logging.getLogger(__name__)
+            logger.info(
+                f"Saving topic metadata for {spec.name}: "
+                f"owner={metadata_dict['owner']}, tags={metadata_dict['tags']}"
+            )
+
             await self.metadata_repository.save_topic_metadata(spec.name, metadata_dict)
+
+            logger.info(f"Successfully saved topic metadata for {spec.name}")
 
         except Exception as e:
             logger = logging.getLogger(__name__)
             logger.error(f"Failed to save topic metadata for {spec.name}: {e}", exc_info=True)
+
+    async def _delete_topic_metadata(self, topic_name: TopicName) -> None:
+        """토픽 메타데이터 삭제"""
+        try:
+            logger = logging.getLogger(__name__)
+            logger.info(f"Deleting topic metadata for {topic_name}")
+
+            await self.metadata_repository.delete_topic_metadata(topic_name)
+
+            logger.info(f"Successfully deleted topic metadata for {topic_name}")
+
+        except Exception as e:
+            logger = logging.getLogger(__name__)
+            logger.error(f"Failed to delete topic metadata for {topic_name}: {e}", exc_info=True)
 
 
 class TopicListUseCase:
@@ -352,21 +388,20 @@ class TopicListUseCase:
         self.topic_repository = topic_repository
         self.metadata_repository = metadata_repository
 
-    async def execute(self) -> list[dict[str, Any]]:
+    async def execute(self) -> TopicDescription:
         """토픽 목록 조회"""
         # 1. Kafka에서 모든 토픽 이름 조회
-        all_topics = await self.topic_repository.list_topics()
+        all_topics: list[TopicName] = await self.topic_repository.list_topics()
 
         # 2. Kafka에서 모든 토픽 상세 정보 배치 조회 (파티션수, 복제개수)
-        topic_details = await self.topic_repository.describe_topics(all_topics)
+        topic_details: KafkaMetaDescription = await self.topic_repository.describe_topics(
+            all_topics
+        )
 
         # 3. DB 메타데이터와 Kafka 정보를 병합
-        topics_with_metadata = []
+        topics_with_metadata: TopicDescription = []
         for topic_name in all_topics:
-            # DB 메타데이터 조회 (owner, tags)
             metadata = await self.metadata_repository.get_topic_metadata(topic_name)
-
-            # Kafka 상세 정보
             kafka_info = topic_details.get(topic_name, {})
 
             topics_with_metadata.append(

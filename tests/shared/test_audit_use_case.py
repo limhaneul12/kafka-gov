@@ -21,6 +21,32 @@ class MockAuditRepository(IAuditActivityRepository):
     async def get_recent_activities(self, limit: int) -> list[AuditActivity]:
         return self.activities[:limit]
 
+    async def get_activity_history(
+        self,
+        from_date: datetime | None = None,
+        to_date: datetime | None = None,
+        activity_type: str | None = None,
+        action: str | None = None,
+        actor: str | None = None,
+        limit: int = 100,
+    ) -> list[AuditActivity]:
+        """활동 히스토리 조회 (필터링 지원)"""
+        filtered = self.activities
+
+        # 필터링 로직
+        if from_date:
+            filtered = [a for a in filtered if a.timestamp >= from_date]
+        if to_date:
+            filtered = [a for a in filtered if a.timestamp <= to_date]
+        if activity_type:
+            filtered = [a for a in filtered if a.activity_type == activity_type]
+        if action:
+            filtered = [a for a in filtered if a.action == action]
+        if actor:
+            filtered = [a for a in filtered if actor in a.actor]
+
+        return filtered[:limit]
+
 
 class TestGetRecentActivitiesUseCase:
     """GetRecentActivitiesUseCase 테스트"""
