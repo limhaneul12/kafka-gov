@@ -60,6 +60,10 @@ class SchemaPlanModel(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), comment="생성 시간"
     )
+    updated_by: Mapped[str | None] = mapped_column(String(100), nullable=True, comment="수정자")
+    updated_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), onupdate=func.now(), nullable=True, comment="수정 시간"
+    )
 
     def __repr__(self) -> str:
         return f"<SchemaPlan(change_id={self.change_id}, env={self.env}, status={self.status})>"

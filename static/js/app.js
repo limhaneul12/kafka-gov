@@ -822,7 +822,10 @@ class KafkaGovApp {
                 this.switchBatchTab('apply');
                 
                 // 적용 탭에 결과 표시
-                document.getElementById('apply-preview').innerHTML = summary;
+                const planResults = document.getElementById('plan-results');
+                if (planResults) {
+                    planResults.innerHTML = summary;
+                }
                 document.getElementById('apply-batch').style.display = 'block';
             }
             
