@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from typing import Annotated
 
 from dependency_injector.wiring import Provide, inject
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
@@ -78,7 +79,8 @@ async def list_topics(use_case=ListTopicDep) -> TopicListResponse:
 )
 @inject
 async def upload_yaml_and_dry_run(
-    file: UploadFile = File(...), dry_run_use_case=DryTopicDep
+    file: Annotated[UploadFile, File(...)],
+    dry_run_use_case=DryTopicDep,
 ) -> TopicBatchDryRunResponse:
     """안전한 YAML 파일 업로드 및 Dry-Run"""
     try:
