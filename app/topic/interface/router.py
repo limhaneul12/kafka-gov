@@ -3,7 +3,7 @@ import logging
 from datetime import UTC, datetime
 
 from dependency_injector.wiring import Provide, inject
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 
 from app.container import AppContainer
 from app.shared.roles import DEFAULT_USER
@@ -68,6 +68,82 @@ async def list_topics(use_case=ListTopicDep) -> TopicListResponse:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"토픽 목록 조회 실패: {e!s}",
+        ) from e
+
+
+@router.post(
+    "/batch/upload",
+    response_model=TopicBatchDryRunResponse,
+    status_code=status.HTTP_200_OK,
+    summary="YAML 파일 업로드 및 Dry-Run",
+    description="YAML 파일을 업로드하여 토픽 배치 변경 계획을 생성합니다.",
+    response_description="파싱된 YAML의 Dry-Run 결과",
+)
+@inject
+async def upload_yaml_and_dry_run(
+    file: UploadFile = File(...), dry_run_use_case=DryTopicDep
+) -> TopicBatchDryRunResponse:
+    """안전한 YAML 파일 업로드 및 Dry-Run"""
+    try:
+        # 1. 파일 타입 검증
+        if not file.filename or not file.filename.endswith((".yaml", ".yml")):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Only YAML files (.yaml, .yml) are allowed",
+            )
+
+        # 2. YAML 컨텐츠 읽기
+        content = await file.read()
+        if not content:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Empty file",
+            )
+
+        # 3. YAML 파싱
+        import yaml
+
+        try:
+            yaml_data = yaml.safe_load(content)
+        except yaml.YAMLError as e:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Invalid YAML format: {e!s}",
+            ) from e
+
+        # 4. TopicBatchRequest로 변환
+        if not isinstance(yaml_data, dict):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="YAML must be a dictionary with 'kind', 'env', 'change_id', 'items'",
+            )
+
+        # 필수 필드 검증
+        if yaml_data.get("kind") != "TopicBatch":
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="kind must be 'TopicBatch'",
+            )
+
+        request = TopicBatchRequest(**yaml_data)
+
+        # 5. Dry-Run 실행
+        batch = safe_convert_request_to_batch(request)
+        plan = await dry_run_use_case.execute(batch, DEFAULT_USER)
+        return safe_convert_plan_to_response(plan, request)
+
+    except HTTPException:
+        raise
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"Validation error: {e!s}",
+        ) from e
+    except Exception as e:
+        logging.getLogger(__name__).error(f"YAML upload failed: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to process YAML: {e!s}",
         ) from e
 
 

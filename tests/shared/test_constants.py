@@ -20,6 +20,7 @@ class TestAuditStatus:
         """감사 상태 값 확인"""
         assert AuditStatus.STARTED == "STARTED"
         assert AuditStatus.COMPLETED == "COMPLETED"
+        assert AuditStatus.PARTIALLY_COMPLETED == "PARTIALLY_COMPLETED"
         assert AuditStatus.FAILED == "FAILED"
 
 

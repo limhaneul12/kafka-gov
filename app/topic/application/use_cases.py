@@ -102,7 +102,7 @@ class TopicBatchApplyUseCase:
         self.planner_service = TopicPlannerService(topic_repository)
 
     async def execute(self, batch: DomainTopicBatch, actor: str) -> DomainTopicApplyResult:
-        """배치 적용 실행"""
+        """배치 적용 실행 (트랜잭션 보장 개선)"""
         audit_id = str(uuid.uuid4())
 
         # 감사 로그 기록
@@ -123,6 +123,9 @@ class TopicBatchApplyUseCase:
             if not plan.can_apply:
                 error_violations = [v.message for v in plan.error_violations]
                 raise ValueError(f"Cannot apply due to policy violations: {error_violations}")
+
+            # Plan과 현재 상태 일치 검증 (경쟁 조건 방지)
+            await self._validate_plan_consistency(plan, batch.specs)
 
             # 토픽 적용 실행
             applied, skipped, failed = await self._apply_topics(batch.specs, actor, batch.change_id)
@@ -150,6 +153,14 @@ class TopicBatchApplyUseCase:
                 if spec.name in applied:
                     actions_map[spec.action.value.upper()].append(spec.name)
 
+            # 상태 결정: 실패가 있으면 PARTIALLY_COMPLETED
+            if len(failed) > 0 and len(applied) > 0:
+                final_status = AuditStatus.PARTIALLY_COMPLETED
+            elif len(applied) == 0:
+                final_status = AuditStatus.FAILED
+            else:
+                final_status = AuditStatus.COMPLETED
+
             # 메시지 및 대상 생성
             if is_single:
                 # 단일 작업
@@ -173,7 +184,10 @@ class TopicBatchApplyUseCase:
                 action_summary = ", ".join(
                     [f"{len(topics)}개 {action}" for action, topics in actions_map.items()]
                 )
-                message = f"배치 작업 완료: {action_summary}"
+                if len(failed) > 0:
+                    message = f"배치 작업 부분 성공: {len(applied)}개 성공, {len(failed)}개 실패 ({action_summary})"
+                else:
+                    message = f"배치 작업 완료: {action_summary}"
                 target = AuditTarget.BATCH
 
             # 감사 로그 기록
@@ -182,12 +196,14 @@ class TopicBatchApplyUseCase:
                 action=AuditAction.APPLY,
                 target=target,
                 actor=actor,
-                status=AuditStatus.COMPLETED,
+                status=final_status,  # 동적 상태
                 message=message,
                 snapshot={
                     "method": method,
                     "total_count": len(applied),
-                    "actions": dict(actions_map),  # defaultdict를 dict로 변환
+                    "failed_count": len(failed),
+                    "actions": dict(actions_map),
+                    "failed_details": failed,  # 실패 상세 정보
                     "apply_summary": result.summary(),
                 },
             )
@@ -207,10 +223,45 @@ class TopicBatchApplyUseCase:
             )
             raise
 
+    async def _validate_plan_consistency(
+        self, plan: DomainTopicPlan, specs: tuple[DomainTopicSpec, ...]
+    ) -> None:
+        """계획 일관성 검증 (경쟁 조건 방지)
+
+        Plan 생성 시점과 Apply 시점 사이에 토픽 상태 변경 검증
+        """
+        topic_names = [spec.name for spec in specs]
+        current_state = await self.topic_repository.describe_topics(topic_names)
+
+        for item in plan.items:
+            current_topic = current_state.get(item.name)
+
+            # CREATE: 토픽이 이미 존재하면 경고
+            if item.action.value == "CREATE" and current_topic is not None:
+                logger = logging.getLogger(__name__)
+                logger.warning(
+                    f"Topic {item.name} already exists (created by another user). "
+                    "Will be skipped or fail during apply."
+                )
+
+            # UPDATE: 파티션 수가 변경되었는지 확인
+            if item.action.value == "ALTER" and current_topic:
+                current_partitions = current_topic.get("partition_count", 0)
+                expected_partitions = int(
+                    item.current_config.get("partitions", 0) if item.current_config else 0
+                )
+                if current_partitions != expected_partitions:
+                    raise ValueError(
+                        f"Topic {item.name} partition count changed during dry-run. "
+                        f"Expected {expected_partitions}, got {current_partitions}. "
+                        "Please re-run dry-run."
+                    )
+
     async def _apply_topics(
         self, specs: tuple[DomainTopicSpec, ...], actor: str, change_id: ChangeId
     ) -> tuple[list[TopicName], list[TopicName], list[dict[str, str]]]:
-        """토픽 적용 실행"""
+        """토픽 적용 실행 (트랜잭션 개선)"""
+        created_topics: list[TopicName] = []  # 롤백용
         applied: list[TopicName] = []
         skipped: list[TopicName] = []
         failed: list[dict[str, str]] = []
@@ -224,17 +275,46 @@ class TopicBatchApplyUseCase:
             s for s in specs if s.action.value in ("update", "upsert")
         ]
 
-        # 토픽 생성
+        # 토픽 생성 (트랜잭션 보장)
         if create_specs:
             create_results = await self.topic_repository.create_topics(create_specs)
             for spec in create_specs:
                 name = spec.name
                 error = create_results.get(name)
                 if error is None:
-                    applied.append(name)
-                    await self._log_topic_operation(name, "CREATE", actor, change_id, "SUCCESS")
-                    # 메타데이터 저장
-                    await self._save_topic_metadata(spec, actor)
+                    try:
+                        # Kafka 생성 성공 -> 메타데이터 저장 (Critical)
+                        await self._save_topic_metadata(spec, actor)
+                        # 둘 다 성공하면 applied에 추가
+                        applied.append(name)
+                        created_topics.append(name)  # 롤백용
+                        await self._log_topic_operation(
+                            name, AuditAction.CREATE, actor, change_id, AuditStatus.COMPLETED
+                        )
+                    except Exception as meta_error:
+                        # 메타데이터 저장 실패 -> 토픽 롤백
+                        logger = logging.getLogger(__name__)
+                        logger.error(
+                            f"CRITICAL: Metadata save failed for {name}, rolling back topic creation",
+                            exc_info=True,
+                        )
+                        # 토픽 삭제 시도
+                        await self._rollback_topic(name)
+                        failed.append(
+                            {
+                                "name": name,
+                                "error": f"메타데이터 저장 실패: {meta_error!s}",
+                                "action": "CREATE",
+                            }
+                        )
+                        await self._log_topic_operation(
+                            name,
+                            AuditAction.CREATE,
+                            actor,
+                            change_id,
+                            AuditStatus.FAILED,
+                            f"메타데이터 저장 실패: {meta_error!s}",
+                        )
                 else:
                     error_str = str(error)
                     # 중복 토픽 에러 메시지 개선
@@ -257,7 +337,9 @@ class TopicBatchApplyUseCase:
             for name, error in delete_results.items():
                 if error is None:
                     applied.append(name)
-                    await self._log_topic_operation(name, "DELETE", actor, change_id, "SUCCESS")
+                    await self._log_topic_operation(
+                        name, AuditAction.DELETE, actor, change_id, AuditStatus.COMPLETED
+                    )
                     # 메타데이터도 삭제
                     await self._delete_topic_metadata(name)
                 else:
@@ -301,19 +383,19 @@ class TopicBatchApplyUseCase:
             # 설정 변경 실행
             if config_changes:
                 config_results = await self.topic_repository.alter_topic_configs(config_changes)
+
                 for name, error in config_results.items():
                     if error is None:
-                        if name not in [
-                            f["name"] for f in failed
-                        ]:  # 파티션 변경이 실패하지 않은 경우만
+                        # 설정 변경 성공 시 무조건 applied에 추가 (파티션 실패 여부와 무관)
+                        if name not in applied:  # 중복 방지
                             applied.append(name)
-                            await self._log_topic_operation(
-                                name, "ALTER_CONFIG", actor, change_id, "SUCCESS"
-                            )
+                        await self._log_topic_operation(
+                            name, "ALTER_CONFIG", actor, change_id, AuditStatus.COMPLETED
+                        )
                     else:
                         failed.append({"name": name, "error": str(error), "action": "ALTER_CONFIG"})
                         await self._log_topic_operation(
-                            name, "ALTER_CONFIG", actor, change_id, "FAILED", str(error)
+                            name, "ALTER_CONFIG", actor, change_id, AuditStatus.FAILED, str(error)
                         )
 
         return applied, skipped, failed
@@ -337,33 +419,44 @@ class TopicBatchApplyUseCase:
             message=message,
         )
 
-    async def _save_topic_metadata(self, spec: DomainTopicSpec, actor: str) -> None:
-        """토픽 메타데이터 저장"""
+    async def _rollback_topic(self, topic_name: TopicName) -> None:
+        """토픽 롤백 (메타데이터 저장 실패 시)"""
         try:
-            # 메타데이터 딕셔너리 생성
-            metadata_dict = {
-                "topic_name": spec.name,
-                "owner": spec.metadata.owner if spec.metadata else None,
-                "doc": spec.metadata.doc if spec.metadata else None,
-                "tags": list(spec.metadata.tags) if spec.metadata and spec.metadata.tags else [],
-                "config": spec.config.to_dict() if spec.config else None,
-                "created_by": actor,
-                "updated_by": actor,
-            }
-
             logger = logging.getLogger(__name__)
-            logger.info(
-                f"Saving topic metadata for {spec.name}: "
-                f"owner={metadata_dict['owner']}, tags={metadata_dict['tags']}"
+            logger.warning(f"Rolling back topic creation: {topic_name}")
+            await self.topic_repository.delete_topics([topic_name])
+            logger.info(f"Successfully rolled back topic: {topic_name}")
+        except Exception as rollback_error:
+            logger = logging.getLogger(__name__)
+            logger.error(
+                f"CRITICAL: Failed to rollback topic {topic_name}: {rollback_error}",
+                exc_info=True,
             )
+            # 롤백 실패는 예외를 발생시키지 않음 (운영 개입 필요)
 
-            await self.metadata_repository.save_topic_metadata(spec.name, metadata_dict)
+    async def _save_topic_metadata(self, spec: DomainTopicSpec, actor: str) -> None:
+        """토픽 메타데이터 저장 (Critical - 예외 발생)"""
+        # 메타데이터 딕셔너리 생성
+        metadata_dict = {
+            "topic_name": spec.name,
+            "owner": spec.metadata.owner if spec.metadata else None,
+            "doc": spec.metadata.doc if spec.metadata else None,
+            "tags": list(spec.metadata.tags) if spec.metadata and spec.metadata.tags else [],
+            "config": spec.config.to_dict() if spec.config else None,
+            "created_by": actor,
+            "updated_by": actor,
+        }
 
-            logger.info(f"Successfully saved topic metadata for {spec.name}")
+        logger = logging.getLogger(__name__)
+        logger.info(
+            f"Saving topic metadata for {spec.name}: "
+            f"owner={metadata_dict['owner']}, tags={metadata_dict['tags']}"
+        )
 
-        except Exception as e:
-            logger = logging.getLogger(__name__)
-            logger.error(f"Failed to save topic metadata for {spec.name}: {e}", exc_info=True)
+        # 예외를 호출자에게 전파 (트랜잭션 보장)
+        await self.metadata_repository.save_topic_metadata(spec.name, metadata_dict)
+
+        logger.info(f"Successfully saved topic metadata for {spec.name}")
 
     async def _delete_topic_metadata(self, topic_name: TopicName) -> None:
         """토픽 메타데이터 삭제"""

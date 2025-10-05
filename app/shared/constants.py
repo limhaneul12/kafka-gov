@@ -8,6 +8,7 @@ class AuditStatus:
 
     STARTED = "STARTED"
     COMPLETED = "COMPLETED"
+    PARTIALLY_COMPLETED = "PARTIALLY_COMPLETED"  # 부분 성공
     FAILED = "FAILED"
 
 
