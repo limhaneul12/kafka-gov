@@ -1,31 +1,12 @@
 """Schema 모듈 라우터 - 단순하고 실용적인 구현"""
 
-from __future__ import annotations
+from typing import Annotated
 
-from typing import Annotated, cast
-
+from dependency_injector.wiring import Provide, inject
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
-from fastapi.responses import ORJSONResponse
-from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.schema.application.use_cases import (
-    SchemaBatchApplyUseCase,
-    SchemaBatchDryRunUseCase,
-    SchemaDeleteAnalysisUseCase,
-    SchemaPlanUseCase,
-    SchemaUploadUseCase,
-)
-from app.schema.container import (
-    DbSession,
-    container,
-    get_schema_apply_use_case,
-    get_schema_dry_run_use_case,
-    get_schema_plan_use_case,
-    get_schema_upload_use_case,
-)
+from app.container import AppContainer
 from app.schema.domain.models import DomainEnvironment, DomainSubjectStrategy
-from app.schema.domain.repositories.interfaces import ISchemaAuditRepository
-from app.schema.infrastructure.repository.audit_repository import MySQLSchemaAuditRepository
 from app.schema.interface.adapters import (
     safe_convert_apply_result_to_response,
     safe_convert_plan_to_response,
@@ -40,30 +21,33 @@ from app.schema.interface.schema import (
 )
 from app.schema.interface.types.enums import Environment
 from app.schema.interface.types.type_hints import ChangeId
-from app.shared.database import get_db_session
 from app.shared.roles import DEFAULT_USER
 
 router = APIRouter(prefix="/v1/schemas", tags=["schemas"])
 
-
-async def _get_dry_run_use_case_dep(session: DbSession) -> SchemaBatchDryRunUseCase:
-    """DI 경계의 레이트 바인딩을 보장해 테스트·운영 모두에서 교체 용이성 확보"""
-    return await get_schema_dry_run_use_case(session)
-
-
-async def _get_apply_use_case_dep(session: DbSession) -> SchemaBatchApplyUseCase:
-    """Apply 유스케이스 의존성 주입"""
-    return await get_schema_apply_use_case(session)
-
-
-async def _get_upload_use_case_dep(session: DbSession) -> SchemaUploadUseCase:
-    """Upload 유스케이스 의존성 주입"""
-    return await get_schema_upload_use_case(session)
+# =============================================================================
+# Dependency Injection - @inject 데코레이터로 엔드포인트에 직접 주입
+# =============================================================================
+DryRunUseCase = Depends(Provide[AppContainer.schema_container.dry_run_use_case])
+ApplyUseCase = Depends(Provide[AppContainer.schema_container.apply_use_case])
+UploadUseCase = Depends(Provide[AppContainer.schema_container.upload_use_case])
+PlanUseCase = Depends(Provide[AppContainer.schema_container.plan_use_case])
+DeleteAnalysisUseCase = Depends(Provide[AppContainer.schema_container.delete_analysis_use_case])
+DeleteUseCase = Depends(Provide[AppContainer.schema_container.delete_use_case])
+SyncUseCase = Depends(Provide[AppContainer.schema_container.sync_use_case])
+MetadataRepository = Depends(Provide[AppContainer.schema_container.metadata_repository])
 
 
-def _get_plan_use_case_dep(session: DbSession) -> SchemaPlanUseCase:
-    """Plan 유스케이스 의존성 주입"""
-    return get_schema_plan_use_case(session)
+def _extract_schema_type_from_url(storage_url: str) -> str:
+    """Storage URL에서 스키마 타입 추출"""
+    url_lower = storage_url.lower()
+    if ".avsc" in url_lower or "/avro/" in url_lower:
+        return "AVRO"
+    elif ".proto" in url_lower or "/protobuf/" in url_lower:
+        return "PROTOBUF"
+    elif ".json" in url_lower or "/json/" in url_lower:
+        return "JSON"
+    return "UNKNOWN"
 
 
 @router.post(
@@ -73,9 +57,10 @@ def _get_plan_use_case_dep(session: DbSession) -> SchemaPlanUseCase:
     summary="스키마 배치 Dry-Run",
     description="스키마 배치 변경 계획을 생성하고 정책 및 호환성을 검증합니다.",
 )
+@inject
 async def schema_batch_dry_run(
     request: SchemaBatchRequest,
-    dry_run_use_case: Annotated[SchemaBatchDryRunUseCase, Depends(_get_dry_run_use_case_dep)],
+    dry_run_use_case=DryRunUseCase,
 ) -> SchemaBatchDryRunResponse:
     """스키마 배치 Dry-Run 실행"""
     try:
@@ -101,9 +86,10 @@ async def schema_batch_dry_run(
     summary="스키마 배치 Apply",
     description="Dry-run 결과를 승인하여 스키마를 실제로 등록하고 아티팩트를 저장합니다.",
 )
+@inject
 async def schema_batch_apply(
     request: SchemaBatchRequest,
-    apply_use_case: Annotated[SchemaBatchApplyUseCase, Depends(_get_apply_use_case_dep)],
+    apply_use_case=ApplyUseCase,
 ) -> SchemaBatchApplyResponse:
     """스키마 배치 Apply 실행"""
     try:
@@ -129,11 +115,12 @@ async def schema_batch_apply(
     summary="스키마 번들 업로드",
     description="스키마 파일(.avsc/.proto/.json 및 zip 번들)을 업로드하여 사전 검증합니다.",
 )
+@inject
 async def upload_schemas(
     env: Annotated[Environment, Form(..., description="업로드 대상 환경")],
     change_id: Annotated[ChangeId, Form(..., description="변경 ID")],
     files: Annotated[list[UploadFile], File(..., description="업로드할 스키마 파일 목록")],
-    upload_use_case: Annotated[SchemaUploadUseCase, Depends(_get_upload_use_case_dep)],
+    upload_use_case=UploadUseCase,
 ) -> SchemaUploadResponse:
     """스키마 파일 업로드"""
     if not files:
@@ -149,7 +136,21 @@ async def upload_schemas(
             files=files,
             actor=DEFAULT_USER,
         )
-        return SchemaUploadResponse.model_validate(result)
+
+        # 도메인 객체를 Pydantic 응답으로 변환
+        return SchemaUploadResponse(
+            upload_id=result.upload_id,
+            artifacts=[
+                {
+                    "subject": artifact.subject,
+                    "version": artifact.version,
+                    "storage_url": artifact.storage_url,
+                    "checksum": artifact.checksum,
+                }
+                for artifact in result.artifacts
+            ],
+            summary=result.summary(),
+        )
     except ValueError as exc:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
@@ -169,9 +170,10 @@ async def upload_schemas(
     summary="스키마 배치 계획 조회",
     description="저장된 스키마 배치 계획(dry-run 결과) 정보를 조회합니다.",
 )
+@inject
 async def get_schema_plan(
     change_id: ChangeId,
-    plan_use_case: Annotated[SchemaPlanUseCase, Depends(_get_plan_use_case_dep)],
+    plan_use_case=PlanUseCase,
 ) -> SchemaBatchDryRunResponse:
     """스키마 배치 계획 조회"""
     try:
@@ -198,23 +200,17 @@ async def get_schema_plan(
     summary="스키마 삭제 영향도 분석",
     description="스키마 삭제 전 영향도를 분석합니다. 실제 삭제는 수행하지 않습니다.",
 )
+@inject
 async def analyze_schema_delete_impact(
     subject: str,
-    session: Annotated[AsyncSession, Depends(get_db_session)],
     strategy: str = "TopicNameStrategy",
+    delete_analysis_use_case=DeleteAnalysisUseCase,
 ) -> SchemaDeleteImpactResponse:
     """스키마 삭제 영향도 분석"""
     try:
-        # Use Case 생성
-        audit_repo = cast(ISchemaAuditRepository, MySQLSchemaAuditRepository(session))
-        use_case = SchemaDeleteAnalysisUseCase(
-            registry_repository=container.schema_registry_repository(),
-            audit_repository=audit_repo,
-        )
-
         # 영향도 분석 수행
         strategy_enum = DomainSubjectStrategy(strategy)
-        impact = await use_case.analyze(
+        impact = await delete_analysis_use_case.analyze(
             subject=subject,
             strategy=strategy_enum,
             actor=DEFAULT_USER,
@@ -249,24 +245,18 @@ async def analyze_schema_delete_impact(
     summary="스키마 삭제",
     description="스키마를 삭제합니다. 영향도 분석 후 안전하지 않으면 실패합니다.",
 )
+@inject
 async def delete_schema(
     subject: str,
-    session: Annotated[AsyncSession, Depends(get_db_session)],
     strategy: str = "TopicNameStrategy",
     force: bool = False,
+    delete_use_case=DeleteUseCase,
 ) -> SchemaDeleteImpactResponse:
-    """스키마 삭제 (영향도 분석 포함)"""
+    """스키마 삭제"""
     try:
-        # Use Case 생성
-        audit_repo = cast(ISchemaAuditRepository, MySQLSchemaAuditRepository(session))
-        use_case = SchemaDeleteAnalysisUseCase(
-            registry_repository=container.schema_registry_repository(),
-            audit_repository=audit_repo,
-        )
-
         # 삭제 실행
         strategy_enum = DomainSubjectStrategy(strategy)
-        impact = await use_case.delete(
+        impact = await delete_use_case.delete(
             subject=subject,
             strategy=strategy_enum,
             actor=DEFAULT_USER,
@@ -296,17 +286,54 @@ async def delete_schema(
 
 
 @router.get(
-    "/health",
+    "/artifacts",
     status_code=status.HTTP_200_OK,
-    summary="스키마 모듈 헬스체크",
-    description="스키마 모듈의 기본 헬스 상태를 확인합니다.",
+    summary="등록된 스키마 아티팩트 목록 조회",
+    description="MinIO에 저장된 모든 스키마 아티팩트 목록을 조회합니다.",
 )
-async def health_check() -> ORJSONResponse:
-    """헬스체크"""
-    return ORJSONResponse(
-        content={
-            "status": "healthy",
-            "module": "schema",
-            "version": "1.0.0",
-        }
-    )
+@inject
+async def list_schema_artifacts(
+    metadata_repository=MetadataRepository,
+) -> list[dict[str, str | int]]:
+    """스키마 아티팩트 목록 조회"""
+    try:
+        # Repository를 통해 조회
+        artifacts = await metadata_repository.list_artifacts()
+
+        # 도메인 객체를 API 응답으로 변환 (스키마 타입 추출)
+        return [
+            {
+                "subject": artifact.subject,
+                "version": artifact.version,
+                "storage_url": artifact.storage_url,
+                "checksum": artifact.checksum,
+                "schema_type": _extract_schema_type_from_url(artifact.storage_url),
+            }
+            for artifact in artifacts
+        ]
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Internal server error: {exc!s}",
+        ) from exc
+
+
+@router.post(
+    "/sync",
+    status_code=status.HTTP_200_OK,
+    summary="스키마 동기화",
+    description="Schema Registry의 모든 스키마를 DB로 동기화합니다.",
+)
+@inject
+async def sync_schemas(
+    sync_use_case=SyncUseCase,
+) -> dict[str, int]:
+    """Schema Registry → DB 동기화"""
+    try:
+        result = await sync_use_case.execute(actor=DEFAULT_USER)
+        return result
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Schema sync failed: {exc!s}",
+        ) from exc

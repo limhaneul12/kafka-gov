@@ -93,6 +93,25 @@ class Modal {
 // 테이블 렌더러
 // =================
 class TableRenderer {
+    static escapeHtml(value) {
+        if (value === undefined || value === null) {
+            return '';
+        }
+        return String(value)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+    }
+
+    static formatConfidence(score) {
+        if (Number.isFinite(score)) {
+            return `${(score * 100).toFixed(1)}%`;
+        }
+        return '-';
+    }
+
     /**
      * 토픽 테이블 렌더링
      */
@@ -103,7 +122,7 @@ class TableRenderer {
         if (!topics || topics.length === 0) {
             tbody.innerHTML = `
                 <tr>
-                    <td colspan="7" style="text-align: center; padding: 2rem; color: var(--text-muted);">
+                    <td colspan="8" style="text-align: center; padding: 2rem; color: var(--text-muted);">
                         토픽이 없습니다.
                     </td>
                 </tr>
@@ -112,30 +131,36 @@ class TableRenderer {
         }
 
         topics.forEach(topic => {
+            const rawName = topic.topic_name ?? '';
+            const name = this.escapeHtml(rawName);
+            const keySubject = this.escapeHtml(topic.key_schema_subject || '-');
+            const valueSubject = this.escapeHtml(topic.value_schema_subject || '-');
+            const rawEnv = topic.environment ?? '-';
+            const environment = this.escapeHtml(rawEnv);
+            const source = this.escapeHtml(topic.link_source || '-');
+            const confidence = this.formatConfidence(topic.confidence_score);
             const row = document.createElement('tr');
             row.innerHTML = `
-                <td>
-                    <div style="font-weight: 500;">${topic.name}</div>
-                    <div style="font-size: 0.75rem; color: var(--text-muted);">${topic.description || ''}</div>
+                <td style="width: 40px;">
+                    <input type="checkbox" class="topic-checkbox" value="${this.escapeHtml(rawName)}" onchange="window.kafkaGovApp.handleTopicCheckboxChange()">
                 </td>
                 <td>
-                    <span class="status-badge ${this.getEnvClass(topic.environment)}">${topic.environment.toUpperCase()}</span>
+                    <div style="font-weight: 500;">${name}</div>
+                    <div style="font-size: 0.75rem; color: var(--text-muted);">${this.escapeHtml(topic.correlation_id || '')}</div>
                 </td>
-                <td>${topic.partitions || '-'}</td>
-                <td>${topic.replication_factor || '-'}</td>
-                <td>${topic.owner || '-'}</td>
                 <td>
-                    <span class="status-badge ${this.getStatusClass(topic.status)}">${topic.status || 'ACTIVE'}</span>
+                    <span class="status-badge ${this.getEnvClass(environment)}">${environment.toUpperCase()}</span>
                 </td>
+                <td>${keySubject}</td>
+                <td>${valueSubject}</td>
+                <td>${confidence}</td>
+                <td>${source}</td>
                 <td>
                     <div style="display: flex; gap: 0.5rem;">
-                        <button class="btn-icon" onclick="viewTopicDetail('${topic.name}')" title="상세 보기">
+                        <button class="btn-icon" onclick="viewTopicDetail(decodeURIComponent('${encodeURIComponent(rawName)}'))" title="상세 보기">
                             <i class="fas fa-eye"></i>
                         </button>
-                        <button class="btn-icon" onclick="editTopic('${topic.name}')" title="편집">
-                            <i class="fas fa-edit"></i>
-                        </button>
-                        <button class="btn-icon" onclick="deleteTopic('${topic.name}')" title="삭제" style="color: var(--error-color);">
+                        <button class="btn-icon" onclick="deleteTopic(decodeURIComponent('${encodeURIComponent(rawName)}'))" title="삭제" style="color: var(--danger);">
                             <i class="fas fa-trash"></i>
                         </button>
                     </div>
@@ -148,14 +173,14 @@ class TableRenderer {
     /**
      * 스키마 테이블 렌더링
      */
-    static renderSchemasTable(schemas) {
+    static renderSchemasTable(schemas, appInstance) {
         const tbody = document.getElementById('schemas-table-body');
         tbody.innerHTML = '';
 
         if (!schemas || schemas.length === 0) {
             tbody.innerHTML = `
                 <tr>
-                    <td colspan="6" style="text-align: center; padding: 2rem; color: var(--text-muted);">
+                    <td colspan="7" style="text-align: center; padding: 2rem; color: var(--text-muted);">
                         스키마가 없습니다.
                     </td>
                 </tr>
@@ -164,33 +189,39 @@ class TableRenderer {
         }
 
         schemas.forEach(schema => {
+            const rawSubject = schema.subject ?? '';
+            const subject = this.escapeHtml(rawSubject);
+            const environments = schema.environments.length > 0 ? schema.environments.map(env => this.escapeHtml(env)).join(', ') : '-';
+            const topics = schema.topics.length > 0 ? schema.topics.map(topic => this.escapeHtml(topic)).join(', ') : '-';
+            const confidence = this.formatConfidence(schema.average_confidence);
+            const sources = schema.sources.length > 0 ? schema.sources.map(src => this.escapeHtml(src)).join(', ') : '-';
             const row = document.createElement('tr');
             row.innerHTML = `
-                <td>
-                    <div style="font-weight: 500;">${schema.subject}</div>
-                    <div style="font-size: 0.75rem; color: var(--text-muted);">${schema.id || ''}</div>
-                </td>
-                <td>${schema.version || '-'}</td>
-                <td>
-                    <span class="status-badge">${schema.schema_type || 'AVRO'}</span>
-                </td>
-                <td>${schema.compatibility || 'BACKWARD'}</td>
-                <td>${schema.registered_at ? new Date(schema.registered_at).toLocaleDateString() : '-'}</td>
+                <td>${subject}</td>
+                <td>${environments}</td>
+                <td>${topics}</td>
+                <td>${confidence}</td>
+                <td>${sources}</td>
                 <td>
                     <div style="display: flex; gap: 0.5rem;">
-                        <button class="btn-icon" onclick="viewSchemaDetail('${schema.subject}')" title="상세 보기">
-                            <i class="fas fa-eye"></i>
-                        </button>
-                        <button class="btn-icon" onclick="downloadSchema('${schema.subject}')" title="다운로드">
-                            <i class="fas fa-download"></i>
-                        </button>
-                        <button class="btn-icon" onclick="deleteSchema('${schema.subject}')" title="삭제" style="color: var(--error-color);">
-                            <i class="fas fa-trash"></i>
+                        <button class="btn-icon analyze-delete-btn" data-subject="${this.escapeHtml(rawSubject)}" title="삭제 영향도 분석">
+                            <i class="fas fa-exclamation-circle"></i>
                         </button>
                     </div>
                 </td>
+                <td>
+                    <button class="btn-icon btn-danger delete-schema-btn" data-subject="${this.escapeHtml(rawSubject)}" title="스키마 삭제">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </td>
             `;
             tbody.appendChild(row);
+            
+            // 이벤트 리스너 연결
+            const deleteBtn = row.querySelector('.delete-schema-btn');
+            if (deleteBtn && appInstance) {
+                deleteBtn.addEventListener('click', () => appInstance.handleSchemaDelete(rawSubject));
+            }
         });
     }
 
@@ -238,17 +269,72 @@ class ActivityRenderer {
             return;
         }
 
-        container.innerHTML = activities.map(activity => `
-            <div class="activity-item">
-                <div class="activity-icon ${activity.type}">
-                    <i class="fas ${this.getActivityIcon(activity.action)}"></i>
+        container.innerHTML = activities.map(activity => {
+            const metadata = activity.metadata || {};
+            const method = metadata.method || '';
+            const actions = metadata.actions || {};
+            
+            // 단일/배치 뱃지
+            const methodBadge = method 
+                ? `<span class="method-badge ${method.toLowerCase()}">${method === 'BATCH' ? '배치' : '단일'}</span>` 
+                : '';
+            
+            // 상세 정보 생성
+            let detailInfo = '';
+            if (Object.keys(actions).length > 0) {
+                // 액션별 토픽 목록 표시
+                const actionDetails = [];
+                for (const [action, topics] of Object.entries(actions)) {
+                    if (Array.isArray(topics) && topics.length > 0) {
+                        const actionText = this.getActionText(action, metadata);
+                        actionDetails.push(`
+                            <div class="action-detail">
+                                <strong>${topics.length}개 ${actionText}</strong>
+                                <br>
+                                <small class="topic-list">${this.escapeHtml(topics.join(', '))}</small>
+                            </div>
+                        `);
+                    }
+                }
+                if (actionDetails.length > 0) {
+                    detailInfo = `<div class="details-section">${actionDetails.join('')}</div>`;
+                }
+            }
+            
+            // DELETE 액션일 때 delete 클래스 추가
+            const actionClass = activity.action === 'DELETE' ? 'delete' : '';
+            
+            return `
+                <div class="activity-item">
+                    <div class="activity-icon ${activity.activity_type || activity.type} ${actionClass}">
+                        <i class="fas ${this.getActivityIcon(activity.action)}"></i>
+                    </div>
+                    <div class="activity-content">
+                        <p>
+                            <span class="activity-type-badge">${activity.activity_type === 'topic' || activity.type === 'topic' ? '토픽' : '스키마'}</span>
+                            ${methodBadge}
+                            <strong>${this.escapeHtml(activity.message || activity.target || 'N/A')}</strong>
+                        </p>
+                        ${detailInfo}
+                        <small>${this.formatTime(activity.timestamp)} · ${this.escapeHtml(activity.actor)}</small>
+                    </div>
                 </div>
-                <div class="activity-content">
-                    <p><strong>${activity.target}</strong> ${activity.message}</p>
-                    <small>${this.formatTime(activity.timestamp)}</small>
-                </div>
-            </div>
-        `).join('');
+            `;
+        }).join('');
+    }
+
+    /**
+     * 활동 액션 텍스트 변환
+     */
+    static getActionText(action, metadata) {
+        const actionMap = {
+            'CREATE': '생성됨',
+            'UPDATE': '수정됨',
+            'DELETE': '삭제됨',
+            'REGISTER': '등록됨',
+            'UPLOAD': '업로드됨'
+        };
+        return actionMap[action] || action;
     }
 
     /**
@@ -282,13 +368,32 @@ class ActivityRenderer {
      */
     static getActivityIcon(action) {
         const icons = {
+            // 소문자
             create: 'fa-plus',
             update: 'fa-edit',
-            delete: 'fa-trash',
+            delete: 'fa-times',  // 빨간색 X
+            register: 'fa-upload',
+            // 대문자 (Backend에서 오는 형식)
+            CREATE: 'fa-plus',
+            UPDATE: 'fa-edit',
+            DELETE: 'fa-times',  // 빨간색 X
+            REGISTER: 'fa-upload',
+            APPLY: 'fa-check',
+            DRY_RUN: 'fa-search',
+            // 기타
             violation: 'fa-exclamation',
             policy: 'fa-shield-alt'
         };
         return icons[action] || 'fa-info';
+    }
+
+    /**
+     * HTML 이스케이프
+     */
+    static escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
     }
 
     /**
@@ -307,6 +412,80 @@ class ActivityRenderer {
         if (minutes < 60) return `${minutes}분 전`;
         if (hours < 24) return `${hours}시간 전`;
         return `${days}일 전`;
+    }
+
+    /**
+     * 클러스터 상태 렌더링
+     */
+    static renderClusterStatus(clusterStatus) {
+        const container = document.getElementById('env-status');
+        
+        if (!clusterStatus || !clusterStatus.brokers) {
+            container.innerHTML = `
+                <div style="text-align: center; padding: 2rem; color: var(--text-muted);">
+                    클러스터 정보를 불러올 수 없습니다.
+                </div>
+            `;
+            return;
+        }
+
+        const brokerCards = clusterStatus.brokers.map(broker => {
+            const statusClass = 'online';  // 브로커 상태는 항상 online (metadata에서 가져온 경우)
+            const statusIcon = '🟢';
+            const controllerBadge = broker.is_controller 
+                ? '<span class="status-badge controller">컨트롤러</span>' 
+                : '';
+            
+            return `
+                <div class="broker-card">
+                    <div class="broker-header">
+                        <div class="broker-title">
+                            <strong>Broker ${broker.broker_id}</strong>
+                            ${controllerBadge}
+                        </div>
+                        <span class="status-badge ${statusClass}">${statusIcon} Online</span>
+                    </div>
+                    <div class="broker-info">
+                        <div class="info-item">
+                            <i class="fas fa-server"></i>
+                            <span>${this.escapeHtml(broker.host)}:${broker.port}</span>
+                        </div>
+                        <div class="info-item">
+                            <i class="fas fa-chart-bar"></i>
+                            <span>리더 파티션: <strong>${broker.leader_partition_count}개</strong></span>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }).join('');
+
+        const summaryHtml = `
+            <div class="cluster-summary">
+                <div class="summary-item">
+                    <i class="fas fa-database"></i>
+                    <div>
+                        <div class="summary-label">전체 토픽</div>
+                        <div class="summary-value">${clusterStatus.total_topics}개</div>
+                    </div>
+                </div>
+                <div class="summary-item">
+                    <i class="fas fa-th"></i>
+                    <div>
+                        <div class="summary-label">전체 파티션</div>
+                        <div class="summary-value">${clusterStatus.total_partitions}개</div>
+                    </div>
+                </div>
+                <div class="summary-item">
+                    <i class="fas fa-server"></i>
+                    <div>
+                        <div class="summary-label">브로커</div>
+                        <div class="summary-value">${clusterStatus.brokers.length}개</div>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        container.innerHTML = summaryHtml + `<div class="broker-grid">${brokerCards}</div>`;
     }
 }
 
@@ -427,35 +606,6 @@ class FileManager {
     }
 }
 
-// =================
-// 통계 업데이트
-// =================
-class StatsUpdater {
-    /**
-     * 대시보드 통계 업데이트
-     */
-    static async updateDashboardStats() {
-        try {
-            // 각 모듈별 헬스 체크로 통계 수집
-            const [topicHealth, schemaHealth] = await Promise.allSettled([
-                api.topicHealthCheck(),
-                api.schemaHealthCheck()
-            ]);
-
-            // 통계 업데이트
-            document.getElementById('topic-count').textContent = 
-                topicHealth.status === 'fulfilled' ? '12' : '-';
-            document.getElementById('schema-count').textContent = 
-                schemaHealth.status === 'fulfilled' ? '8' : '-';
-            document.getElementById('policy-count').textContent = '6';
-            document.getElementById('violation-count').textContent = '2';
-
-        } catch (error) {
-            console.error('통계 업데이트 실패:', error);
-        }
-    }
-}
-
 // 전역으로 노출
 window.Toast = Toast;
 window.Loading = Loading;
@@ -464,4 +614,3 @@ window.TableRenderer = TableRenderer;
 window.ActivityRenderer = ActivityRenderer;
 window.FormUtils = FormUtils;
 window.FileManager = FileManager;
-window.StatsUpdater = StatsUpdater;

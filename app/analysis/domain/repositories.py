@@ -26,6 +26,17 @@ class ICorrelationRepository(ABC):
     async def find_all(self) -> list[TopicSchemaCorrelation]:
         """모든 상관관계 조회"""
 
+    @abstractmethod
+    async def remove_schema_reference(self, subject: SubjectName) -> int:
+        """
+        스키마 참조 제거 (스키마 삭제 시 호출)
+
+        해당 스키마를 참조하는 correlation의 스키마 필드를 NULL로 업데이트합니다.
+
+        Returns:
+            업데이트된 레코드 수
+        """
+
 
 class IImpactAnalysisRepository(ABC):
     """영향도 분석 Repository"""

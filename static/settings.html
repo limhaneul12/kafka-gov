@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="ko">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -9,6 +10,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
+
 <body>
     <!-- 헤더 -->
     <header class="header">
@@ -26,32 +28,44 @@
                 </nav>
             </div>
         </div>
-    </header>
-
     <!-- 메인 컨텐츠 -->
     <main class="main">
         <div class="container">
             <div class="page-header">
-                <h1>시스템 설정</h1>
-                <p>Kafka Governance Platform 설정을 관리합니다</p>
+                <h1>Kafka 설정</h1>
+                <p>Kafka 클러스터 연결 설정을 관리합니다</p>
             </div>
 
             <div class="settings-grid">
-                <!-- API 설정 -->
+                <!-- Kafka Bootstrap 설정 -->
                 <div class="settings-card">
                     <div class="card-header">
-                        <h3><i class="fas fa-cog"></i> API 설정</h3>
+                        <h3><i class="fas fa-server"></i> Kafka Bootstrap 서버</h3>
                     </div>
                     <div class="settings-content">
                         <div class="form-group">
-                            <label for="api-base-url">API Base URL</label>
-                            <input type="text" id="api-base-url" value="/api" readonly>
-                            <small>API 엔드포인트의 기본 URL입니다.</small>
+                            <label for="kafka-bootstrap-servers">Bootstrap Servers</label>
+                            <input type="text" id="kafka-bootstrap-servers" value="localhost:9092" placeholder="host1:9092,host2:9092" />
+                            <small>Kafka 브로커 주소 (쉼표로 구분)</small>
                         </div>
                         <div class="form-group">
-                            <label for="request-timeout">요청 타임아웃 (초)</label>
-                            <input type="number" id="request-timeout" value="30" min="5" max="300">
-                            <small>API 요청의 최대 대기 시간입니다.</small>
+                            <label for="kafka-timeout">연결 타임아웃 (초)</label>
+                            <input type="number" id="kafka-timeout" value="30" min="5" max="120" />
+                            <small>Kafka 연결 요청의 최대 대기 시간입니다.</small>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Schema Registry 설정 -->
+                <div class="settings-card">
+                    <div class="card-header">
+                        <h3><i class="fas fa-database"></i> Schema Registry</h3>
+                    </div>
+                    <div class="settings-content">
+                        <div class="form-group">
+                            <label for="schema-registry-url">Schema Registry URL</label>
+                            <input type="text" id="schema-registry-url" value="http://localhost:8082" placeholder="http://localhost:8082" />
+                            <small>Schema Registry 서버 URL</small>
                         </div>
                     </div>
                 </div>
@@ -59,158 +73,17 @@
                 <!-- 환경 설정 -->
                 <div class="settings-card">
                     <div class="card-header">
-                        <h3><i class="fas fa-server"></i> 환경 설정</h3>
-                    </div>
-                    <div class="settings-content">
-                        <div class="env-list">
-                            <div class="env-item-config">
-                                <div class="env-header">
-                                    <span class="env-name">DEV</span>
-                                    <span class="status-badge success">활성</span>
-                                </div>
-                                <div class="env-details">
-                                    <p>개발 환경 - 관대한 정책 적용</p>
-                                    <small>Bootstrap Servers: dev-kafka:9092</small>
-                                </div>
-                            </div>
-                            <div class="env-item-config">
-                                <div class="env-header">
-                                    <span class="env-name">STG</span>
-                                    <span class="status-badge warning">활성</span>
-                                </div>
-                                <div class="env-details">
-                                    <p>스테이징 환경 - 중간 수준 정책</p>
-                                    <small>Bootstrap Servers: stg-kafka:9092</small>
-                                </div>
-                            </div>
-                            <div class="env-item-config">
-                                <div class="env-header">
-                                    <span class="env-name">PROD</span>
-                                    <span class="status-badge error">활성</span>
-                                </div>
-                                <div class="env-details">
-                                    <p>운영 환경 - 엄격한 정책 적용</p>
-                                    <small>Bootstrap Servers: prod-kafka:9092</small>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- 알림 설정 -->
-                <div class="settings-card">
-                    <div class="card-header">
-                        <h3><i class="fas fa-bell"></i> 알림 설정</h3>
+                        <h3><i class="fas fa-layer-group"></i> 환경 설정</h3>
                     </div>
                     <div class="settings-content">
                         <div class="form-group">
-                            <label class="checkbox-label">
-                                <input type="checkbox" id="enable-notifications" checked>
-                                <span class="checkmark"></span>
-                                브라우저 알림 활성화
-                            </label>
-                            <small>정책 위반 및 중요 이벤트에 대한 알림을 받습니다.</small>
-                        </div>
-                        <div class="form-group">
-                            <label class="checkbox-label">
-                                <input type="checkbox" id="enable-sound" checked>
-                                <span class="checkmark"></span>
-                                알림 사운드 활성화
-                            </label>
-                            <small>알림 시 사운드를 재생합니다.</small>
-                        </div>
-                        <div class="form-group">
-                            <label for="notification-duration">알림 표시 시간 (초)</label>
-                            <input type="number" id="notification-duration" value="5" min="1" max="30">
-                            <small>토스트 알림이 화면에 표시되는 시간입니다.</small>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- 테마 설정 -->
-                <div class="settings-card">
-                    <div class="card-header">
-                        <h3><i class="fas fa-palette"></i> 테마 설정</h3>
-                    </div>
-                    <div class="settings-content">
-                        <div class="form-group">
-                            <label for="theme-select">테마 선택</label>
-                            <select id="theme-select">
-                                <option value="auto">시스템 설정 따르기</option>
-                                <option value="light">라이트 모드</option>
-                                <option value="dark">다크 모드</option>
+                            <label for="default-env">기본 환경</label>
+                            <select id="default-env">
+                                <option value="dev">개발 (dev)</option>
+                                <option value="stg">스테이징 (stg)</option>
+                                <option value="prod">프로덕션 (prod)</option>
                             </select>
-                            <small>사용자 인터페이스의 색상 테마를 선택합니다.</small>
-                        </div>
-                        <div class="form-group">
-                            <label for="font-size">글꼴 크기</label>
-                            <select id="font-size">
-                                <option value="small">작게</option>
-                                <option value="medium" selected>보통</option>
-                                <option value="large">크게</option>
-                            </select>
-                            <small>인터페이스의 글꼴 크기를 조정합니다.</small>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- 데이터 설정 -->
-                <div class="settings-card">
-                    <div class="card-header">
-                        <h3><i class="fas fa-database"></i> 데이터 설정</h3>
-                    </div>
-                    <div class="settings-content">
-                        <div class="form-group">
-                            <label for="refresh-interval">자동 새로고침 간격 (분)</label>
-                            <input type="number" id="refresh-interval" value="5" min="1" max="60">
-                            <small>대시보드 데이터의 자동 새로고침 간격입니다.</small>
-                        </div>
-                        <div class="form-group">
-                            <label for="page-size">페이지당 항목 수</label>
-                            <select id="page-size">
-                                <option value="10">10개</option>
-                                <option value="25" selected>25개</option>
-                                <option value="50">50개</option>
-                                <option value="100">100개</option>
-                            </select>
-                            <small>테이블에서 한 페이지에 표시할 항목 수입니다.</small>
-                        </div>
-                        <div class="form-group">
-                            <label class="checkbox-label">
-                                <input type="checkbox" id="cache-enabled" checked>
-                                <span class="checkmark"></span>
-                                로컬 캐시 활성화
-                            </label>
-                            <small>성능 향상을 위해 데이터를 로컬에 캐시합니다.</small>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- 보안 설정 -->
-                <div class="settings-card">
-                    <div class="card-header">
-                        <h3><i class="fas fa-shield-alt"></i> 보안 설정</h3>
-                    </div>
-                    <div class="settings-content">
-                        <div class="form-group">
-                            <label for="session-timeout">세션 타임아웃 (분)</label>
-                            <input type="number" id="session-timeout" value="60" min="5" max="480">
-                            <small>비활성 상태에서 자동 로그아웃되는 시간입니다.</small>
-                        </div>
-                        <div class="form-group">
-                            <label class="checkbox-label">
-                                <input type="checkbox" id="remember-login" checked>
-                                <span class="checkmark"></span>
-                                로그인 상태 유지
-                            </label>
-                            <small>브라우저를 닫아도 로그인 상태를 유지합니다.</small>
-                        </div>
-                        <div class="form-group">
-                            <button class="btn btn-secondary" id="clear-cache-btn">
-                                <i class="fas fa-trash"></i>
-                                캐시 및 저장된 데이터 삭제
-                            </button>
-                            <small>로컬에 저장된 모든 데이터를 삭제합니다.</small>
+                            <small>기본으로 선택될 환경입니다.</small>
                         </div>
                     </div>
                 </div>
@@ -230,14 +103,13 @@
         </div>
     </main>
 
-    <!-- 토스트 알림 -->
     <div id="toast-container" class="toast-container"></div>
 
     <script src="/static/js/api.js"></script>
     <script src="/static/js/components.js"></script>
     <script>
-        // 설정 관리 클래스
-        class SettingsManager {
+        // Kafka 설정 관리 클래스
+        class KafkaSettingsManager {
             constructor() {
                 this.settings = this.loadSettings();
                 this.init();
@@ -245,10 +117,7 @@
 
             init() {
                 this.loadSettingsToForm();
-                this.setupEventListeners();
-            }
 
-            setupEventListeners() {
                 document.getElementById('save-settings').addEventListener('click', () => {
                     this.saveSettings();
                 });
@@ -258,32 +127,14 @@
                         this.resetSettings();
                     }
                 });
-
-                document.getElementById('clear-cache-btn').addEventListener('click', () => {
-                    if (confirm('캐시 및 저장된 데이터를 모두 삭제하시겠습니까?')) {
-                        this.clearCache();
-                    }
-                });
-
-                document.getElementById('theme-select').addEventListener('change', (e) => {
-                    this.applyTheme(e.target.value);
-                });
             }
 
             loadSettings() {
                 const defaultSettings = {
-                    apiBaseUrl: '/api',
-                    requestTimeout: 30,
-                    enableNotifications: true,
-                    enableSound: true,
-                    notificationDuration: 5,
-                    theme: 'auto',
-                    fontSize: 'medium',
-                    refreshInterval: 5,
-                    pageSize: 25,
-                    cacheEnabled: true,
-                    sessionTimeout: 60,
-                    rememberLogin: true
+                    kafkaBootstrapServers: 'localhost:9092',
+                    kafkaTimeout: 30,
+                    schemaRegistryUrl: 'http://localhost:8082',
+                    defaultEnv: 'dev'
                 };
 
                 const saved = localStorage.getItem('kafka-gov-settings');
@@ -291,85 +142,35 @@
             }
 
             loadSettingsToForm() {
-                Object.keys(this.settings).forEach(key => {
-                    const element = document.getElementById(key.replace(/([A-Z])/g, '-$1').toLowerCase());
-                    if (element) {
-                        if (element.type === 'checkbox') {
-                            element.checked = this.settings[key];
-                        } else {
-                            element.value = this.settings[key];
-                        }
-                    }
-                });
+                document.getElementById('kafka-bootstrap-servers').value = this.settings.kafkaBootstrapServers;
+                document.getElementById('kafka-timeout').value = this.settings.kafkaTimeout;
+                document.getElementById('schema-registry-url').value = this.settings.schemaRegistryUrl;
+                document.getElementById('default-env').value = this.settings.defaultEnv;
             }
 
             saveSettings() {
-                const formData = new FormData();
-                
-                // 폼에서 설정값 수집
-                const newSettings = {};
-                Object.keys(this.settings).forEach(key => {
-                    const elementId = key.replace(/([A-Z])/g, '-$1').toLowerCase();
-                    const element = document.getElementById(elementId);
-                    if (element) {
-                        if (element.type === 'checkbox') {
-                            newSettings[key] = element.checked;
-                        } else if (element.type === 'number') {
-                            newSettings[key] = parseInt(element.value);
-                        } else {
-                            newSettings[key] = element.value;
-                        }
-                    }
-                });
+                this.settings = {
+                    kafkaBootstrapServers: document.getElementById('kafka-bootstrap-servers').value,
+                    kafkaTimeout: parseInt(document.getElementById('kafka-timeout').value, 10),
+                    schemaRegistryUrl: document.getElementById('schema-registry-url').value,
+                    defaultEnv: document.getElementById('default-env').value
+                };
 
-                this.settings = { ...this.settings, ...newSettings };
                 localStorage.setItem('kafka-gov-settings', JSON.stringify(this.settings));
-                
-                this.applySettings();
-                Toast.success('설정이 저장되었습니다.');
+                Toast.success('Kafka 설정이 저장되었습니다.');
             }
 
             resetSettings() {
                 localStorage.removeItem('kafka-gov-settings');
                 this.settings = this.loadSettings();
                 this.loadSettingsToForm();
-                this.applySettings();
                 Toast.info('설정이 기본값으로 재설정되었습니다.');
-            }
-
-            clearCache() {
-                localStorage.clear();
-                sessionStorage.clear();
-                Toast.info('캐시 및 저장된 데이터가 삭제되었습니다.');
-            }
-
-            applySettings() {
-                this.applyTheme(this.settings.theme);
-                this.applyFontSize(this.settings.fontSize);
-            }
-
-            applyTheme(theme) {
-                const body = document.body;
-                body.classList.remove('theme-light', 'theme-dark');
-                
-                if (theme === 'light') {
-                    body.classList.add('theme-light');
-                } else if (theme === 'dark') {
-                    body.classList.add('theme-dark');
-                }
-                // 'auto'인 경우 시스템 설정을 따름 (CSS media query 사용)
-            }
-
-            applyFontSize(size) {
-                const body = document.body;
-                body.classList.remove('font-small', 'font-medium', 'font-large');
-                body.classList.add(`font-${size}`);
             }
         }
 
         // 설정 관리자 초기화
         document.addEventListener('DOMContentLoaded', () => {
-            new SettingsManager();
+            new KafkaSettingsManager();
         });
     </script>
 
@@ -466,19 +267,28 @@
         }
 
         /* 폰트 크기 클래스 */
-        .font-small { font-size: 0.875rem; }
-        .font-medium { font-size: 1rem; }
-        .font-large { font-size: 1.125rem; }
+        .font-small {
+            font-size: 0.875rem;
+        }
+
+        .font-medium {
+            font-size: 1rem;
+        }
+
+        .font-large {
+            font-size: 1.125rem;
+        }
 
         @media (max-width: 768px) {
             .settings-grid {
                 grid-template-columns: 1fr;
             }
-            
+
             .settings-actions {
                 flex-direction: column;
             }
         }
     </style>
 </body>
+
 </html>

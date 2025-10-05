@@ -176,6 +176,7 @@ class MinIOObjectStorageAdapter(IObjectStorageRepository):
 def create_minio_client(
     endpoint: str, access_key: str, secret_key: str, secure: bool = False
 ) -> Minio:
+    endpoint = endpoint.replace("http://", "").replace("https://", "")
     """MinIO 클라이언트 생성"""
     return Minio(
         endpoint=endpoint,

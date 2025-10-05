@@ -1,23 +1,24 @@
 """Analysis REST API Router"""
 
-from __future__ import annotations
-
-from typing import Annotated
-
+from dependency_injector.wiring import Provide, inject
 from fastapi import APIRouter, Depends, HTTPException, status
-from fastapi.responses import ORJSONResponse
-from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.analysis.container import get_correlation_query_service, get_impact_analysis_service
 from app.analysis.domain.authorization import validate_action
 from app.analysis.interface.schema import (
     SchemaImpactAnalysisResponse,
+    StatisticsResponse,
     TopicSchemaCorrelationResponse,
 )
-from app.shared.database import get_db_session
+from app.container import AppContainer
 from app.shared.roles import DEFAULT_ROLE, UserRole
 
 router = APIRouter(prefix="/v1/analysis", tags=["analysis"])
+
+# =============================================================================
+# Dependency Injection
+# =============================================================================
+CorrelationServiceDep = Depends(Provide[AppContainer.analysis_container.correlation_query_service])
+ImpactServiceDep = Depends(Provide[AppContainer.analysis_container.impact_analysis_query_service])
 
 
 @router.get(
@@ -27,16 +28,15 @@ router = APIRouter(prefix="/v1/analysis", tags=["analysis"])
     summary="모든 토픽-스키마 상관관계 조회",
     description="모든 토픽-스키마 상관관계를 조회합니다. (읽기 권한 필요)",
 )
+@inject
 async def get_all_correlations(
-    session: Annotated[AsyncSession, Depends(get_db_session)],
-    role: UserRole = DEFAULT_ROLE,
+    service=CorrelationServiceDep, role: UserRole = DEFAULT_ROLE
 ) -> list[TopicSchemaCorrelationResponse]:
     """모든 토픽-스키마 상관관계 조회"""
     try:
         # 권한 검증
         validate_action(role, "view")
 
-        service = get_correlation_query_service(session)
         correlations = await service.get_all_correlations()
 
         return [
@@ -70,13 +70,12 @@ async def get_all_correlations(
     status_code=status.HTTP_200_OK,
     summary="토픽의 스키마 정보 조회",
 )
+@inject
 async def get_topic_schemas(
-    topic_name: str,
-    session: Annotated[AsyncSession, Depends(get_db_session)],
+    topic_name: str, service=CorrelationServiceDep
 ) -> TopicSchemaCorrelationResponse:
     """특정 토픽의 스키마 정보 조회"""
     try:
-        service = get_correlation_query_service(session)
         correlation = await service.get_topic_schemas(topic_name)
 
         if not correlation:
@@ -110,13 +109,12 @@ async def get_topic_schemas(
     status_code=status.HTTP_200_OK,
     summary="스키마가 사용되는 토픽 목록 조회",
 )
+@inject
 async def get_schema_topics(
-    subject: str,
-    session: Annotated[AsyncSession, Depends(get_db_session)],
+    subject: str, service=CorrelationServiceDep
 ) -> list[TopicSchemaCorrelationResponse]:
-    """특정 스키마가 사용되는 토픽 목록 조회"""
+    """스키마가 사용되는 토픽 목록 조회"""
     try:
-        service = get_correlation_query_service(session)
         correlations = await service.get_schema_topics(subject)
 
         return [
@@ -132,6 +130,8 @@ async def get_schema_topics(
             for corr in correlations
         ]
 
+    except HTTPException:
+        raise
     except Exception as exc:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -146,18 +146,17 @@ async def get_schema_topics(
     summary="스키마 영향도 분석",
     description="스키마 변경/삭제 시 영향도를 분석합니다. (읽기 권한 필요)",
 )
+@inject
 async def analyze_schema_impact(
     subject: str,
-    session: Annotated[AsyncSession, Depends(get_db_session)],
+    service=ImpactServiceDep,
     strategy: str = "TopicNameStrategy",
     role: UserRole = DEFAULT_ROLE,
 ) -> SchemaImpactAnalysisResponse:
-    """스키마 변경/삭제 시 영향도 분석"""
+    """스키마 영향도 분석"""
     try:
         # 권한 검증
-        validate_action(role, "analyze")
-
-        service = get_impact_analysis_service(session)
+        validate_action(role, "view")
         analysis = await service.analyze_schema_impact(subject, strategy)
 
         return SchemaImpactAnalysisResponse(
@@ -176,16 +175,69 @@ async def analyze_schema_impact(
 
 
 @router.get(
-    "/health",
+    "/statistics/topics",
     status_code=status.HTTP_200_OK,
-    summary="Analysis 모듈 헬스체크",
+    summary="토픽 개수 조회",
+    description="등록된 토픽 개수를 조회합니다.",
 )
-async def health_check() -> ORJSONResponse:
-    """헬스체크"""
-    return ORJSONResponse(
-        content={
-            "status": "healthy",
-            "module": "analysis",
-            "version": "1.0.0",
-        }
-    )
+@inject
+async def get_topic_count(
+    service=CorrelationServiceDep,
+) -> dict[str, int]:
+    """토픽 개수 조회"""
+    try:
+        count = await service.get_topic_count()
+        return {"count": count}
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Internal server error: {exc!s}",
+        ) from exc
+
+
+@router.get(
+    "/statistics/schemas",
+    status_code=status.HTTP_200_OK,
+    summary="스키마 개수 조회",
+    description="등록된 스키마 개수를 조회합니다.",
+)
+@inject
+async def get_schema_count(
+    service=CorrelationServiceDep,
+) -> dict[str, int]:
+    """스키마 개수 조회"""
+    try:
+        count = await service.get_schema_count()
+        return {"count": count}
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Internal server error: {exc!s}",
+        ) from exc
+
+
+@router.get(
+    "/statistics",
+    response_model=StatisticsResponse,
+    status_code=status.HTTP_200_OK,
+    summary="전체 통계 조회",
+    description="토픽, 스키마, 상관관계 개수를 한번에 조회합니다.",
+)
+@inject
+async def get_statistics(
+    service=CorrelationServiceDep,
+) -> StatisticsResponse:
+    """전체 통계 조회"""
+    try:
+        stats = await service.get_statistics()
+
+        return StatisticsResponse(
+            topic_count=stats["topic_count"],
+            schema_count=stats["schema_count"],
+            correlation_count=stats["correlation_count"],
+        )
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Internal server error: {exc!s}",
+        ) from exc

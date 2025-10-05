@@ -8,7 +8,7 @@ from typing import Protocol
 
 import msgspec
 
-from ...policy import DomainPolicySeverity, DomainResourceType
+from ...shared.domain.policy_types import DomainPolicySeverity, DomainResourceType
 from .models import DomainEnvironment, DomainPolicyViolation, DomainTopicSpec
 
 
@@ -79,7 +79,8 @@ GUARDRAIL_CONFIGS: dict[DomainEnvironment, GuardrailConfig] = {
 class NamingPolicy(msgspec.Struct):
     """네이밍 정책"""
 
-    pattern: str = r"^((dev|stg|prod)\.)[a-z0-9._-]+$"
+    # 토픽 이름: 소문자, 숫자, 점(.), 밑줄(_), 하이픈(-) 허용
+    pattern: str = r"^[a-z0-9._-]+$"
     forbidden_prefixes: tuple[str, ...] = ("tmp.", "test.")
     reserved_words: tuple[str, ...] = (
         "__consumer_offsets",
@@ -275,33 +276,6 @@ class EnvironmentGuardrails(msgspec.Struct):
         )
 
 
-class CompressionPolicy(msgspec.Struct):
-    """압축 정책"""
-
-    def validate(self, spec: DomainTopicSpec) -> list[DomainPolicyViolation]:
-        """압축 설정 검증"""
-        if not spec.config:
-            return []
-
-        # 프로덕션에서는 압축 권장
-        if (
-            spec.environment == DomainEnvironment.PROD
-            and spec.config.compression_type.value == "none"
-        ):
-            return [
-                DomainPolicyViolation(
-                    resource_type=DomainResourceType.TOPIC,
-                    resource_name=spec.name,
-                    rule_id="compression.recommended",
-                    message="Compression is recommended in prod environment",
-                    severity=DomainPolicySeverity.WARNING,
-                    field="config.compression_type",
-                )
-            ]
-
-        return []
-
-
 class TopicPolicyEngine:
     """토픽 정책 엔진"""
 
@@ -309,18 +283,15 @@ class TopicPolicyEngine:
         self,
         naming_policy: NamingPolicy | None = None,
         guardrails_policy: EnvironmentGuardrails | None = None,
-        compression_policy: CompressionPolicy | None = None,
     ) -> None:
         self.naming_policy = naming_policy or NamingPolicy()
         self.guardrails_policy = guardrails_policy or EnvironmentGuardrails()
-        self.compression_policy = compression_policy or CompressionPolicy()
 
     def validate_spec(self, spec: DomainTopicSpec) -> list[DomainPolicyViolation]:
         """토픽 명세 검증"""
         return [
             *self.naming_policy.validate(spec),
             *self.guardrails_policy.validate(spec),
-            *self.compression_policy.validate(spec),
         ]
 
     def validate_batch(self, specs: list[DomainTopicSpec]) -> list[DomainPolicyViolation]:

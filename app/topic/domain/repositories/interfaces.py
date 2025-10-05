@@ -12,6 +12,11 @@ class ITopicRepository(ABC):
     """토픽 리포지토리 인터페이스"""
 
     @abstractmethod
+    async def list_topics(self) -> list[TopicName]:
+        """모든 토픽 목록 조회"""
+        ...
+
+    @abstractmethod
     async def get_topic_metadata(self, name: TopicName) -> dict[str, Any] | None:
         """토픽 메타데이터 조회"""
         ...

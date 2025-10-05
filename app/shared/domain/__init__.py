@@ -1,1 +1,6 @@
-"""Shared Domain Layer - 도메인 이벤트 및 공유 객체"""
+"""Shared Domain 패키지"""
+
+from .models import AuditActivity
+from .repositories import IAuditActivityRepository
+
+__all__ = ["AuditActivity", "IAuditActivityRepository"]

@@ -96,3 +96,23 @@ class SchemaImpactAnalysisResponse(BaseModel):
     total_impact_count: int = Field(ge=0)
     risk_level: RiskLevel
     warnings: list[StrictStr] = Field(default_factory=list, max_length=20)
+
+
+class StatisticsResponse(BaseModel):
+    """통계 응답"""
+
+    model_config = ConfigDict(
+        extra="forbid",
+        frozen=True,
+        json_schema_extra={
+            "example": {
+                "topic_count": 25,
+                "schema_count": 42,
+                "correlation_count": 30,
+            }
+        },
+    )
+
+    topic_count: int = Field(ge=0, description="총 토픽 수")
+    schema_count: int = Field(ge=0, description="총 스키마 수")
+    correlation_count: int = Field(ge=0, description="총 상관관계 수")

@@ -9,8 +9,10 @@ import pytest
 from app.schema.application.use_cases import (
     SchemaBatchApplyUseCase,
     SchemaBatchDryRunUseCase,
-    SchemaDeleteAnalysisUseCase,
+    SchemaDeleteUseCase,
     SchemaPlanUseCase,
+    SchemaSyncUseCase,
+    SchemaUploadUseCase,
 )
 from app.schema.domain.models import (
     DomainCompatibilityMode,
@@ -228,13 +230,20 @@ class TestSchemaPlanUseCase:
         mock_metadata_repository.get_plan.assert_called_once_with("test-001")
 
 
-class TestSchemaDeleteAnalysisUseCase:
-    """SchemaDeleteAnalysisUseCase 테스트"""
+class TestSchemaDeleteUseCase:
+    """SchemaDeleteUseCase 테스트"""
 
     @pytest.mark.asyncio
-    async def test_analyze_delete_impact(self, mock_registry_repository, mock_audit_repository):
+    async def test_analyze_delete_impact(
+        self,
+        mock_registry_repository,
+        mock_schema_metadata_repository,
+        mock_schema_audit_repository,
+    ):
         """삭제 영향도 분석"""
-        use_case = SchemaDeleteAnalysisUseCase(mock_registry_repository, mock_audit_repository)
+        use_case = SchemaDeleteUseCase(
+            mock_registry_repository, mock_schema_metadata_repository, mock_schema_audit_repository
+        )
 
         # Repository: 스키마 존재
         mock_registry_repository.describe_subjects.return_value = {
@@ -260,10 +269,15 @@ class TestSchemaDeleteAnalysisUseCase:
 
     @pytest.mark.asyncio
     async def test_analyze_non_existing_schema(
-        self, mock_registry_repository, mock_audit_repository
+        self,
+        mock_registry_repository,
+        mock_schema_metadata_repository,
+        mock_schema_audit_repository,
     ):
         """존재하지 않는 스키마"""
-        use_case = SchemaDeleteAnalysisUseCase(mock_registry_repository, mock_audit_repository)
+        use_case = SchemaDeleteUseCase(
+            mock_registry_repository, mock_schema_metadata_repository, mock_schema_audit_repository
+        )
 
         # Repository: 스키마 없음
         mock_registry_repository.describe_subjects.return_value = {}
@@ -469,3 +483,428 @@ class TestSchemaBatchApplyUseCaseExtended:
         assert len(result.registered) == 1
         assert len(result.failed) == 1
         assert result.failed[0]["subject"] == "dev.test2-value"
+
+
+class TestSchemaUploadUseCase:
+    """SchemaUploadUseCase 테스트"""
+
+    @pytest.fixture
+    def mock_upload_file(self):
+        """Mock UploadFile"""
+
+        class MockFile:
+            def __init__(
+                self, filename: str, content: bytes, content_type: str = "application/json"
+            ):
+                self.filename = filename
+                self._content = content
+                self.content_type = content_type
+
+            async def read(self):
+                return self._content
+
+        return MockFile
+
+    @pytest.mark.asyncio
+    async def test_upload_single_avro_file(
+        self,
+        mock_registry_repository,
+        mock_schema_metadata_repository,
+        mock_schema_audit_repository,
+        mock_upload_file,
+    ):
+        """단일 AVRO 파일 업로드"""
+        storage_repo = AsyncMock()
+        storage_repo.put_object.return_value = "s3://bucket/dev/uploads/upload_123/test.avsc"
+
+        use_case = SchemaUploadUseCase(
+            storage_repo,
+            mock_schema_metadata_repository,
+            mock_schema_audit_repository,
+            mock_registry_repository,
+        )
+
+        # AVRO 스키마 파일
+        avro_schema = (
+            b'{"type": "record", "name": "User", "fields": [{"name": "id", "type": "string"}]}'
+        )
+        files = [mock_upload_file("test.avsc", avro_schema)]
+
+        # Registry 등록 성공
+        mock_registry_repository.register_schema.return_value = 1
+        mock_registry_repository.describe_subjects.return_value = {}
+
+        result = await use_case.execute(
+            env=DomainEnvironment.DEV,
+            change_id="upload-001",
+            files=files,
+            actor="test-user",
+        )
+
+        assert result.upload_id.startswith("upload_upload-001")
+        assert len(result.artifacts) == 1
+        assert result.artifacts[0].subject == "dev.test"
+        assert result.artifacts[0].version == 1
+
+    @pytest.mark.asyncio
+    async def test_upload_json_file(
+        self,
+        mock_registry_repository,
+        mock_schema_metadata_repository,
+        mock_schema_audit_repository,
+        mock_upload_file,
+    ):
+        """JSON 스키마 파일 업로드"""
+        storage_repo = AsyncMock()
+        storage_repo.put_object.return_value = "s3://bucket/dev/uploads/upload_123/schema.json"
+
+        use_case = SchemaUploadUseCase(
+            storage_repo,
+            mock_schema_metadata_repository,
+            mock_schema_audit_repository,
+            mock_registry_repository,
+        )
+
+        json_schema = b'{"type": "object", "properties": {"name": {"type": "string"}}}'
+        files = [mock_upload_file("schema.json", json_schema)]
+
+        mock_registry_repository.register_schema.return_value = 2
+        mock_registry_repository.describe_subjects.return_value = {}
+
+        result = await use_case.execute(
+            env=DomainEnvironment.DEV,
+            change_id="upload-002",
+            files=files,
+            actor="test-user",
+        )
+
+        assert len(result.artifacts) == 1
+
+    @pytest.mark.asyncio
+    async def test_upload_proto_file(
+        self,
+        mock_registry_repository,
+        mock_schema_metadata_repository,
+        mock_schema_audit_repository,
+        mock_upload_file,
+    ):
+        """Protobuf 스키마 파일 업로드"""
+        storage_repo = AsyncMock()
+        storage_repo.put_object.return_value = "s3://bucket/dev/uploads/upload_123/schema.proto"
+
+        use_case = SchemaUploadUseCase(
+            storage_repo,
+            mock_schema_metadata_repository,
+            mock_schema_audit_repository,
+            mock_registry_repository,
+        )
+
+        proto_schema = b'syntax = "proto3"; message User { string id = 1; }'
+        files = [mock_upload_file("schema.proto", proto_schema)]
+
+        mock_registry_repository.register_schema.return_value = 1
+        mock_registry_repository.describe_subjects.return_value = {}
+
+        result = await use_case.execute(
+            env=DomainEnvironment.DEV,
+            change_id="upload-003",
+            files=files,
+            actor="test-user",
+        )
+
+        assert len(result.artifacts) == 1
+
+    @pytest.mark.asyncio
+    async def test_upload_no_files_error(
+        self,
+        mock_registry_repository,
+        mock_schema_metadata_repository,
+        mock_schema_audit_repository,
+    ):
+        """파일이 없을 때 에러"""
+        storage_repo = AsyncMock()
+        use_case = SchemaUploadUseCase(
+            storage_repo,
+            mock_schema_metadata_repository,
+            mock_schema_audit_repository,
+            mock_registry_repository,
+        )
+
+        with pytest.raises(ValueError, match="No files provided"):
+            await use_case.execute(
+                env=DomainEnvironment.DEV,
+                change_id="upload-004",
+                files=[],
+                actor="test-user",
+            )
+
+    @pytest.mark.asyncio
+    async def test_upload_unsupported_extension(
+        self,
+        mock_registry_repository,
+        mock_schema_metadata_repository,
+        mock_schema_audit_repository,
+        mock_upload_file,
+    ):
+        """지원하지 않는 파일 확장자"""
+        storage_repo = AsyncMock()
+        use_case = SchemaUploadUseCase(
+            storage_repo,
+            mock_schema_metadata_repository,
+            mock_schema_audit_repository,
+            mock_registry_repository,
+        )
+
+        files = [mock_upload_file("test.txt", b"invalid")]
+
+        with pytest.raises(ValueError, match="Unsupported file type"):
+            await use_case.execute(
+                env=DomainEnvironment.DEV,
+                change_id="upload-005",
+                files=files,
+                actor="test-user",
+            )
+
+    @pytest.mark.asyncio
+    async def test_upload_file_too_large(
+        self,
+        mock_registry_repository,
+        mock_schema_metadata_repository,
+        mock_schema_audit_repository,
+        mock_upload_file,
+    ):
+        """파일 크기 초과"""
+        storage_repo = AsyncMock()
+        use_case = SchemaUploadUseCase(
+            storage_repo,
+            mock_schema_metadata_repository,
+            mock_schema_audit_repository,
+            mock_registry_repository,
+        )
+
+        # 10MB 초과
+        large_content = b"x" * (11 * 1024 * 1024)
+        files = [mock_upload_file("large.avsc", large_content)]
+
+        with pytest.raises(ValueError, match="is too large"):
+            await use_case.execute(
+                env=DomainEnvironment.DEV,
+                change_id="upload-006",
+                files=files,
+                actor="test-user",
+            )
+
+    @pytest.mark.asyncio
+    async def test_upload_empty_file(
+        self,
+        mock_registry_repository,
+        mock_schema_metadata_repository,
+        mock_schema_audit_repository,
+        mock_upload_file,
+    ):
+        """빈 파일"""
+        storage_repo = AsyncMock()
+        use_case = SchemaUploadUseCase(
+            storage_repo,
+            mock_schema_metadata_repository,
+            mock_schema_audit_repository,
+            mock_registry_repository,
+        )
+
+        files = [mock_upload_file("empty.avsc", b"")]
+
+        with pytest.raises(ValueError, match="is empty"):
+            await use_case.execute(
+                env=DomainEnvironment.DEV,
+                change_id="upload-007",
+                files=files,
+                actor="test-user",
+            )
+
+    @pytest.mark.asyncio
+    async def test_upload_invalid_json(
+        self,
+        mock_registry_repository,
+        mock_schema_metadata_repository,
+        mock_schema_audit_repository,
+        mock_upload_file,
+    ):
+        """잘못된 JSON 파일"""
+        storage_repo = AsyncMock()
+        use_case = SchemaUploadUseCase(
+            storage_repo,
+            mock_schema_metadata_repository,
+            mock_schema_audit_repository,
+            mock_registry_repository,
+        )
+
+        files = [mock_upload_file("invalid.json", b"{invalid json}")]
+
+        with pytest.raises(ValueError, match="Invalid schema file"):
+            await use_case.execute(
+                env=DomainEnvironment.DEV,
+                change_id="upload-008",
+                files=files,
+                actor="test-user",
+            )
+
+    @pytest.mark.asyncio
+    async def test_upload_registry_failure_continues(
+        self,
+        mock_registry_repository,
+        mock_schema_metadata_repository,
+        mock_schema_audit_repository,
+        mock_upload_file,
+    ):
+        """Registry 등록 실패해도 MinIO 저장은 유지"""
+        storage_repo = AsyncMock()
+        storage_repo.put_object.return_value = "s3://bucket/dev/uploads/upload_123/test.avsc"
+
+        use_case = SchemaUploadUseCase(
+            storage_repo,
+            mock_schema_metadata_repository,
+            mock_schema_audit_repository,
+            mock_registry_repository,
+        )
+
+        avro_schema = b'{"type": "record", "name": "Test"}'
+        files = [mock_upload_file("test.avsc", avro_schema)]
+
+        # Registry 등록 실패
+        mock_registry_repository.register_schema.side_effect = Exception("Registry error")
+        mock_registry_repository.describe_subjects.return_value = {}
+
+        result = await use_case.execute(
+            env=DomainEnvironment.DEV,
+            change_id="upload-009",
+            files=files,
+            actor="test-user",
+        )
+
+        # MinIO 저장은 성공, 버전은 1로 폴백
+        assert len(result.artifacts) == 1
+        assert result.artifacts[0].version == 1
+
+
+class TestSchemaSyncUseCase:
+    """SchemaSyncUseCase 테스트"""
+
+    @pytest.mark.asyncio
+    async def test_sync_success(
+        self,
+        mock_registry_repository,
+        mock_schema_metadata_repository,
+        mock_schema_audit_repository,
+    ):
+        """동기화 성공"""
+        use_case = SchemaSyncUseCase(
+            mock_registry_repository,
+            mock_schema_metadata_repository,
+            mock_schema_audit_repository,
+        )
+
+        # Registry에 스키마 존재
+        mock_registry_repository.list_all_subjects.return_value = [
+            "dev.user-value",
+            "dev.order-value",
+        ]
+        mock_registry_repository.describe_subjects.return_value = {
+            "dev.user-value": SchemaVersionInfo(
+                version=1,
+                schema_id=101,
+                schema='{"type": "record"}',
+                schema_type="AVRO",
+                references=[],
+                hash="hash1",
+            ),
+            "dev.order-value": SchemaVersionInfo(
+                version=2,
+                schema_id=102,
+                schema='{"type": "record"}',
+                schema_type="AVRO",
+                references=[],
+                hash="hash2",
+            ),
+        }
+
+        result = await use_case.execute(actor="test-user")
+
+        assert result["total"] == 2
+        assert result["added"] == 2
+        assert result["updated"] == 0
+
+    @pytest.mark.asyncio
+    async def test_sync_no_schemas(
+        self,
+        mock_registry_repository,
+        mock_schema_metadata_repository,
+        mock_schema_audit_repository,
+    ):
+        """Registry에 스키마가 없을 때"""
+        use_case = SchemaSyncUseCase(
+            mock_registry_repository,
+            mock_schema_metadata_repository,
+            mock_schema_audit_repository,
+        )
+
+        mock_registry_repository.list_all_subjects.return_value = []
+
+        result = await use_case.execute(actor="test-user")
+
+        assert result["total"] == 0
+        assert result["added"] == 0
+        assert result["updated"] == 0
+
+    @pytest.mark.asyncio
+    async def test_sync_with_existing_artifacts(
+        self,
+        mock_registry_repository,
+        mock_schema_metadata_repository,
+        mock_schema_audit_repository,
+    ):
+        """이미 존재하는 artifact는 업데이트 카운트"""
+        use_case = SchemaSyncUseCase(
+            mock_registry_repository,
+            mock_schema_metadata_repository,
+            mock_schema_audit_repository,
+        )
+
+        mock_registry_repository.list_all_subjects.return_value = ["dev.user-value"]
+        mock_registry_repository.describe_subjects.return_value = {
+            "dev.user-value": SchemaVersionInfo(
+                version=1,
+                schema_id=101,
+                schema='{"type": "record"}',
+                schema_type="AVRO",
+                references=[],
+                hash="hash1",
+            ),
+        }
+
+        # artifact 저장 시 예외 발생 (이미 존재)
+        mock_schema_metadata_repository.record_artifact.side_effect = Exception("Already exists")
+
+        result = await use_case.execute(actor="test-user")
+
+        assert result["total"] == 1
+        assert result["added"] == 0
+        assert result["updated"] == 1
+
+    @pytest.mark.asyncio
+    async def test_sync_failure(
+        self,
+        mock_registry_repository,
+        mock_schema_metadata_repository,
+        mock_schema_audit_repository,
+    ):
+        """동기화 실패"""
+        use_case = SchemaSyncUseCase(
+            mock_registry_repository,
+            mock_schema_metadata_repository,
+            mock_schema_audit_repository,
+        )
+
+        mock_registry_repository.list_all_subjects.side_effect = Exception("Connection error")
+
+        with pytest.raises(Exception, match="Connection error"):
+            await use_case.execute(actor="test-user")

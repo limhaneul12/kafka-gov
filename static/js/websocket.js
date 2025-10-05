@@ -112,9 +112,6 @@ class WebSocketClient {
             case 'schema_updated':
                 this.emit('schema_updated', payload);
                 break;
-            case 'policy_violation':
-                this.emit('policy_violation', payload);
-                break;
             case 'system_alert':
                 this.emit('system_alert', payload);
                 break;
@@ -196,15 +193,6 @@ class WebSocketClient {
         });
     }
 
-    /**
-     * 정책 위반 알림 구독
-     */
-    subscribePolicyViolations() {
-        this.send({
-            action: 'subscribe',
-            resource: 'policy_violations'
-        });
-    }
 
     /**
      * 시스템 알림 구독
@@ -254,11 +242,6 @@ class RealtimeNotificationManager {
             this.refreshSchemaList();
         });
 
-        // 정책 위반
-        this.wsClient.on('policy_violation', (data) => {
-            Toast.error(`정책 위반: ${data.message}`);
-            this.refreshViolationsList();
-        });
 
         // 시스템 알림
         this.wsClient.on('system_alert', (data) => {
@@ -302,8 +285,23 @@ let notificationManager = null;
 
 /**
  * WebSocket 초기화
+ * 
+ * 참고: 현재 백엔드에 WebSocket 엔드포인트가 구현되지 않았습니다.
+ * WebSocket 기능이 필요한 경우 백엔드에 /ws 엔드포인트를 추가해야 합니다.
  */
 function initializeWebSocket() {
+    // WebSocket 기능 비활성화됨
+    console.log('WebSocket 기능은 현재 비활성화되어 있습니다.');
+    
+    // 연결 상태를 disconnected로 표시
+    const statusElement = document.getElementById('connection-status');
+    if (statusElement) {
+        statusElement.className = 'connection-status disconnected';
+        statusElement.innerHTML = '<i class="fas fa-plug"></i> 연결 안 함';
+    }
+    
+    // 실제 구현 시 아래 코드 활성화
+    /*
     wsClient = new WebSocketClient();
     notificationManager = new RealtimeNotificationManager(wsClient);
     
@@ -312,9 +310,9 @@ function initializeWebSocket() {
     
     // 기본 구독 설정
     wsClient.on('connected', () => {
-        wsClient.subscribePolicyViolations();
         wsClient.subscribeSystemAlerts();
     });
+    */
 }
 
 /**

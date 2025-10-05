@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Annotated, Final, TypeAlias
 
-from pydantic import Field, StrictStr, StringConstraints, TypeAdapter, conint
+from pydantic import Field, StrictStr, StringConstraints, TypeAdapter
 
 # 타입 별칭 정의
 ChangeId: TypeAlias = str
@@ -43,4 +43,4 @@ def string_type(
 
 def int_type(*, desc: str, ge: int, le: int | None = None) -> type[int]:
     """정수 타입 생성 헬퍼"""
-    return Annotated[conint(ge=ge, le=le, strict=True), Field(description=desc)]
+    return Annotated[int, Field(description=desc, ge=ge, le=le, strict=True)]

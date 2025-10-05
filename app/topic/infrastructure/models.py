@@ -21,7 +21,6 @@ class TopicMetadataModel(Base):
 
     # 메타데이터 필드
     owner: Mapped[str | None] = mapped_column(String(100), comment="소유자")
-    sla: Mapped[str | None] = mapped_column(String(50), comment="SLA 등급")
     doc: Mapped[str | None] = mapped_column(Text, comment="문서/설명")
     tags: Mapped[dict[str, Any] | None] = mapped_column(JSON, comment="태그 (JSON)")
 

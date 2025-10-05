@@ -4,9 +4,6 @@ from __future__ import annotations
 
 from typing import Any
 
-from app.policy.domain.models import DomainEnvironment as PolicyEnvironment
-
-from ..application.policy_integration import TopicPolicyAdapter
 from .models import (
     DomainPlanAction,
     DomainTopicBatch,
@@ -15,6 +12,7 @@ from .models import (
     DomainTopicPlanItem,
     DomainTopicSpec,
 )
+from .policies import TopicPolicyEngine
 from .repositories.interfaces import ITopicRepository
 
 
@@ -24,20 +22,16 @@ class TopicPlannerService:
     def __init__(
         self,
         topic_repository: ITopicRepository,
-        policy_adapter: TopicPolicyAdapter,
+        policy_engine: TopicPolicyEngine | None = None,
     ) -> None:
         self.topic_repository = topic_repository
-        self.policy_adapter = policy_adapter
+        self.policy_engine = policy_engine or TopicPolicyEngine()
 
     async def create_plan(self, batch: DomainTopicBatch, actor: str = "system") -> DomainTopicPlan:
         """배치에 대한 실행 계획 생성"""
 
-        policy_env = PolicyEnvironment(batch.env.value)
-        violations = await self.policy_adapter.validate_topic_specs(
-            environment=policy_env,  # type: ignore[arg-type]
-            topic_specs=list(batch.specs),
-            actor=actor,
-        )
+        # 직접 정책 검증
+        violations = self.policy_engine.validate_batch(list(batch.specs))
 
         # 현재 토픽 상태 조회
         topic_names: list[str] = [spec.name for spec in batch.specs]

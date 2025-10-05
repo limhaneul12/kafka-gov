@@ -13,7 +13,6 @@ from app.topic.interface.schema import (
 )
 from app.topic.interface.types import (
     CleanupPolicy,
-    CompressionType,
     Environment,
     TopicAction,
 )
@@ -26,7 +25,6 @@ class TestTopicMetadata:
         """정상적인 메타데이터"""
         data = {
             "owner": "team-commerce",
-            "sla": "P99<200ms",
             "doc": "https://wiki.company.com/orders",
             "tags": ["pii", "critical"],
         }
@@ -34,13 +32,12 @@ class TestTopicMetadata:
         metadata = TopicMetadata.model_validate(data)
 
         assert metadata.owner == "team-commerce"
-        assert metadata.sla == "P99<200ms"
         assert metadata.doc == "https://wiki.company.com/orders"
         assert len(metadata.tags) == 2
 
     def test_owner_required(self):
         """owner는 필수"""
-        data = {"sla": "P99<200ms"}
+        data = {}
 
         with pytest.raises(ValidationError):
             TopicMetadata.model_validate(data)
@@ -59,7 +56,6 @@ class TestTopicMetadata:
         metadata = TopicMetadata.model_validate(data)
 
         assert metadata.owner == "team-test"
-        assert metadata.sla is None
         assert metadata.doc is None
         assert metadata.tags == []
 
@@ -93,7 +89,6 @@ class TestTopicConfig:
             "partitions": 12,
             "replication_factor": 3,
             "cleanup_policy": "compact",
-            "compression_type": "zstd",
             "retention_ms": 604800000,
             "min_insync_replicas": 2,
         }
@@ -103,7 +98,6 @@ class TestTopicConfig:
         assert config.partitions == 12
         assert config.replication_factor == 3
         assert config.cleanup_policy == CleanupPolicy.COMPACT
-        assert config.compression_type == CompressionType.ZSTD
 
     def test_partitions_required(self):
         """partitions 필수"""
@@ -145,7 +139,6 @@ class TestTopicConfig:
         config = TopicConfig.model_validate(data)
 
         assert config.cleanup_policy == CleanupPolicy.DELETE
-        assert config.compression_type == CompressionType.ZSTD
         assert config.retention_ms is None
 
     def test_config_is_immutable(self):
@@ -190,24 +183,12 @@ class TestTopicItem:
         data = {
             "name": "dev.test.topic",
             "action": "delete",
-            "reason": "Not needed anymore",
         }
 
         item = TopicItem.model_validate(data)
 
         assert item.name == "dev.test.topic"
         assert item.action == TopicAction.DELETE
-        assert item.reason == "Not needed anymore"
-
-    def test_delete_requires_reason(self):
-        """DELETE는 reason 필수"""
-        data = {
-            "name": "dev.test.topic",
-            "action": "delete",
-        }
-
-        with pytest.raises(ValidationError, match="reason is required for delete action"):
-            TopicItem.model_validate(data)
 
     def test_delete_should_not_have_config(self):
         """DELETE는 config 불필요"""
@@ -218,7 +199,6 @@ class TestTopicItem:
                 "partitions": 6,
                 "replication_factor": 2,
             },
-            "reason": "Clean up",
         }
 
         with pytest.raises(
@@ -310,7 +290,6 @@ class TestTopicBatchRequest:
                 {
                     "name": "dev.test.topic",  # 중복
                     "action": "delete",
-                    "reason": "Clean up",
                 },
             ],
         }
@@ -318,14 +297,14 @@ class TestTopicBatchRequest:
         with pytest.raises(ValidationError, match="Duplicate topic names found"):
             TopicBatchRequest.model_validate(data)
 
-    def test_environment_consistency(self):
-        """환경 일관성"""
+    def test_mixed_environment_allowed(self):
+        """환경 검증 제거됨 - 혼합 환경 허용"""
         data = {
             "env": "dev",
             "change_id": "test-001",
             "items": [
                 {
-                    "name": "prod.test.topic",  # 다른 환경
+                    "name": "prod.test.topic",  # 다른 환경도 허용
                     "action": "create",
                     "config": {"partitions": 6, "replication_factor": 2},
                     "metadata": {"owner": "team-test"},
@@ -333,8 +312,10 @@ class TestTopicBatchRequest:
             ],
         }
 
-        with pytest.raises(ValidationError, match="does not match batch environment"):
-            TopicBatchRequest.model_validate(data)
+        # 환경 검증이 제거되어 정상 생성됨
+        request = TopicBatchRequest.model_validate(data)
+        assert request.env == "dev"
+        assert len(request.items) == 1
 
     def test_max_items_limit(self):
         """최대 아이템 개수"""

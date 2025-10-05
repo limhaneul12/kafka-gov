@@ -2,13 +2,11 @@
 
 from __future__ import annotations
 
-from app.policy.domain.models import DomainPolicySeverity
+from app.shared.domain.policy_types import DomainPolicySeverity
 from app.topic.domain.models import (
-    DomainCompressionType,
     DomainTopicAction,
 )
 from app.topic.domain.policies import (
-    CompressionPolicy,
     EnvironmentGuardrails,
     NamingPolicy,
     TopicPolicyEngine,
@@ -206,56 +204,10 @@ class TestEnvironmentGuardrails:
 
         # DELETE 액션은 config가 None
         spec = create_topic_spec(
-            name="prod.test.topic",
+            name="dev.old.topic",
             action=DomainTopicAction.DELETE,
             config=None,
             metadata=None,
-            reason="Clean up",
-        )
-
-        violations = policy.validate(spec)
-
-        assert len(violations) == 0
-
-
-class TestCompressionPolicy:
-    """CompressionPolicy 테스트"""
-
-    def test_prod_compression_recommended(self):
-        """PROD에서는 압축 권장"""
-        policy = CompressionPolicy()
-
-        spec = create_topic_spec(
-            name="prod.test.topic",
-            config=create_topic_config(compression_type=DomainCompressionType.NONE),
-        )
-
-        violations = policy.validate(spec)
-
-        assert len(violations) > 0
-        assert violations[0].rule_id == "compression.recommended"
-        assert violations[0].severity == DomainPolicySeverity.WARNING
-
-    def test_dev_compression_no_warning(self):
-        """DEV에서는 압축 없어도 경고 없음"""
-        policy = CompressionPolicy()
-
-        spec = create_topic_spec(
-            name="dev.test.topic",
-            config=create_topic_config(compression_type=DomainCompressionType.NONE),
-        )
-
-        violations = policy.validate(spec)
-
-        assert len(violations) == 0
-
-    def test_prod_with_compression_no_violations(self):
-        """PROD에서 압축 사용 시 위반 없음"""
-        policy = CompressionPolicy()
-
-        spec = create_topic_spec(
-            name="prod.test.topic",
-            config=create_topic_config(compression_type=DomainCompressionType.ZSTD),
         )
 
         violations = policy.validate(spec)
@@ -275,7 +227,6 @@ class TestTopicPolicyEngine:
             name="prod.test.topic",
             config=create_topic_config(
                 replication_factor=1,  # PROD 가드레일 위반
-                compression_type=DomainCompressionType.NONE,  # 압축 권장 위반
             ),
         )
 
@@ -323,7 +274,6 @@ class TestTopicPolicyEngine:
             config=create_topic_config(
                 partitions=3,
                 replication_factor=2,
-                compression_type=DomainCompressionType.ZSTD,
             ),
         )
 

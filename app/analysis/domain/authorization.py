@@ -1,7 +1,5 @@
 """Analysis Authorization - 역할 기반 권한 검증"""
 
-from __future__ import annotations
-
 from ...shared.roles import UserRole
 
 

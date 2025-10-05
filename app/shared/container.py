@@ -1,58 +1,75 @@
-"""공통 DI 컨테이너 - 고성능 최적화"""
+"""공통 DI 컨테이너 - 인프라스트럭처 의존성 관리"""
 
 from __future__ import annotations
 
 from dependency_injector import containers, providers
 
 from app.schema.infrastructure.storage.minio_adapter import create_minio_client
+from app.shared.application.use_cases import GetClusterStatusUseCase, GetRecentActivitiesUseCase
+from app.shared.infrastructure.cluster_repository import KafkaClusterRepository
+from app.shared.infrastructure.repository import MySQLAuditActivityRepository
 
 from .database import DatabaseManager
-from .settings import get_settings
-
-
-class SharedContainer(containers.DeclarativeContainer):
-    """공통 컨테이너 - 설정 관리 (최적화)"""
-
-    # Settings는 이미 lru_cache로 싱글톤이므로 직접 사용
-    settings = providers.Singleton(get_settings)
+from .settings import (
+    create_kafka_admin_client,
+    create_schema_registry_client,
+    settings,
+)
 
 
 class InfrastructureContainer(containers.DeclarativeContainer):
-    """인프라스트럭처 컨테이너 - 외부 시스템 연결 (최적화)"""
+    infra_container = providers.Object(settings)
 
-    # Configuration from shared container
-    config = providers.DependenciesContainer()
-
-    # Database Manager - Lazy 초기화
+    # Database Manager - Singleton
     database_manager = providers.Singleton(
         DatabaseManager,
-        database_url=providers.Callable(lambda: get_settings().database.url),
-        echo=providers.Callable(lambda: get_settings().database.echo),
+        database_url=infra_container.provided.database.url,
+        echo=infra_container.provided.database.echo,
     )
 
-    # Kafka AdminClient (외부에서 주입)
-    kafka_admin_client = providers.Dependency()
+    # Kafka AdminClient - Singleton
+    kafka_admin_client = providers.Singleton(
+        create_kafka_admin_client,
+        bootstrap_servers=infra_container.provided.kafka.bootstrap_servers,
+    )
 
-    # Schema Registry Client (외부에서 주입)
-    schema_registry_client = providers.Dependency()
+    # Schema Registry Client - Singleton
+    schema_registry_client = providers.Singleton(
+        create_schema_registry_client,
+        config=infra_container.provided.schema_registry.client_config,
+    )
 
-    # MinIO Client - Factory
-    minio_client = providers.Factory(
+    # MinIO Client - Singleton
+    minio_client = providers.Singleton(
         create_minio_client,
-        endpoint=providers.Callable(
-            lambda: get_settings()
-            .storage.endpoint_url.replace("http://", "")
-            .replace("https://", "")
-        ),
-        access_key=providers.Callable(lambda: get_settings().storage.access_key),
-        secret_key=providers.Callable(lambda: get_settings().storage.secret_key),
-        secure=providers.Callable(lambda: get_settings().storage.use_ssl),
+        endpoint=infra_container.provided.storage.endpoint_url,
+        access_key=infra_container.provided.storage.access_key,
+        secret_key=infra_container.provided.storage.secret_key,
+        secure=infra_container.provided.storage.use_ssl,
     )
 
+    # MinIO 설정값 노출 (SchemaContainer에서 사용)
+    bucket_name = infra_container.provided.storage.bucket_name
+    endpoint_url = infra_container.provided.storage.endpoint_url
 
-# 전역 컨테이너 인스턴스들
-shared_container = SharedContainer()
-infrastructure_container = InfrastructureContainer()
+    # Repositories
+    audit_activity_repository = providers.Factory(
+        MySQLAuditActivityRepository,
+        session_factory=database_manager.provided.get_db_session,
+    )
 
-# 컨테이너 간 의존성 연결
-infrastructure_container.config.override(shared_container)
+    cluster_repository = providers.Factory(
+        KafkaClusterRepository,
+        admin_client=kafka_admin_client,
+    )
+
+    # Use Cases
+    get_recent_activities_use_case = providers.Factory(
+        GetRecentActivitiesUseCase,
+        audit_repository=audit_activity_repository,
+    )
+
+    get_cluster_status_use_case = providers.Factory(
+        GetClusterStatusUseCase,
+        cluster_repository=cluster_repository,
+    )

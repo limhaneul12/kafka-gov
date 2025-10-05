@@ -3,7 +3,7 @@
 
 class ApiClient {
     constructor() {
-        this.baseURL = '/api';
+        this.baseURL = '/api/v1';
         this.timeout = 30000;
         this.defaultHeaders = {
             'Content-Type': 'application/json',
@@ -15,21 +15,37 @@ class ApiClient {
      */
     async request(endpoint, options = {}) {
         const url = `${this.baseURL}${endpoint}`;
+        
+        // FormData인 경우 Content-Type을 설정하지 않음 (브라우저가 자동 설정)
+        const isFormData = options.body instanceof FormData;
+        
         const config = {
-            headers: {
+            headers: isFormData ? {
+                ...options.headers,
+            } : {
                 'Content-Type': 'application/json',
                 ...options.headers,
             },
             ...options,
         };
 
-
         try {
             const response = await fetch(url, config);
             
             if (!response.ok) {
                 const error = await response.json().catch(() => ({}));
-                throw new Error(error.detail || `HTTP ${response.status}`);
+                // 에러 메시지를 더 명확하게 처리
+                let errorMessage = error.detail || `HTTP ${response.status}`;
+                
+                // detail이 배열인 경우 (FastAPI validation error)
+                if (Array.isArray(error.detail)) {
+                    errorMessage = error.detail.map(err => {
+                        const loc = err.loc ? err.loc.join(' > ') : '';
+                        return `${loc}: ${err.msg}`;
+                    }).join('\n');
+                }
+                
+                throw new Error(errorMessage);
             }
 
             // 응답이 비어있으면 null 반환
@@ -99,6 +115,26 @@ class ApiClient {
     // =================
 
     /**
+     * 토픽 목록 조회
+     */
+    async getTopics() {
+        return this.get('/topics');
+    }
+
+    /**
+     * 토픽 배치 YAML 업로드
+     */
+    async topicBatchUpload(file) {
+        const formData = new FormData();
+        formData.append('file', file);
+        
+        return this.request('/topics/batch/upload', {
+            method: 'POST',
+            body: formData,
+        });
+    }
+
+    /**
      * 토픽 배치 Dry-run
      */
     async topicBatchDryRun(batch) {
@@ -127,11 +163,53 @@ class ApiClient {
     }
 
     /**
-     * 토픽 헬스 체크
+     * 토픽 삭제
      */
-    async topicHealthCheck() {
-        return this.get('/topics/health');
+    async deleteTopic(topicName) {
+        return this.delete(`/topics/${encodeURIComponent(topicName)}`);
     }
+
+    /**
+     * 토픽 일괄 삭제
+     */
+    async bulkDeleteTopics(topicNames) {
+        return this.post('/topics/bulk-delete', topicNames);
+    }
+
+
+    // =================
+    // Analysis API
+    // =================
+
+    /**
+     * 토픽-스키마 상관관계 전체 조회
+     */
+    async getAllCorrelations(params = {}) {
+        return this.get('/analysis/correlations', params);
+    }
+
+    /**
+     * 토픽 개수 조회
+     */
+    async getTopicCount() {
+        return this.get('/analysis/statistics/topics');
+    }
+
+    /**
+     * 스키마 개수 조회
+     */
+    async getSchemaCount() {
+        return this.get('/analysis/statistics/schemas');
+    }
+
+    /**
+     * 전체 통계 조회
+     */
+    async getStatistics() {
+        return this.get('/analysis/statistics');
+    }
+
+
 
     // =================
     // Schema API
@@ -153,8 +231,18 @@ class ApiClient {
     /**
      * 스키마 파일 업로드
      */
-    async uploadSchemaFiles(files) {
-        return this.uploadFiles('/schemas/upload', files);
+    async uploadSchemaFiles({ env, changeId, files }) {
+        const formData = new FormData();
+        formData.append('env', env);
+        formData.append('change_id', changeId);
+        for (const file of files) {
+            formData.append('files', file);
+        }
+
+        return this.request('/schemas/upload', {
+            method: 'POST',
+            body: formData,
+        });
     }
 
     /**
@@ -165,66 +253,56 @@ class ApiClient {
     }
 
     /**
-     * 스키마 헬스 체크
+     * 스키마 삭제 영향도 분석
      */
-    async schemaHealthCheck() {
-        return this.get('/schemas/health');
+    async analyzeSchemaDelete(subject, strategy = 'TopicNameStrategy') {
+        return this.post(`/schemas/delete/analyze?subject=${encodeURIComponent(subject)}&strategy=${strategy}`, null);
+    }
+
+    /**
+     * 스키마 삭제
+     */
+    async deleteSchema(subject, strategy = 'TopicNameStrategy', force = false) {
+        return this.delete(`/schemas/delete/${encodeURIComponent(subject)}?strategy=${strategy}&force=${force}`);
+    }
+
+    /**
+     * 스키마 아티팩트 목록 조회
+     */
+    async getSchemaArtifacts() {
+        return this.get('/schemas/artifacts');
+    }
+
+    /**
+     * 스키마 동기화 (Schema Registry → DB)
+     */
+    async syncSchemas() {
+        return this.post('/schemas/sync');
     }
 
     // =================
-    // Policy API
+    // Audit API
     // =================
 
     /**
-     * 정책 평가
+     * 최근 활동 조회
      */
-    async evaluatePolicy(request) {
-        return this.post('/policies/evaluate', request);
+    async getRecentActivities(limit = 20) {
+        return this.get(`/audit/recent?limit=${limit}`);
     }
-
-    /**
-     * 검증 요약 조회
-     */
-    async getValidationSummary(environment, resourceType) {
-        return this.get(`/policies/validation-summary/${environment}/${resourceType}`);
-    }
-
-    /**
-     * 정책 목록 조회
-     */
-    async getPolicies() {
-        return this.get('/policies/');
-    }
-
-    /**
-     * 특정 정책 집합 조회
-     */
-    async getPolicySet(environment, resourceType) {
-        return this.get(`/policies/${environment}/${resourceType}`);
-    }
-
-    /**
-     * 기본 정책 초기화
-     */
-    async initializePolicies() {
-        return this.post('/policies/initialize');
-    }
-
 
     // =================
-    // 헬스 체크
+    // Cluster API
     // =================
 
     /**
-     * 전체 헬스 체크
+     * Kafka 클러스터 상태 조회
      */
-    async healthCheck() {
-        return this.get('/health');
+    async getClusterStatus() {
+        return this.get('/cluster/status');
     }
 }
 
 // 전역 API 클라이언트 인스턴스
 const api = new ApiClient();
-
-// 전역으로 노출
 window.api = api;

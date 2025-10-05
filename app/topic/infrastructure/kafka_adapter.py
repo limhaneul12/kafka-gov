@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from collections.abc import Callable
+from functools import partial
 from typing import Any
 
 from confluent_kafka.admin import AdminClient, ConfigResource, NewPartitions, NewTopic
@@ -23,6 +25,83 @@ class KafkaTopicAdapter(ITopicRepository):
     def __init__(self, admin_client: AdminClient) -> None:
         self.admin_client = admin_client
 
+    async def _wait_for_futures(
+        self,
+        futures: dict[Any, Any],
+        operation: str,
+        key_extractor: Callable[[Any], str] | None = None,
+    ) -> TopicMetadata:
+        """Kafka AdminClient의 future 결과를 대기하고 처리
+
+        Args:
+            futures: AdminClient가 반환한 futures 딕셔너리
+            operation: 작업 이름 (로깅용)
+            key_extractor: future dict의 키에서 토픽 이름을 추출하는 함수 (기본: str 변환)
+
+        Returns:
+            TopicMetadata: {topic_name: None (성공) | Exception (실패)}
+        """
+        results: TopicMetadata = {}
+
+        for key, future in futures.items():
+            # 토픽 이름 추출
+            topic_name = key_extractor(key) if key_extractor else str(key)
+
+            try:
+                await asyncio.get_event_loop().run_in_executor(None, future.result, 30.0)
+                results[topic_name] = None  # 성공
+                logger.info(f"Successfully {operation} topic: {topic_name}")
+            except Exception as e:
+                results[topic_name] = e
+                logger.error(f"Failed to {operation} topic {topic_name}: {e}")
+
+        return results
+
+    async def _execute_kafka_operation(
+        self,
+        futures: dict[Any, Any],
+        operation: str,
+        fallback_keys: list[str] | dict,
+        key_extractor: Callable[[Any], str] | None = None,
+    ) -> TopicMetadata:
+        """Kafka 작업 실행 및 에러 핸들링
+
+        Args:
+            futures: AdminClient가 반환한 futures 딕셔너리
+            operation: 작업 이름 (로깅용)
+            fallback_keys: 에러 발생 시 반환할 키 목록 (list 또는 dict)
+            key_extractor: future dict의 키에서 토픽 이름을 추출하는 함수
+
+        Returns:
+            TopicMetadata: {topic_name: None (성공) | Exception (실패)}
+        """
+        try:
+            return await self._wait_for_futures(futures, operation, key_extractor)
+        except Exception as e:
+            logger.error(f"Failed to {operation} topics: {e}")
+            # 모든 토픽에 대해 동일한 에러 반환
+            if isinstance(fallback_keys, dict):
+                return dict.fromkeys(fallback_keys.keys(), e)
+            return dict.fromkeys(fallback_keys, e)
+
+    async def list_topics(self) -> list[TopicName]:
+        """모든 토픽 목록 조회"""
+        try:
+            # 클러스터 메타데이터 조회
+            # list_topics(topic=None, timeout=-1) - 첫 번째 인자는 topic(str or None), 두 번째가 timeout
+            metadata = await asyncio.get_event_loop().run_in_executor(
+                None, partial(self.admin_client.list_topics, timeout=30.0)
+            )
+
+            # 내부 토픽 제외 (__ 로 시작하는 토픽)
+            topics = [topic for topic in metadata.topics if not topic.startswith("__")]
+
+            logger.info(f"Retrieved {len(topics)} topics from Kafka")
+            return topics
+        except Exception as e:
+            logger.error(f"Failed to list topics: {e}")
+            raise RuntimeError(f"Failed to retrieve topics: {e}") from e
+
     async def get_topic_metadata(self, name: TopicName) -> dict[str, Any] | None:
         """토픽 메타데이터 조회"""
         try:
@@ -38,153 +117,105 @@ class KafkaTopicAdapter(ITopicRepository):
             return {}
 
         # NewTopic 객체 생성
-        new_topics = []
-        for spec in specs:
-            if not spec.config:
-                continue
-
-            new_topic = NewTopic(
+        new_topics: list[NewTopic] = [
+            NewTopic(
                 topic=spec.name,
                 num_partitions=spec.config.partitions,
                 replication_factor=spec.config.replication_factor,
                 config=spec.config.to_kafka_config(),
             )
-            new_topics.append(new_topic)
+            for spec in specs
+            if spec.config
+        ]
 
         if not new_topics:
             return {}
 
-        try:
-            # 비동기 실행
-            futures = self.admin_client.create_topics(
-                new_topics,
-                operation_timeout=30.0,
-                request_timeout=60.0,
-            )
+        # 비동기 실행
+        futures: dict = self.admin_client.create_topics(
+            new_topics,
+            operation_timeout=30.0,
+            request_timeout=60.0,
+        )
 
-            # 결과 대기
-            results = {}
-            for topic_name, future in futures.items():
-                try:
-                    await asyncio.get_event_loop().run_in_executor(None, future.result, 30.0)
-                    results[topic_name] = None  # 성공
-                    logger.info(f"Successfully created topic: {topic_name}")
-                except Exception as e:
-                    results[topic_name] = e
-                    logger.error(f"Failed to create topic {topic_name}: {e}")
-
-            return results
-
-        except Exception as e:
-            logger.error(f"Failed to create topics: {e}")
-            # 모든 토픽에 대해 동일한 에러 반환
-            return {spec.name: e for spec in specs}
+        # 결과 대기
+        return await self._execute_kafka_operation(
+            futures=futures,
+            operation="created",
+            fallback_keys=[spec.name for spec in specs],
+        )
 
     async def delete_topics(self, names: list[TopicName]) -> TopicMetadata:
         """토픽 삭제"""
         if not names:
             return {}
 
-        try:
-            # 비동기 실행
-            futures = self.admin_client.delete_topics(
-                names,
-                operation_timeout=30.0,
-                request_timeout=60.0,
-            )
+        # 비동기 실행
+        futures: dict = self.admin_client.delete_topics(
+            names, operation_timeout=30.0, request_timeout=60.0
+        )
 
-            # 결과 대기
-            results = {}
-            for topic_name, future in futures.items():
-                try:
-                    await asyncio.get_event_loop().run_in_executor(None, future.result, 30.0)
-                    results[topic_name] = None  # 성공
-                    logger.info(f"Successfully deleted topic: {topic_name}")
-                except Exception as e:
-                    results[topic_name] = e
-                    logger.error(f"Failed to delete topic {topic_name}: {e}")
-
-            return results
-
-        except Exception as e:
-            logger.error(f"Failed to delete topics: {e}")
-            # 모든 토픽에 대해 동일한 에러 반환
-            return dict.fromkeys(names, e)
+        # 결과 대기
+        return await self._execute_kafka_operation(
+            futures=futures,
+            operation="deleted",
+            fallback_keys=names,
+        )
 
     async def alter_topic_configs(self, configs: TopicConfig) -> TopicMetadata:
         """토픽 설정 변경"""
         if not configs:
             return {}
 
-        try:
-            # ConfigResource 객체 생성
-            resources = []
-            for topic_name, config in configs.items():
-                resource = ConfigResource(ConfigResource.Type.TOPIC, topic_name)
-                resources.append((resource, config))
+        # ConfigResource 객체 생성
+        resources: list[tuple[ConfigResource, dict[str, str]]] = [
+            (ConfigResource(ConfigResource.Type.TOPIC, topic_name), config)
+            for topic_name, config in configs.items()
+        ]
 
-            # 비동기 실행
-            futures = self.admin_client.alter_configs(resources, request_timeout=60.0)
+        # 비동기 실행
+        futures: dict = self.admin_client.alter_configs(resources, request_timeout=60.0)
 
-            # 결과 대기
-            results = {}
-            for resource, future in futures.items():
-                # Confluent returns keys as ConfigResource; tests may mock with strings
-                topic_name = getattr(resource, "name", None)
-                if topic_name is None:
-                    topic_name = str(resource)
-                    if ":" in topic_name:
-                        # e.g., "TOPIC:dev.user.events" -> "dev.user.events"
-                        topic_name = topic_name.split(":", 1)[1]
-                try:
-                    await asyncio.get_event_loop().run_in_executor(None, future.result, 30.0)
-                    results[topic_name] = None  # 성공
-                    logger.info(f"Successfully altered config for topic: {topic_name}")
-                except Exception as e:
-                    results[topic_name] = e
-                    logger.error(f"Failed to alter config for topic {topic_name}: {e}")
+        # ConfigResource에서 토픽 이름 추출 함수
+        def extract_topic_name(resource: Any) -> str:
+            # Confluent returns keys as ConfigResource; tests may mock with strings
+            if topic_name := getattr(resource, "name", None):
+                return topic_name
+            # Mock string format: "TOPIC:dev.user.events" -> "dev.user.events"
+            return str(resource).split(":", 1)[1] if ":" in str(resource) else str(resource)
 
-            return results
-
-        except Exception as e:
-            logger.error(f"Failed to alter topic configs: {e}")
-            # 모든 토픽에 대해 동일한 에러 반환
-            return dict.fromkeys(configs.keys(), e)
+        # 결과 대기
+        return await self._execute_kafka_operation(
+            futures=futures,
+            operation="altered config for",
+            fallback_keys=configs,
+            key_extractor=extract_topic_name,
+        )
 
     async def create_partitions(self, partitions: TopicPartitions) -> TopicMetadata:
         """파티션 수 증가"""
         if not partitions:
             return {}
 
-        try:
-            # NewPartitions 객체 생성
-            partition_updates = [
-                NewPartitions(topic=topic_name, new_total_count=partition_count)
-                for topic_name, partition_count in partitions.items()
-            ]
+        # NewPartitions 객체 생성
+        partition_updates: list[NewPartitions] = [
+            NewPartitions(topic=topic_name, new_total_count=partition_count)
+            for topic_name, partition_count in partitions.items()
+        ]
 
-            # 비동기 실행
-            futures = self.admin_client.create_partitions(
-                partition_updates, operation_timeout=30.0, request_timeout=60.0
-            )
+        # 비동기 실행
+        futures: dict = self.admin_client.create_partitions(
+            partition_updates,
+            operation_timeout=30.0,
+            request_timeout=60.0,
+        )
 
-            # 결과 대기
-            results: TopicMetadata = {}
-            for topic_name, future in futures.items():
-                try:
-                    await asyncio.get_event_loop().run_in_executor(None, future.result, 30.0)
-                    results[topic_name] = None  # 성공
-                    logger.info(f"Successfully created partitions for topic: {topic_name}")
-                except Exception as e:
-                    results[topic_name] = e
-                    logger.error(f"Failed to create partitions for topic {topic_name}: {e}")
-
-            return results
-
-        except Exception as e:
-            logger.error(f"Failed to create partitions: {e}")
-            # 모든 토픽에 대해 동일한 에러 반환
-            return dict.fromkeys(partitions.keys(), e)
+        # 결과 대기
+        return await self._execute_kafka_operation(
+            futures=futures,
+            operation="created partitions for",
+            fallback_keys=partitions,
+        )
 
     async def describe_topics(self, names: list[TopicName]) -> dict[TopicName, dict[str, Any]]:
         """토픽 상세 정보 조회"""
@@ -194,8 +225,9 @@ class KafkaTopicAdapter(ITopicRepository):
         try:
             # 클러스터 메타데이터 조회
             metadata = await asyncio.get_event_loop().run_in_executor(
-                None, self.admin_client.list_topics, 60.0
+                None, partial(self.admin_client.list_topics, timeout=60.0)
             )
+            logger.debug(f"Metadata for topics {names}: {metadata}")
 
             results: dict[TopicName, dict[str, Any]] = {}
             for name in names:
@@ -206,6 +238,7 @@ class KafkaTopicAdapter(ITopicRepository):
                 # 토픽 설정 조회
                 config_resource = ConfigResource(ConfigResource.Type.TOPIC, name)
                 config_futures = self.admin_client.describe_configs([config_resource])
+                logger.info("config_futures: %s", config_futures)
 
                 try:
                     config_result = await asyncio.get_event_loop().run_in_executor(
@@ -253,15 +286,3 @@ class KafkaTopicAdapter(ITopicRepository):
         except Exception as e:
             logger.error(f"Failed to describe topics: {e}")
             return {}
-
-
-def create_kafka_admin_client(bootstrap_servers: str, **config) -> AdminClient:
-    """Kafka AdminClient 생성"""
-    admin_config = {
-        "bootstrap.servers": bootstrap_servers,
-        "request.timeout.ms": 60000,
-        "socket.timeout.ms": 60000,
-        **config,
-    }
-
-    return AdminClient(admin_config)

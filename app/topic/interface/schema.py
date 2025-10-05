@@ -17,23 +17,14 @@ from .types import (
     AuditId,
     ChangeId,
     CleanupPolicy,
-    CompressionType,
     DocumentUrl,
     Environment,
     ErrorField,
     ErrorMessage,
     ErrorRule,
     ErrorSeverity,
-    MaxMessageBytes,
-    MinInsyncReplicas,
-    PartitionCount,
     PlanAction,
     PlanStatus,
-    ReasonText,
-    ReplicationFactor,
-    RetentionMs,
-    SegmentMs,
-    SlaRequirement,
     TagName,
     TeamName,
     TopicAction,
@@ -52,7 +43,6 @@ class TopicMetadata(BaseModel):
         json_schema_extra={
             "example": {
                 "owner": "team-commerce",
-                "sla": "P99<200ms",
                 "doc": "https://wiki.company.com/streams/orders",
                 "tags": ["pii", "critical"],
             }
@@ -60,7 +50,6 @@ class TopicMetadata(BaseModel):
     )
 
     owner: TeamName
-    sla: SlaRequirement | None = None
     doc: DocumentUrl | None = None
     tags: list[TagName] = Field(default_factory=list, max_length=10)
 
@@ -76,7 +65,6 @@ class TopicConfig(BaseModel):
                 "partitions": 12,
                 "replication_factor": 3,
                 "cleanup_policy": "compact",
-                "compression_type": "zstd",
                 "retention_ms": 604800000,
                 "min_insync_replicas": 2,
                 "max_message_bytes": 1048576,
@@ -84,14 +72,13 @@ class TopicConfig(BaseModel):
         },
     )
 
-    partitions: PartitionCount
-    replication_factor: ReplicationFactor
+    partitions: int = Field(..., gt=0, description="파티션 수")
+    replication_factor: int = Field(..., gt=0, description="복제 팩터")
     cleanup_policy: CleanupPolicy = CleanupPolicy.DELETE
-    compression_type: CompressionType = CompressionType.ZSTD
-    retention_ms: RetentionMs | None = None
-    min_insync_replicas: MinInsyncReplicas | None = None
-    max_message_bytes: MaxMessageBytes | None = None
-    segment_ms: SegmentMs | None = None
+    retention_ms: int | None = Field(default=None, description="보존 시간(밀리초)")
+    min_insync_replicas: int | None = Field(default=None, description="최소 동기화 복제본 수")
+    max_message_bytes: int | None = Field(default=None, description="최대 메시지 크기(바이트)")
+    segment_ms: int | None = Field(default=None, description="세그먼트 롤링 시간(밀리초)")
 
     @model_validator(mode="after")
     def validate_config_consistency(self) -> TopicConfig:
@@ -125,10 +112,8 @@ class TopicItem(BaseModel):
                 },
                 "metadata": {
                     "owner": "team-commerce",
-                    "sla": "P99<200ms",
                     "doc": "https://wiki.company.com/streams/orders",
                 },
-                "reason": "Business requirement change",
             }
         },
     )
@@ -137,14 +122,11 @@ class TopicItem(BaseModel):
     action: TopicAction
     config: TopicConfig | None = None
     metadata: TopicMetadata | None = None
-    reason: ReasonText | None = None
 
     @model_validator(mode="after")
     def validate_action_requirements(self) -> TopicItem:
         """액션별 필수 필드 검증"""
         if self.action == TopicAction.DELETE:
-            if not self.reason:
-                raise ValueError("reason is required for delete action")
             if self.config is not None:
                 raise ValueError("config should not be provided for delete action")
         else:
@@ -181,7 +163,6 @@ class TopicBatchRequest(BaseModel):
                         },
                         "metadata": {
                             "owner": "team-commerce",
-                            "sla": "P99<200ms",
                             "doc": "https://wiki.company.com/streams/orders",
                         },
                     }
@@ -207,18 +188,6 @@ class TopicBatchRequest(BaseModel):
             duplicates = [name for name in names if names.count(name) > 1]
             raise ValueError(f"Duplicate topic names found: {duplicates}")
         return v
-
-    @model_validator(mode="after")
-    def validate_env_consistency(self) -> TopicBatchRequest:
-        """환경 일관성 검증"""
-        for item in self.items:
-            topic_env = item.name.split(".")[0]
-            if topic_env != self.env.value:
-                raise ValueError(
-                    f"Topic {item.name} environment ({topic_env}) "
-                    f"does not match batch environment ({self.env.value})"
-                )
-        return self
 
 
 class TopicPlanItem(BaseModel):
@@ -331,7 +300,7 @@ class KafkaCoreMetadata(BaseModel):
         },
     )
 
-    partition_count: PartitionCount
+    partition_count: int = Field(ge=1, le=1000, description="파티션 수")
     leader_replicas: list[int] = Field(default_factory=list)
     created_at: StrictStr | None = None
 
@@ -369,6 +338,53 @@ class TopicBatchApplyResponse(BaseModel):
     summary: dict[str, int] = Field(default_factory=dict)
 
 
+class TopicListItem(BaseModel):
+    """토픽 목록 아이템"""
+
+    model_config = ConfigDict(
+        extra="forbid",
+        frozen=True,
+        json_schema_extra={
+            "example": {
+                "name": "dev.orders.created",
+                "owner": "team-commerce",
+                "environment": "dev",
+            }
+        },
+    )
+
+    name: TopicName
+    owner: TeamName | None = None
+    environment: str
+
+
+class TopicListResponse(BaseModel):
+    """토픽 목록 응답"""
+
+    model_config = ConfigDict(
+        extra="forbid",
+        frozen=True,
+        json_schema_extra={
+            "example": {
+                "topics": [
+                    {
+                        "name": "dev.orders.created",
+                        "owner": "team-commerce",
+                        "environment": "dev",
+                    },
+                    {
+                        "name": "prod.payments.completed",
+                        "owner": "team-payments",
+                        "environment": "prod",
+                    },
+                ]
+            }
+        },
+    )
+
+    topics: list[TopicListItem]
+
+
 class TopicDetailResponse(BaseModel):
     """토픽 상세 응답"""
 
@@ -378,31 +394,27 @@ class TopicDetailResponse(BaseModel):
         json_schema_extra={
             "example": {
                 "name": "prod.orders.created",
-                "config": {
-                    "partitions": 12,
+                "kafka_metadata": {
+                    "partition_count": 12,
                     "replication_factor": 3,
-                    "cleanup_policy": "compact",
-                    "compression_type": "zstd",
-                    "retention_ms": 604800000,
+                    "config": {
+                        "cleanup.policy": "compact",
+                        "compression.type": "zstd",
+                        "retention.ms": "604800000",
+                    },
                 },
                 "metadata": {
                     "owner": "team-commerce",
-                    "sla": "P99<200ms",
                     "doc": "https://wiki.company.com/streams/orders",
-                },
-                "kafka_metadata": {
-                    "partition_count": 12,
-                    "leader_replicas": [1, 2, 3],
-                    "created_at": "2025-09-25T10:00:00Z",
+                    "tags": ["commerce", "orders"],
                 },
             }
         },
     )
 
     name: TopicName
-    config: TopicConfig
-    metadata: TopicMetadata | None = None
-    kafka_metadata: KafkaCoreMetadata | None = None
+    kafka_metadata: dict[str, int | str | dict]  # Kafka 메타데이터 (유연한 구조)
+    metadata: TopicMetadata | None = None  # DB 메타데이터 (구조화된 모델)
 
 
 class TopicPlanResponse(BaseModel):
@@ -435,3 +447,23 @@ class TopicPlanResponse(BaseModel):
     created_at: StrictStr
     applied_at: StrictStr | None = None
     plan: list[TopicPlanItem] = Field(default_factory=list)
+
+
+class TopicBulkDeleteResponse(BaseModel):
+    """토픽 일괄 삭제 응답"""
+
+    model_config = ConfigDict(
+        extra="forbid",
+        frozen=True,
+        json_schema_extra={
+            "example": {
+                "succeeded": ["dev.orders.created", "prod.payments.completed"],
+                "failed": ["dev.orders.created", "prod.payments.completed"],
+                "message": "Deleted 2 topics, 2 failed",
+            }
+        },
+    )
+
+    succeeded: list[str]
+    failed: list[str]
+    message: str

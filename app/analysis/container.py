@@ -1,11 +1,9 @@
-"""Analysis Container - Dependency Injection"""
+"""Analysis Container - Dependency Injection (Session Factory 패턴)"""
 
 from __future__ import annotations
 
-from sqlalchemy.ext.asyncio import AsyncSession
+from dependency_injector import containers, providers
 
-from ..shared.infrastructure.event_bus import get_event_bus
-from .application.event_handlers import SchemaRegisteredHandler, TopicCreatedHandler
 from .application.queries import CorrelationQueryService, ImpactAnalysisQueryService
 from .domain.services import TopicSchemaLinker
 from .infrastructure.mysql_repository import (
@@ -14,32 +12,37 @@ from .infrastructure.mysql_repository import (
 )
 
 
-def get_correlation_query_service(session: AsyncSession) -> CorrelationQueryService:
-    """상관관계 조회 서비스 팩토리"""
-    correlation_repo = MySQLCorrelationRepository(session)
-    return CorrelationQueryService(correlation_repo)
+class AnalysisContainer(containers.DeclarativeContainer):
+    """Analysis 모듈 DI 컨테이너"""
 
+    # 인프라스트럭처 컨테이너 참조
+    infrastructure = providers.DependenciesContainer()
 
-def get_impact_analysis_service(session: AsyncSession) -> ImpactAnalysisQueryService:
-    """영향도 분석 서비스 팩토리"""
-    correlation_repo = MySQLCorrelationRepository(session)
-    impact_repo = MySQLImpactAnalysisRepository(session)
-    return ImpactAnalysisQueryService(correlation_repo, impact_repo)
+    # Repositories (Session Factory 패턴)
+    correlation_repository = providers.Factory(
+        MySQLCorrelationRepository,
+        session_factory=infrastructure.database_manager.provided.get_db_session,
+    )
 
+    impact_analysis_repository = providers.Factory(
+        MySQLImpactAnalysisRepository,
+        session_factory=infrastructure.database_manager.provided.get_db_session,
+    )
 
-def register_event_handlers(session: AsyncSession) -> None:
-    """이벤트 핸들러 등록"""
-    event_bus = get_event_bus()
+    # Services
+    topic_schema_linker = providers.Factory(
+        TopicSchemaLinker, correlation_repo=correlation_repository
+    )
 
-    # Repository 생성
-    correlation_repo = MySQLCorrelationRepository(session)
+    # Query Services
+    correlation_query_service = providers.Factory(
+        CorrelationQueryService,
+        correlation_repo=correlation_repository,
+        session_factory=infrastructure.database_manager.provided.get_db_session,
+    )
 
-    # Service 생성
-    linker = TopicSchemaLinker(correlation_repo)
-
-    # Handler 생성 및 등록
-    schema_handler = SchemaRegisteredHandler(linker)
-    topic_handler = TopicCreatedHandler(linker)
-
-    event_bus.subscribe("schema.registered", schema_handler.handle)
-    event_bus.subscribe("topic.created", topic_handler.handle)
+    impact_analysis_query_service = providers.Factory(
+        ImpactAnalysisQueryService,
+        correlation_repo=correlation_repository,
+        impact_repo=impact_analysis_repository,
+    )

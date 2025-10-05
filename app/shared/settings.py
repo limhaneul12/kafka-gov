@@ -5,6 +5,8 @@ from __future__ import annotations
 from functools import lru_cache
 from typing import Any
 
+from confluent_kafka.admin import AdminClient
+from confluent_kafka.schema_registry import AsyncSchemaRegistryClient
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -24,9 +26,9 @@ class DatabaseSettings(BaseSettings):
     model_config = model_config_module("DB_")
 
     # MySQL 연결 설정
-    host: str = Field(default="localhost", description="데이터베이스 호스트")
+    host: str = Field(default="mysql", description="데이터베이스 호스트")
     port: int = Field(default=3306, ge=1, le=65535, description="데이터베이스 포트")
-    username: str = Field(default="kafka_gov", description="데이터베이스 사용자명")
+    username: str = Field(default="user", description="데이터베이스 사용자명")
     password: str = Field(default="password", description="데이터베이스 비밀번호")
     database: str = Field(default="kafka_gov", description="데이터베이스명")
 
@@ -50,7 +52,7 @@ class KafkaSettings(BaseSettings):
     model_config = model_config_module("KAFKA_")
 
     # Kafka 브로커 설정
-    bootstrap_servers: str = Field(default="localhost:9092", description="Kafka 브로커 주소")
+    bootstrap_servers: str = Field(default="kafka:9092", description="Kafka 브로커 주소")
     security_protocol: str = Field(default="PLAINTEXT", description="보안 프로토콜")
 
     # AdminClient 설정
@@ -65,16 +67,6 @@ class KafkaSettings(BaseSettings):
             raise ValueError(f"security_protocol must be one of {allowed}")
         return v
 
-    @property
-    def admin_config(self) -> dict[str, Any]:
-        """AdminClient 설정 딕셔너리"""
-        return {
-            "bootstrap.servers": self.bootstrap_servers,
-            "security.protocol": self.security_protocol,
-            "request.timeout.ms": self.request_timeout_ms,
-            "retries": self.retries,
-        }
-
 
 class SchemaRegistrySettings(BaseSettings):
     """Schema Registry 설정"""
@@ -82,7 +74,7 @@ class SchemaRegistrySettings(BaseSettings):
     model_config = model_config_module("SCHEMA_REGISTRY_")
 
     # Schema Registry 연결 설정
-    url: str = Field(default="http://localhost:8081", description="Schema Registry URL")
+    url: str = Field(default="http://localhost:8082", description="Schema Registry URL")
 
     # 인증 설정 (선택적)
     username: str | None = Field(default=None, description="Basic Auth 사용자명")
@@ -172,6 +164,36 @@ class AppSettings(BaseSettings):
         if v not in allowed:
             raise ValueError(f"environment must be one of {allowed}")
         return v
+
+
+def create_kafka_admin_client(bootstrap_servers: str, **config) -> AdminClient:
+    """Kafka AdminClient 생성"""
+    admin_config = {
+        "bootstrap.servers": bootstrap_servers,
+        "request.timeout.ms": 60000,
+        "socket.timeout.ms": 60000,
+        **config,
+    }
+
+    return AdminClient(conf=admin_config)
+
+
+def create_schema_registry_client(config: dict[str, str | int]) -> AsyncSchemaRegistryClient:
+    """Schema Registry 클라이언트 생성
+
+    Args:
+        config: Schema Registry 클라이언트 설정 딕셔너리
+            - url: Schema Registry URL (필수)
+            - timeout: 요청 타임아웃(초)
+            - basic.auth.user.info: Basic Auth 정보 (선택)
+            - ssl.ca.location: SSL CA 인증서 경로 (선택)
+            - ssl.certificate.location: SSL 클라이언트 인증서 경로 (선택)
+            - ssl.key.location: SSL 클라이언트 키 경로 (선택)
+
+    Returns:
+        AsyncSchemaRegistryClient 인스턴스
+    """
+    return AsyncSchemaRegistryClient(conf=config)
 
 
 @lru_cache

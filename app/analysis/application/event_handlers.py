@@ -1,9 +1,12 @@
 """Analysis Event Handlers - Schema/Topic 이벤트 구독"""
 
-from __future__ import annotations
-
 import logging
+from collections.abc import Callable
+from contextlib import AbstractAsyncContextManager
 
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from ...schema.infrastructure.models import SchemaMetadataModel
 from ...shared.domain.events import SchemaRegisteredEvent, TopicCreatedEvent
 from ...shared.roles import UserRole
 from ..domain.services import TopicSchemaLinker
@@ -12,18 +15,28 @@ logger = logging.getLogger(__name__)
 
 
 class SchemaRegisteredHandler:
-    """스키마 등록 이벤트 핸들러"""
+    """스키마 등록 이벤트 핸들러 (Session Factory 패턴)"""
 
-    def __init__(self, linker: TopicSchemaLinker) -> None:
+    def __init__(
+        self,
+        linker: TopicSchemaLinker,
+        session_factory: Callable[..., AbstractAsyncContextManager[AsyncSession]],
+    ) -> None:
         self.linker = linker
+        self.session_factory = session_factory
 
     async def handle(self, event: SchemaRegisteredEvent) -> None:
-        """스키마 등록 시 자동으로 토픽과 연결"""
+        """스키마 등록 시 자동으로 토픽과 연결 및 메타데이터 저장"""
         try:
             logger.info(
                 f"Handling SchemaRegisteredEvent: {event.subject} "
                 f"(actor={event.actor}, role={event.actor_role})"
             )
+
+            # 1. schema_metadata에 저장
+            await self._save_schema_metadata(event)
+
+            # 2. 토픽과 연결
 
             # 역할 검증 (자동 연결은 모든 역할 허용)
             actor_role = UserRole(event.actor_role)
@@ -58,6 +71,43 @@ class SchemaRegisteredHandler:
         except Exception as e:
             logger.error(f"Failed to handle SchemaRegisteredEvent: {e}", exc_info=True)
             # 이벤트 핸들러 실패해도 원본 작업은 성공 (베스트 에포트)
+
+    async def _save_schema_metadata(self, event: SchemaRegisteredEvent) -> None:
+        """스키마 메타데이터 저장 (Session Factory 패턴)"""
+        async with self.session_factory() as session:
+            try:
+                # 이미 존재하는지 확인
+                from sqlalchemy import select
+
+                stmt = select(SchemaMetadataModel).where(
+                    SchemaMetadataModel.subject == event.subject
+                )
+                result = await session.execute(stmt)
+                existing = result.scalar_one_or_none()
+
+                if existing:
+                    # 이미 존재하면 업데이트
+                    existing.updated_by = event.actor
+                    existing.description = f"Schema ID: {event.schema_id}, Version: {event.version}, Type: {event.schema_type}"
+                    logger.info(f"Updated schema metadata: {event.subject}")
+                else:
+                    # 새로 생성
+                    metadata = SchemaMetadataModel(
+                        subject=event.subject,
+                        description=f"Schema ID: {event.schema_id}, Version: {event.version}, Type: {event.schema_type}, Compatibility: {event.compatibility_mode}",
+                        created_by=event.actor,
+                        updated_by=event.actor,
+                    )
+                    session.add(metadata)
+                    logger.info(f"Created schema metadata: {event.subject}")
+
+                await session.flush()
+
+            except Exception as e:
+                logger.error(
+                    f"Failed to save schema metadata for {event.subject}: {e}", exc_info=True
+                )
+                # 메타데이터 저장 실패해도 계속 진행
 
     def _extract_topics(self, subject: str, strategy: str) -> list[str]:
         """Subject naming에서 토픽 추출"""

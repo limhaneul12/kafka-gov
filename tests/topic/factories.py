@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from app.topic.domain.models import (
     DomainCleanupPolicy,
-    DomainCompressionType,
     DomainEnvironment,
     DomainPlanAction,
     DomainTopicAction,
@@ -19,14 +18,12 @@ from app.topic.domain.models import (
 
 def create_topic_metadata(
     owner: str = "team-test",
-    sla: str | None = None,
     doc: str | None = None,
     tags: tuple[str, ...] = (),
 ) -> DomainTopicMetadata:
     """토픽 메타데이터 생성"""
     return DomainTopicMetadata(
         owner=owner,
-        sla=sla,
         doc=doc,
         tags=tags,
     )
@@ -36,7 +33,6 @@ def create_topic_config(
     partitions: int = 3,
     replication_factor: int = 2,
     cleanup_policy: DomainCleanupPolicy = DomainCleanupPolicy.DELETE,
-    compression_type: DomainCompressionType = DomainCompressionType.ZSTD,
     retention_ms: int | None = None,
     min_insync_replicas: int | None = None,
     max_message_bytes: int | None = None,
@@ -47,7 +43,6 @@ def create_topic_config(
         partitions=partitions,
         replication_factor=replication_factor,
         cleanup_policy=cleanup_policy,
-        compression_type=compression_type,
         retention_ms=retention_ms,
         min_insync_replicas=min_insync_replicas,
         max_message_bytes=max_message_bytes,
@@ -60,7 +55,6 @@ def create_topic_spec(
     action: DomainTopicAction = DomainTopicAction.CREATE,
     config: DomainTopicConfig | None = None,
     metadata: DomainTopicMetadata | None = None,
-    reason: str | None = None,
 ) -> DomainTopicSpec:
     """토픽 명세 생성"""
     if action != DomainTopicAction.DELETE and config is None:
@@ -73,7 +67,6 @@ def create_topic_spec(
         action=action,
         config=config,
         metadata=metadata,
-        reason=reason,
     )
 
 

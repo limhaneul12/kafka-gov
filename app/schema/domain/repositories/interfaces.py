@@ -41,6 +41,10 @@ class ISchemaRegistryRepository(ABC):
     async def delete_subject(self, subject: SubjectName) -> None:
         """Subject 삭제"""
 
+    @abstractmethod
+    async def list_all_subjects(self) -> list[SubjectName]:
+        """Schema Registry의 모든 Subject 목록 조회"""
+
 
 class ISchemaMetadataRepository(ABC):
     """스키마 메타데이터/Audit Repository 인터페이스"""
@@ -64,6 +68,14 @@ class ISchemaMetadataRepository(ABC):
     @abstractmethod
     async def save_upload_result(self, upload: DomainSchemaUploadResult, uploaded_by: str) -> None:
         """업로드 결과 저장"""
+
+    @abstractmethod
+    async def list_artifacts(self) -> list[DomainSchemaArtifact]:
+        """모든 스키마 아티팩트 목록 조회"""
+
+    @abstractmethod
+    async def delete_artifact_by_subject(self, subject: SubjectName) -> None:
+        """Subject별 아티팩트 삭제"""
 
 
 class ISchemaAuditRepository(ABC):

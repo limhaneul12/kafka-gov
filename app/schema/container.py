@@ -2,18 +2,14 @@
 
 from __future__ import annotations
 
-from typing import Annotated
-
 from dependency_injector import containers, providers
-from fastapi import Depends
-from sqlalchemy.ext.asyncio import AsyncSession
 
-from ..shared.container import infrastructure_container, shared_container
-from ..shared.database import get_db_session
 from .application.use_cases import (
     SchemaBatchApplyUseCase,
     SchemaBatchDryRunUseCase,
+    SchemaDeleteUseCase,
     SchemaPlanUseCase,
+    SchemaSyncUseCase,
     SchemaUploadUseCase,
 )
 from .domain.policies import SchemaPolicyEngine
@@ -32,9 +28,11 @@ from .infrastructure.storage.minio_adapter import create_minio_storage_adapter
 class SchemaContainer(containers.DeclarativeContainer):
     """Schema 모듈 DI 컨테이너"""
 
-    # 공통 컨테이너에서 설정 가져오기
-    config = providers.DependenciesContainer()
+    # 인프라스트럭처 컨테이너 참조
     infrastructure = providers.DependenciesContainer()
+
+    # Analysis 컨테이너 참조 (correlation_repository 사용)
+    analysis = providers.DependenciesContainer()
 
     # Repositories
     schema_registry_repository: providers.Provider[ISchemaRegistryRepository] = providers.Singleton(
@@ -42,23 +40,23 @@ class SchemaContainer(containers.DeclarativeContainer):
         client=infrastructure.schema_registry_client,
     )
 
-    # MySQL 기반 구현체들 (팩토리 함수 사용)
+    # MySQL 기반 구현체들 (Session Factory 패턴)
     metadata_repository: providers.Provider[ISchemaMetadataRepository] = providers.Factory(
         MySQLSchemaMetadataRepository,  # type: ignore[arg-type]
-        session=providers.Dependency(),  # 세션은 외부에서 주입
+        session_factory=infrastructure.database_manager.provided.get_db_session,
     )
 
     audit_repository: providers.Provider[ISchemaAuditRepository] = providers.Factory(
         MySQLSchemaAuditRepository,  # type: ignore[arg-type]
-        session=providers.Dependency(),  # 세션은 외부에서 주입
+        session_factory=infrastructure.database_manager.provided.get_db_session,
     )
 
     # Object Storage (MinIO)
     object_storage_repository: providers.Provider[IObjectStorageRepository] = providers.Singleton(
         create_minio_storage_adapter,
         client=infrastructure.minio_client,
-        bucket_name=config.storage_bucket_name,
-        base_url=config.storage_base_url,
+        bucket_name=infrastructure.bucket_name,
+        base_url=infrastructure.endpoint_url,
     )
 
     # Domain Services
@@ -92,60 +90,28 @@ class SchemaContainer(containers.DeclarativeContainer):
         storage_repository=object_storage_repository,
         metadata_repository=metadata_repository,
         audit_repository=audit_repository,
+        registry_repository=schema_registry_repository,
     )
 
-
-# 전역 컨테이너 인스턴스
-container = SchemaContainer()
-
-# 공통 컨테이너와 연결
-container.config.override(shared_container)
-container.infrastructure.override(infrastructure_container)
-
-
-# 타입 별칭 (Depends 패턴)
-DbSession = Annotated[AsyncSession, Depends(get_db_session)]
-
-
-async def get_schema_dry_run_use_case(session: DbSession) -> SchemaBatchDryRunUseCase:
-    """SchemaBatchDryRunUseCase 의존성 (세션 포함)"""
-    metadata_repo = MySQLSchemaMetadataRepository(session)
-    audit_repo = MySQLSchemaAuditRepository(session)
-    return SchemaBatchDryRunUseCase(
-        registry_repository=container.schema_registry_repository(),
-        metadata_repository=metadata_repo,  # type: ignore[arg-type]
-        audit_repository=audit_repo,  # type: ignore[arg-type]
-        policy_engine=container.policy_engine(),
+    delete_analysis_use_case: providers.Provider[SchemaDeleteUseCase] = providers.Factory(
+        SchemaDeleteUseCase,
+        registry_repository=schema_registry_repository,
+        metadata_repository=metadata_repository,
+        audit_repository=audit_repository,
+        correlation_repository=analysis.correlation_repository,
     )
 
-
-async def get_schema_apply_use_case(session: DbSession) -> SchemaBatchApplyUseCase:
-    """SchemaBatchApplyUseCase 의존성 (세션 포함)"""
-    metadata_repo = MySQLSchemaMetadataRepository(session)
-    audit_repo = MySQLSchemaAuditRepository(session)
-    return SchemaBatchApplyUseCase(
-        registry_repository=container.schema_registry_repository(),
-        metadata_repository=metadata_repo,  # type: ignore[arg-type]
-        audit_repository=audit_repo,  # type: ignore[arg-type]
-        storage_repository=container.object_storage_repository(),
-        policy_engine=container.policy_engine(),
+    sync_use_case: providers.Provider[SchemaSyncUseCase] = providers.Factory(
+        SchemaSyncUseCase,
+        registry_repository=schema_registry_repository,
+        metadata_repository=metadata_repository,
+        audit_repository=audit_repository,
     )
 
-
-async def get_schema_upload_use_case(session: DbSession) -> SchemaUploadUseCase:
-    """SchemaUploadUseCase 의존성 (세션 포함)"""
-    metadata_repo = MySQLSchemaMetadataRepository(session)
-    audit_repo = MySQLSchemaAuditRepository(session)
-    return SchemaUploadUseCase(
-        storage_repository=container.object_storage_repository(),
-        metadata_repository=metadata_repo,  # type: ignore[arg-type]
-        audit_repository=audit_repo,  # type: ignore[arg-type]
-    )
-
-
-def get_schema_plan_use_case(session: DbSession) -> SchemaPlanUseCase:
-    """SchemaPlanUseCase 의존성 (세션 포함)"""
-    metadata_repo = MySQLSchemaMetadataRepository(session)
-    return SchemaPlanUseCase(
-        metadata_repository=metadata_repo,  # type: ignore[arg-type]
+    delete_use_case: providers.Provider[SchemaDeleteUseCase] = providers.Factory(
+        SchemaDeleteUseCase,
+        registry_repository=schema_registry_repository,
+        metadata_repository=metadata_repository,
+        audit_repository=audit_repository,
+        correlation_repository=analysis.correlation_repository,
     )

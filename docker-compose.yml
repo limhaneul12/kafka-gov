@@ -41,29 +41,29 @@ services:
       - kafka-network
     restart: unless-stopped
 
-  # # 마이그레이션 전용 서비스
-  # migration:
-  #   build:
-  #     context: .
-  #     dockerfile: Dockerfile
-  #   environment:
-  #     - DATABASE_URL=mysql+aiomysql://kafka_gov:kafka_gov123@mysql:3306/kafka_gov_db
-  #     - KAFKA_BOOTSTRAP_SERVERS=kafka1:19092,kafka2:29092,kafka3:39092
-  #     - KAFKA_SCHEMA_REGISTRY_URL=http://schema-registry:8082
-  #     - JWT_SECRET_KEY=your-super-secret-jwt-key-change-in-production
-  #     - JWT_ALGORITHM=HS256
-  #     - JWT_ACCESS_TOKEN_EXPIRE_MINUTES=1440
-  #     - ENVIRONMENT=development
-  #     - LOG_LEVEL=INFO
-  #   depends_on:
-  #     mysql:
-  #       condition: service_healthy
-  #   volumes:
-  #     - ./static:/app/static
-  #   command: ["python", "scripts/init_db.py"]
-  #   networks:
-  #     - kafka-network
-  #   restart: "no"  # 한 번만 실행
+  # 마이그레이션 전용 서비스
+  migration:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      - DATABASE_URL=mysql+asyncmy://user:password@mysql:3306/kafka_gov?charset=utf8mb4
+      - KAFKA_BOOTSTRAP_SERVERS=kafka1:19092,kafka2:29092,kafka3:39092
+      - KAFKA_SCHEMA_REGISTRY_URL=http://schema-registry:8081
+      - JWT_SECRET_KEY=your-super-secret-jwt-key-change-in-production
+      - JWT_ALGORITHM=HS256
+      - JWT_ACCESS_TOKEN_EXPIRE_MINUTES=1440
+      - ENVIRONMENT=development
+      - LOG_LEVEL=INFO
+    depends_on:
+      mysql:
+        condition: service_healthy
+    volumes:
+      - ./script:/app/script
+    command: ["/app/script/migrate.sh"]
+    networks:
+      - kafka-network
+    restart: "no"  # 한 번만 실행
 
   app:
     build:
@@ -72,34 +72,47 @@ services:
     ports:
       - "8000:8000"
     environment:
-      - DATABASE_URL=mysql+aiomysql://kafka_gov:kafka_gov123@mysql:3306/kafka_gov_db
+      # Database 설정
+      - DB_HOST=mysql
+      - DB_PORT=3306
+      - DB_USERNAME=user
+      - DB_PASSWORD=password
+      - DB_DATABASE=kafka_gov
+      - DB_POOL_SIZE=10
+      - DB_MAX_OVERFLOW=20
+      - DB_ECHO=false
+      # App 설정
       - APP_DEBUG=true
       - APP_LOG_LEVEL=INFO
-      - SECRET_KEY=dev-secret-please-change-8c7f89bd5e434f6e9cfea5c1d2ab3d51
-      - JWT_ALGORITHM=HS256
-      - JWT_EXPIRE_MINUTES=30
+      - APP_ENVIRONMENT=development
       # Kafka 설정
       - KAFKA_BOOTSTRAP_SERVERS=kafka1:19092,kafka2:29092,kafka3:39092
-      - KAFKA_GROUP_ID=kafkaflow-backoffice-market
-      # MinIO 설정
-      - MINIO_ENDPOINT=minio:9000
-      - MINIO_ACCESS_KEY=minioadmin
-      - MINIO_SECRET_KEY=minioadmin123
-      - MINIO_SECURE=false
+      - KAFKA_SECURITY_PROTOCOL=PLAINTEXT
+      - KAFKA_REQUEST_TIMEOUT_MS=30000
+      - KAFKA_RETRIES=3
+      # Schema Registry 설정
+      - SCHEMA_REGISTRY_URL=http://schema-registry:8081
+      - SCHEMA_REGISTRY_TIMEOUT=30
+      # MinIO/Storage 설정
+      - STORAGE_ENDPOINT_URL=http://minio:9000
+      - STORAGE_ACCESS_KEY=minioadmin
+      - STORAGE_SECRET_KEY=minioadmin123
+      - STORAGE_BUCKET_NAME=kafka-gov-schemas
+      - STORAGE_REGION=us-east-1
+      - STORAGE_USE_SSL=false
     depends_on:
       mysql:
         condition: service_healthy
       minio:
         condition: service_healthy
-      # migration:
-      #   condition: service_completed_successfully
+      migration:
+        condition: service_completed_successfully
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 40s
-    # command: ["python", "scripts/start_server.py"]
     networks:
       - kafka-network
     restart: unless-stopped
@@ -112,4 +125,4 @@ volumes:
 
 networks:
   kafka-network:
-    driver: bridge
+    external: true

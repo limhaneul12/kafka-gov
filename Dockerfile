@@ -1,49 +1,37 @@
 # Use Python 3.12 slim image
 FROM python:3.12-slim
 
-# Install system dependencies
 RUN apt-get update && apt-get install -y \
-    curl \
-    default-mysql-client \
+    curl default-mysql-client \
+    build-essential \
     && rm -rf /var/lib/apt/lists/*
 
 # Install uv
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /bin/uv
 
-# Set working directory
 WORKDIR /app
-
-# Set uv environment variables for optimal performance
 ENV UV_COMPILE_BYTECODE=1
 ENV UV_LINK_MODE=copy
 ENV UV_CACHE_DIR=/tmp/uv-cache
 
-# Copy dependency files (uv only needs pyproject.toml and uv.lock)
 COPY pyproject.toml uv.lock ./
+RUN --mount=type=cache,target=/tmp/uv-cache uv sync --frozen --no-dev
 
-# Install dependencies using uv sync (faster than pip)
-RUN --mount=type=cache,target=/tmp/uv-cache \
-    uv sync --frozen --no-dev
-
-# Copy application code
+# 앱 코드 및 설정 복사
 COPY app/ ./app/
 COPY static/ ./static/
+COPY script/ ./script/
+COPY alembic.ini ./
+# ★ 여기가 포인트: 레포의 migrations 폴더를 그대로 이미지에 포함
+COPY migrations/ ./migrations/
 
-# Copy optional files (if they exist)
-COPY alembic* ./
-COPY scripts* ./
-
-# Create non-root user
-RUN useradd --create-home --shell /bin/bash app && \
-    chown -R app:app /app
+# 권한/사용자 설정
+RUN useradd --create-home --shell /bin/bash app && chown -R app:app /app
 USER app
 
-# Expose port
 EXPOSE 8000
 
-# Health check
 HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
     CMD curl -f http://localhost:8000/health || exit 1
 
-# Run the application using uv
 CMD ["uv", "run", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]

@@ -8,9 +8,9 @@ import pytest
 @pytest.mark.unit
 def test_container_import():
     """지연 로딩 제거 검증 - container import 성공"""
-    from app.shared.container import infrastructure_container
+    from app.shared.container import InfrastructureContainer
 
-    assert infrastructure_container is not None
+    assert InfrastructureContainer is not None
 
 
 @pytest.mark.unit
@@ -36,22 +36,7 @@ def test_authorization_function():
         validate_action(UserRole.VIEWER, "delete")
 
 
-@pytest.mark.unit
-def test_extract_resource_name():
-    """중복 코드 제거 검증 - extract_resource_name 함수"""
-    from app.policy.domain.models import DomainResourceType, extract_resource_name
-
-    # Topic 이름 추출
-    topic_target = {"name": "test-topic", "partitions": 3}
-    assert extract_resource_name(topic_target, DomainResourceType.TOPIC) == "test-topic"
-
-    # Schema subject 추출
-    schema_target = {"subject": "test-subject", "schema": "{}"}
-    assert extract_resource_name(schema_target, DomainResourceType.SCHEMA) == "test-subject"
-
-    # 지원하지 않는 타입
-    with pytest.raises(ValueError, match="unsupported resource type"):
-        extract_resource_name({}, "UNKNOWN")  # type: ignore
+# Policy 모듈 제거로 인해 extract_resource_name 테스트 제거됨
 
 
 @pytest.mark.unit

@@ -28,13 +28,3 @@ class CleanupPolicy(str, Enum):
     DELETE = "delete"
     COMPACT = "compact"
     COMPACT_DELETE = "compact,delete"
-
-
-class CompressionType(str, Enum):
-    """압축 타입"""
-
-    NONE = "none"
-    GZIP = "gzip"
-    SNAPPY = "snappy"
-    LZ4 = "lz4"
-    ZSTD = "zstd"

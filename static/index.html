@@ -33,16 +33,9 @@
                         <i class="fas fa-code"></i>
                         스키마 관리
                     </a>
-                    <a href="#policies" class="nav-link" data-tab="policies">
-                        <i class="fas fa-shield-alt"></i>
-                        정책 관리
-                    </a>
                 </nav>
                 <div class="user-menu">
                     <div class="user-actions">
-                        <div id="connection-status" class="connection-status disconnected">
-                            <i class="fas fa-wifi-slash"></i> 연결 끊김
-                        </div>
                         <a href="/static/settings.html" class="btn-icon" title="설정">
                             <i class="fas fa-cog"></i>
                         </a>
@@ -73,7 +66,7 @@
                         </div>
                         <div class="stat-content">
                             <h3 id="topic-count">-</h3>
-                            <p>총 토픽 수</p>
+                            <p>등록한 토픽 수</p>
                         </div>
                     </div>
                     <div class="stat-card">
@@ -87,20 +80,11 @@
                     </div>
                     <div class="stat-card">
                         <div class="stat-icon">
-                            <i class="fas fa-shield-alt"></i>
+                            <i class="fas fa-link"></i>
                         </div>
                         <div class="stat-content">
-                            <h3 id="policy-count">-</h3>
-                            <p>활성 정책</p>
-                        </div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-icon">
-                            <i class="fas fa-exclamation-triangle"></i>
-                        </div>
-                        <div class="stat-content">
-                            <h3 id="violation-count">-</h3>
-                            <p>정책 위반</p>
+                            <h3 id="correlation-count">-</h3>
+                            <p>연결 관계</p>
                         </div>
                     </div>
                 </div>
@@ -109,52 +93,21 @@
                     <div class="dashboard-card">
                         <div class="card-header">
                             <h3>최근 활동</h3>
-                            <button class="btn-icon">
+                            <button class="btn-icon" id="refresh-activities-btn" title="새로고침">
                                 <i class="fas fa-refresh"></i>
                             </button>
                         </div>
                         <div class="activity-list" id="recent-activities">
-                            <div class="activity-item">
-                                <div class="activity-icon success">
-                                    <i class="fas fa-plus"></i>
-                                </div>
-                                <div class="activity-content">
-                                    <p><strong>user-events</strong> 토픽이 생성되었습니다</p>
-                                    <small>5분 전</small>
-                                </div>
-                            </div>
-                            <div class="activity-item">
-                                <div class="activity-icon warning">
-                                    <i class="fas fa-exclamation"></i>
-                                </div>
-                                <div class="activity-content">
-                                    <p><strong>payment-schema</strong>에서 정책 위반 감지</p>
-                                    <small>15분 전</small>
-                                </div>
-                            </div>
+                            <!-- 최근 활동 항목이 동적으로 렌더링됩니다. -->
                         </div>
                     </div>
 
                     <div class="dashboard-card">
                         <div class="card-header">
-                            <h3>환경별 상태</h3>
+                            <h3>클러스터 상태</h3>
                         </div>
-                        <div class="env-status">
-                            <div class="env-item">
-                                <div class="env-indicator success"></div>
-                                <span>DEV</span>
-                                <span class="env-count">12 토픽</span>
-                            </div>
-                            <div class="env-item">
-                                <div class="env-indicator success"></div>
-                                <span>STG</span>
-                                <span class="env-count">8 토픽</span>
-                            </div>
-                            <div class="env-item">
-                                <div class="env-indicator warning"></div>
-                                <span>PROD</span>
-                                <span class="env-count">25 토픽</span>
-                            </div>
+                        <div class="env-status" id="env-status">
+                            <!-- 클러스터 상태 정보가 동적으로 렌더링됩니다. -->
                         </div>
                     </div>
                 </div>
@@ -165,26 +118,44 @@
                 <div class="page-header">
                     <h1>토픽 관리</h1>
                     <div class="page-actions">
-                        <button class="btn btn-primary" id="create-topic-btn">
+                        <button class="btn btn-danger" id="bulk-delete-topics-btn" style="display: none;">
+                            <i class="fas fa-trash"></i>
+                            선택 삭제 (<span id="selected-count">0</span>)
+                        </button>
+                        <button class="btn btn-secondary" id="sync-topics-btn" title="Kafka에서 토픽 목록 동기화">
+                            <i class="fas fa-sync-alt"></i>
+                            동기화
+                        </button>
+                        <button class="btn btn-primary" id="create-single-topic-btn">
                             <i class="fas fa-plus"></i>
-                            토픽 생성
+                            단일 토픽 생성
+                        </button>
+                        <button class="btn btn-primary" id="batch-topic-btn">
+                            <i class="fas fa-layer-group"></i>
+                            배치 작업 실행
                         </button>
                     </div>
                 </div>
 
                 <div class="filters">
                     <div class="filter-group">
-                        <label>환경</label>
-                        <select id="topic-env-filter">
-                            <option value="">전체</option>
-                            <option value="dev">DEV</option>
-                            <option value="stg">STG</option>
-                            <option value="prod">PROD</option>
-                        </select>
+                        <label>
+                            <i class="fas fa-search"></i>
+                            검색
+                        </label>
+                        <input type="text" id="topic-search" placeholder="토픽명 검색...">
                     </div>
                     <div class="filter-group">
-                        <label>검색</label>
-                        <input type="text" id="topic-search" placeholder="토픽명 검색...">
+                        <label>
+                            <i class="fas fa-server"></i>
+                            환경
+                        </label>
+                        <select id="topic-env-filter">
+                            <option value="">전체</option>
+                            <option value="dev">개발(dev)</option>
+                            <option value="stg">스테이징(stg)</option>
+                            <option value="prod">프로덕션(prod)</option>
+                        </select>
                     </div>
                 </div>
 
@@ -192,13 +163,16 @@
                     <table class="data-table">
                         <thead>
                             <tr>
+                                <th style="width: 40px;">
+                                    <input type="checkbox" id="topic-select-all" title="전체 선택">
+                                </th>
                                 <th>토픽명</th>
                                 <th>환경</th>
-                                <th>파티션</th>
-                                <th>복제 팩터</th>
-                                <th>소유자</th>
-                                <th>상태</th>
-                                <th>작업</th>
+                                <th>키 스키마</th>
+                                <th>값 스키마</th>
+                                <th>신뢰도</th>
+                                <th>출처</th>
+                                <th>상세</th>
                             </tr>
                         </thead>
                         <tbody id="topics-table-body">
@@ -213,6 +187,10 @@
                 <div class="page-header">
                     <h1>스키마 관리</h1>
                     <div class="page-actions">
+                        <button class="btn btn-secondary" id="sync-schemas-btn" title="Schema Registry에서 스키마 목록 동기화">
+                            <i class="fas fa-sync-alt"></i>
+                            동기화
+                        </button>
                         <button class="btn btn-primary" id="upload-schema-btn">
                             <i class="fas fa-upload"></i>
                             스키마 업로드
@@ -222,16 +200,34 @@
 
                 <div class="filters">
                     <div class="filter-group">
-                        <label>Subject</label>
+                        <label>
+                            <i class="fas fa-search"></i>
+                            Subject
+                        </label>
                         <input type="text" id="schema-search" placeholder="Subject 검색...">
                     </div>
                     <div class="filter-group">
-                        <label>타입</label>
+                        <label>
+                            <i class="fas fa-file-code"></i>
+                            타입
+                        </label>
                         <select id="schema-type-filter">
                             <option value="">전체</option>
                             <option value="AVRO">AVRO</option>
                             <option value="JSON">JSON</option>
                             <option value="PROTOBUF">PROTOBUF</option>
+                        </select>
+                    </div>
+                    <div class="filter-group">
+                        <label>
+                            <i class="fas fa-server"></i>
+                            환경
+                        </label>
+                        <select id="schema-env-filter">
+                            <option value="">전체</option>
+                            <option value="dev">개발(dev)</option>
+                            <option value="stg">스테이징(stg)</option>
+                            <option value="prod">프로덕션(prod)</option>
                         </select>
                     </div>
                 </div>
@@ -241,11 +237,12 @@
                         <thead>
                             <tr>
                                 <th>Subject</th>
-                                <th>버전</th>
-                                <th>타입</th>
-                                <th>호환성</th>
-                                <th>등록일</th>
-                                <th>작업</th>
+                                <th>환경</th>
+                                <th>연관 토픽</th>
+                                <th>평균 신뢰도</th>
+                                <th>출처</th>
+                                <th>분석</th>
+                                <th>삭제</th>
                             </tr>
                         </thead>
                         <tbody id="schemas-table-body">
@@ -255,92 +252,22 @@
                 </div>
             </div>
 
-            <!-- 정책 관리 탭 -->
-            <div id="policies" class="tab-content">
-                <div class="page-header">
-                    <h1>정책 관리</h1>
-                    <div class="page-actions">
-                        <button class="btn btn-secondary" id="init-policies-btn">
-                            <i class="fas fa-sync"></i>
-                            기본 정책 초기화
-                        </button>
-                    </div>
-                </div>
-
-                <div class="policy-grid">
-                    <div class="policy-card">
-                        <div class="policy-header">
-                            <h3>네이밍 규칙</h3>
-                            <span class="policy-status active">활성</span>
-                        </div>
-                        <div class="policy-content">
-                            <p>토픽과 스키마의 네이밍 규칙을 관리합니다.</p>
-                            <ul class="policy-rules">
-                                <li>소문자와 하이픈만 허용</li>
-                                <li>최대 길이 64자</li>
-                                <li>예약어 사용 금지</li>
-                            </ul>
-                        </div>
-                    </div>
-
-                    <div class="policy-card">
-                        <div class="policy-header">
-                            <h3>설정 규칙</h3>
-                            <span class="policy-status active">활성</span>
-                        </div>
-                        <div class="policy-content">
-                            <p>토픽 설정값의 유효성을 검증합니다.</p>
-                            <ul class="policy-rules">
-                                <li>최소 복제 팩터: 3 (PROD)</li>
-                                <li>최대 파티션 수: 100</li>
-                                <li>보존 기간 제한</li>
-                            </ul>
-                        </div>
-                    </div>
-
-                    <div class="policy-card">
-                        <div class="policy-header">
-                            <h3>환경별 정책</h3>
-                            <span class="policy-status active">활성</span>
-                        </div>
-                        <div class="policy-content">
-                            <p>환경별로 다른 정책을 적용합니다.</p>
-                            <ul class="policy-rules">
-                                <li>DEV: 관대한 정책</li>
-                                <li>STG: 중간 수준 정책</li>
-                                <li>PROD: 엄격한 정책</li>
-                            </ul>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="violations-section">
-                    <h3>최근 정책 위반</h3>
-                    <div class="violations-list" id="violations-list">
-                        <!-- 동적으로 생성 -->
-                    </div>
-                </div>
-            </div>
         </div>
     </main>
 
     <!-- 모달들 -->
-    <!-- 토픽 생성 모달 -->
-    <div id="create-topic-modal" class="modal">
+    <!-- 단일 토픽 생성 모달 -->
+    <div id="create-single-topic-modal" class="modal">
         <div class="modal-content">
             <div class="modal-header">
-                <h3>토픽 생성</h3>
+                <h3>단일 토픽 생성</h3>
                 <button class="modal-close">&times;</button>
             </div>
             <div class="modal-body">
-                <form id="create-topic-form">
+                <form id="create-single-topic-form">
                     <div class="form-group">
-                        <label for="topic-name">토픽명</label>
-                        <input type="text" id="topic-name" required>
-                    </div>
-                    <div class="form-group">
-                        <label for="topic-env">환경</label>
-                        <select id="topic-env" required>
+                        <label for="single-topic-env">환경 *</label>
+                        <select id="single-topic-env" name="single-topic-env" required>
                             <option value="">선택하세요</option>
                             <option value="dev">DEV</option>
                             <option value="stg">STG</option>
@@ -348,22 +275,178 @@
                         </select>
                     </div>
                     <div class="form-group">
-                        <label for="topic-partitions">파티션 수</label>
-                        <input type="number" id="topic-partitions" min="1" value="3">
+                        <label for="single-topic-name">토픽명 *</label>
+                        <input type="text" id="single-topic-name" name="single-topic-name" 
+                               placeholder="예: orders.created 또는 dev.orders.created" 
+                               pattern="^[a-z0-9._-]+$"
+                               required>
+                        <small>형식: 소문자, 숫자, ., _, - 만 사용 가능</small>
                     </div>
                     <div class="form-group">
-                        <label for="topic-replication">복제 팩터</label>
-                        <input type="number" id="topic-replication" min="1" value="3">
+                        <label for="single-topic-partitions">파티션 수 *</label>
+                        <input type="number" id="single-topic-partitions" name="single-topic-partitions" min="1" value="3" required>
                     </div>
                     <div class="form-group">
-                        <label for="topic-description">설명</label>
-                        <textarea id="topic-description" rows="3"></textarea>
+                        <label for="single-topic-replication">복제 계수 *</label>
+                        <input type="number" id="single-topic-replication" name="single-topic-replication" min="1" value="3" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="single-topic-min-insync">Min In-Sync Replicas *</label>
+                        <input type="number" id="single-topic-min-insync" name="single-topic-min-insync" min="1" value="2" required>
+                        <small>Production 환경에서는 최소 2 이상 권장</small>
+                    </div>
+                    <div class="form-group">
+                        <label for="single-topic-owner">소유자 *</label>
+                        <input type="text" id="single-topic-owner" name="single-topic-owner" placeholder="예: team-commerce" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="single-topic-doc">문서 URL</label>
+                        <input type="url" id="single-topic-doc" name="single-topic-doc" placeholder="https://wiki.example.com">
+                    </div>
+                    <div class="form-group">
+                        <label for="single-topic-tags">태그</label>
+                        <input type="text" id="single-topic-tags" name="single-topic-tags" placeholder="tag1, tag2, tag3">
                     </div>
                 </form>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" id="cancel-topic">취소</button>
-                <button type="submit" class="btn btn-primary" form="create-topic-form">생성</button>
+                <button type="button" class="btn btn-secondary"
+                    onclick="Modal.hide('create-single-topic-modal')">취소</button>
+                <button type="submit" class="btn btn-primary" form="create-single-topic-form">생성</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 배치 작업 모달 -->
+    <div id="batch-topic-modal" class="modal">
+        <div class="modal-content large">
+            <div class="modal-header">
+                <h3>토픽 배치 작업</h3>
+                <button class="modal-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="batch-tabs">
+                    <button class="batch-tab active" data-tab="dry-run">1. Dry Run</button>
+                    <button class="batch-tab" data-tab="apply">2. 적용</button>
+                </div>
+
+                <div id="dry-run-tab" class="batch-tab-content active">
+                    <div class="batch-input-tabs">
+                        <button type="button" class="batch-input-tab active" data-input="manual">수동 입력</button>
+                        <button type="button" class="batch-input-tab" data-input="yaml">YAML 업로드</button>
+                    </div>
+
+                    <!-- 수동 입력 -->
+                    <div id="manual-input" class="batch-input-content active">
+                        <form id="batch-dry-run-form">
+                            <div class="form-group">
+                                <label for="batch-env">환경</label>
+                                <select id="batch-env" required>
+                                    <option value="">선택하세요</option>
+                                    <option value="dev">DEV</option>
+                                    <option value="stg">STG</option>
+                                    <option value="prod">PROD</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="batch-change-id">변경 ID</label>
+                                <input type="text" id="batch-change-id" placeholder="변경 식별자" required>
+                            </div>
+                            <div class="form-group">
+                                <label>작업 목록</label>
+                                <div class="batch-items" id="batch-items">
+                                    <div class="batch-item">
+                                        <div class="batch-item-row batch-item-header">
+                                            <label>
+                                                작업
+                                                <select class="batch-action">
+                                                    <option value="CREATE">생성</option>
+                                                    <option value="UPDATE">수정</option>
+                                                    <option value="UPSERT">업서트</option>
+                                                    <option value="DELETE">삭제</option>
+                                                </select>
+                                            </label>
+                                            <button type="button" class="btn-icon remove-batch-item" title="행 제거">
+                                                <i class="fas fa-trash"></i>
+                                            </button>
+                                        </div>
+                                        <div class="batch-item-row">
+                                            <label>토픽명
+                                                <input type="text" class="batch-topic-name" placeholder="env.topic.name"
+                                                    required>
+                                            </label>
+                                            <label>파티션
+                                                <input type="number" class="batch-partitions" min="1" value="3"
+                                                    required>
+                                            </label>
+                                            <label>복제
+                                                <input type="number" class="batch-replication" min="1" value="3"
+                                                    required>
+                                            </label>
+                                        </div>
+                                        <div class="batch-item-row metadata-fields">
+                                            <label>소유자
+                                                <input type="text" class="batch-owner" placeholder="team-service"
+                                                    required>
+                                            </label>
+                                            <label>문서 URL
+                                                <input type="url" class="batch-doc" placeholder="https://...">
+                                            </label>
+                                        </div>
+                                        <div class="batch-item-row metadata-fields">
+                                            <label>태그
+                                                <input type="text" class="batch-tags" placeholder="tag1, tag2">
+                                            </label>
+                                        </div>
+                                    </div>
+                                </div>
+                                <button type="button" class="btn btn-secondary" id="add-batch-item">작업 추가</button>
+                            </div>
+                        </form>
+                    </div>
+
+                    <!-- YAML 업로드 -->
+                    <div id="yaml-input" class="batch-input-content">
+                        <form id="batch-yaml-form">
+                            <div class="form-group">
+                                <label for="batch-yaml-file">YAML 파일 업로드</label>
+                                <input type="file" id="batch-yaml-file" accept=".yml,.yaml" required>
+                                <small>토픽 배치 정의 YAML 파일을 선택하세요</small>
+                            </div>
+                            <div class="form-group">
+                                <label>YAML 예시</label>
+                                <pre style="background: #f5f5f5; padding: 1rem; border-radius: 4px; overflow-x: auto;">kind: TopicBatch
+env: prod
+change_id: "2025-10-02_001"
+items:
+  - name: prod.orders.created
+    action: create
+    config:
+      partitions: 12
+      replication_factor: 3
+      retention_ms: 604800000
+    metadata:
+      owner: team-commerce
+      doc: "https://wiki.example.com"
+      tags: ["orders", "events"]</pre>
+                            </div>
+                            <div id="yaml-preview" style="display: none;">
+                                <h4>파싱 결과 미리보기</h4>
+                                <pre id="yaml-preview-content"
+                                    style="background: #f5f5f5; padding: 1rem; border-radius: 4px; max-height: 300px; overflow: auto;"></pre>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+
+                <div id="apply-tab" class="batch-tab-content">
+                    <div class="plan-results" id="plan-results"></div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" id="cancel-batch">취소</button>
+                <button type="button" class="btn btn-primary" id="run-dry-run">Dry Run 실행</button>
+                <button type="button" class="btn btn-success" id="apply-batch" style="display: none;">변경 적용</button>
             </div>
         </div>
     </div>
@@ -378,31 +461,74 @@
             <div class="modal-body">
                 <form id="upload-schema-form">
                     <div class="form-group">
+                        <label for="schema-env">환경</label>
+                        <select id="schema-env" required>
+                            <option value="">선택하세요</option>
+                            <option value="dev">DEV</option>
+                            <option value="stg">STG</option>
+                            <option value="prod">PROD</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="schema-change-id">변경 ID</label>
+                        <input type="text" id="schema-change-id" placeholder="예: 2025-09-30_001" required>
+                    </div>
+                    <div class="form-group">
                         <label for="schema-files">스키마 파일</label>
-                        <input type="file" id="schema-files" multiple accept=".avsc,.json,.proto">
-                        <small>AVRO (.avsc), JSON (.json), Protobuf (.proto) 파일을 선택하세요</small>
+                        <input type="file" id="schema-files" multiple accept=".avsc,.json,.proto,.zip">
+                        <small>AVRO (.avsc), JSON (.json), Protobuf (.proto), ZIP 번들을 선택하세요</small>
                     </div>
                     <div class="file-list" id="selected-files"></div>
                 </form>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" id="cancel-schema">취소</button>
                 <button type="submit" class="btn btn-primary" form="upload-schema-form">업로드</button>
             </div>
         </div>
     </div>
 
-    <!-- 로딩 스피너 -->
-    <div id="loading" class="loading">
-        <div class="spinner"></div>
+    <!-- 스키마 삭제 분석 모달 -->
+    <div id="schema-delete-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>스키마 삭제 영향도 분석</h3>
+                <button class="modal-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div id="delete-analysis-results"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" id="cancel-delete-analysis">취소</button>
+                <button type="button" class="btn btn-danger" id="force-delete-schema" style="display: none;">강제
+                    삭제</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 토픽 상세 모달 -->
+    <div id="topic-detail-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>토픽 상세 정보</h3>
+                <button class="modal-close">&times;</button>
+            </div>
+            <div class="modal-body" id="topic-detail-content"></div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="Modal.hide('topic-detail-modal')">닫기</button>
+            </div>
+        </div>
     </div>
 
     <!-- 토스트 알림 -->
     <div id="toast-container" class="toast-container"></div>
 
+    <!-- 로딩 오버레이 -->
+    <div id="loading" class="loading">
+        <div class="spinner"></div>
+    </div>
+
     <script src="/static/js/api.js"></script>
     <script src="/static/js/components.js"></script>
-    <script src="/static/js/websocket.js"></script>
     <script src="/static/js/app.js"></script>
 </body>
 

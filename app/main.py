@@ -6,15 +6,15 @@ import logging
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import ORJSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
 from .analysis.interface.router import router as analysis_router
-from .policy import policy_router, policy_use_case_factory
+from .container import AppContainer, register_event_handlers
 from .schema.interface.router import router as schema_router
-from .shared.database import get_db_session
+from .shared.interface.router import router as shared_router
 from .topic.interface.router import router as topic_router
 
 logger = logging.getLogger(__name__)
@@ -23,82 +23,100 @@ logger = logging.getLogger(__name__)
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """애플리케이션 생명주기 관리"""
-    # 시작 시 초기화
+    container = app.state.container  # type: ignore[attr-defined]
+
     try:
-        # Policy 기본 정책 초기화
-        await policy_use_case_factory.initialize_default_policies()
-        logger.info("Policy 기본 정책이 초기화되었습니다.")
+        container.init_resources()
+        register_event_handlers(container)
 
-        # Analysis 이벤트 핸들러 등록
-        from .analysis.container import register_event_handlers
-
-        async for session in get_db_session():
-            register_event_handlers(session)
-            logger.info("Analysis 이벤트 핸들러가 등록되었습니다.")
-            break
-
-    except Exception as e:
-        logger.error(f"초기화 중 오류 발생: {e}", exc_info=True)
-
-    yield
-
-    # 종료 시 정리 작업 (필요시)
+        logger.info("컨테이너 초기화 및 이벤트 핸들러 등록 완료")
+        yield
+    except Exception:
+        logger.exception("초기화 중 오류 발생")
+        raise
+    finally:
+        # Resource 종료
+        container.shutdown_resources()
+        logger.info("리소스 정리 완료")
 
 
 def create_app() -> FastAPI:
-    """FastAPI 애플리케이션 생성"""
     app = FastAPI(
         default_response_class=ORJSONResponse,
         title="Kafka Governance API",
         description="Kafka Topic / Schema Registry 관리용 API",
         version="0.1.0",
-        docs_url="/swagger",  # Swagger 경로 변경 (기본은 /docs)
+        docs_url="/swagger",
         redoc_url="/redoc",
         lifespan=lifespan,
         swagger_ui_parameters={
-            "defaultModelsExpandDepth": -1,  # 모델 섹션 기본 접기
-            "defaultModelRendering": "example",  # Example 뷰 기본
-            "displayRequestDuration": True,  # 요청-응답 시간 표시
-            "docExpansion": "none",  # 전체 접기
-            "syntaxHighlight.theme": "obsidian",  # 다크 테마
-            "persistAuthorization": True,  # Authorize 토큰 유지
+            "defaultModelsExpandDepth": -1,
+            "defaultModelRendering": "example",  # ← 유효한 값으로 교체
+            "displayRequestDuration": True,
+            "docExpansion": "none",
+            "syntaxHighlight.theme": "obsidian",
+            "persistAuthorization": True,
         },
     )
-    # CORS 설정
+
+    # CORS
     app.add_middleware(
         CORSMiddleware,  # type: ignore[arg-type]
-        allow_origins=["*"],  # 운영에서는 구체적인 도메인 지정
+        allow_origins=["*"],  # 운영에선 화이트리스트 권장
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
     )
 
-    # 정적 파일 서빙
+    # 정적 파일
     app.mount("/static", StaticFiles(directory="static"), name="static")
 
+    # ✅ 컨테이너 인스턴스 생성 & 보관
+    container = AppContainer()
+    app.state.container = container
+
+    # (선택) 하위 컨테이너 인스턴스를 접근 용도로 보관하고 싶다면 호출해서 저장
+    app.state.infrastructure_container = container.infrastructure_container()
+    app.state.topic_container = container.topic_container()
+    app.state.schema_container = container.schema_container()
+    app.state.analysis_container = container.analysis_container()
+
+    # ✅ (중요) 와이어링 - wiring_config가 있으면 생략 가능하지만,
+    # 명시적으로 호출하면 import 타이밍 이슈를 줄일 수 있음
+    container.wire(
+        packages=[
+            # 라우터/핸들러 패키지들
+            "app.topic.interface",
+            "app.schema.interface",
+            "app.analysis.interface",
+            "app.shared.interface",
+            "app.analysis.application",
+        ]
+    )
+
     # 라우터 등록
+    app.include_router(shared_router, prefix="/api")
     app.include_router(topic_router, prefix="/api")
     app.include_router(schema_router, prefix="/api")
-    app.include_router(policy_router, prefix="/api")
-    app.include_router(analysis_router, prefix="/api")  # 🆕 Analysis 라우터
+    app.include_router(analysis_router, prefix="/api")
 
     @app.get("/")
     async def root() -> RedirectResponse:
-        """루트 엔드포인트 - 프론트엔드로 리다이렉트"""
         return RedirectResponse(url="/static/index.html")
 
     @app.get("/api")
     async def api_info() -> dict[str, str]:
-        """API 정보 엔드포인트"""
         return {"message": "Kafka Governance API", "version": "1.0.0"}
 
     @app.get("/health")
     async def health_check() -> dict[str, str]:
-        """헬스 체크 엔드포인트"""
         return {"status": "healthy"}
+
+    @app.exception_handler(404)
+    async def not_found_exception_handler(request: Request, exc: Exception):
+        return ORJSONResponse(status_code=404, content={"message": "Not Found"})
 
     return app
 
 
-# 애플리케이션 인스턴스 생성
 app = create_app()

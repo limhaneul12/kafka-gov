@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
-from pydantic import TypeAdapter, ValidationError
+import logging
+
+import msgspec
 
 from ..domain.models import (
     DomainTopicAction,
@@ -26,16 +28,6 @@ from .schema import (
 class TopicTypeAdapters:
     """Topic 모듈 TypeAdapter 컬렉션"""
 
-    # Domain 모델 어댑터들
-    topic_spec_adapter: TypeAdapter[DomainTopicSpec] = TypeAdapter(DomainTopicSpec)
-    topic_config_adapter: TypeAdapter[DomainTopicConfig] = TypeAdapter(DomainTopicConfig)
-    topic_metadata_adapter: TypeAdapter[DomainTopicMetadata] = TypeAdapter(DomainTopicMetadata)
-    topic_batch_adapter: TypeAdapter[DomainTopicBatch] = TypeAdapter(DomainTopicBatch)
-
-    # Interface 모델 어댑터들
-    topic_item_adapter: TypeAdapter[TopicItem] = TypeAdapter(TopicItem)
-    topic_batch_request_adapter: TypeAdapter[TopicBatchRequest] = TypeAdapter(TopicBatchRequest)
-
     @classmethod
     def convert_item_to_spec(cls, item: TopicItem) -> DomainTopicSpec:
         """TopicItem을 DomainTopicSpec으로 안전하게 변환
@@ -57,24 +49,22 @@ class TopicTypeAdapters:
                     "partitions": item.config.partitions,
                     "replication_factor": item.config.replication_factor,
                     "cleanup_policy": item.config.cleanup_policy,
-                    "compression_type": item.config.compression_type,
                     "retention_ms": item.config.retention_ms,
                     "min_insync_replicas": item.config.min_insync_replicas,
                     "max_message_bytes": item.config.max_message_bytes,
                     "segment_ms": item.config.segment_ms,
                 }
-                domain_config = cls.topic_config_adapter.validate_python(config_data)
+                domain_config = msgspec.convert(config_data, DomainTopicConfig)
 
             # 메타데이터 변환
             domain_metadata = None
             if item.metadata:
                 metadata_data = {
                     "owner": item.metadata.owner,
-                    "sla": item.metadata.sla,
                     "doc": item.metadata.doc,
                     "tags": tuple(item.metadata.tags),
                 }
-                domain_metadata = cls.topic_metadata_adapter.validate_python(metadata_data)
+                domain_metadata = msgspec.convert(metadata_data, DomainTopicMetadata)
 
             # TopicSpec 생성
             spec_data = {
@@ -82,12 +72,11 @@ class TopicTypeAdapters:
                 "action": DomainTopicAction(item.action.value),
                 "config": domain_config,
                 "metadata": domain_metadata,
-                "reason": item.reason,
             }
 
-            return cls.topic_spec_adapter.validate_python(spec_data)
+            return msgspec.convert(spec_data, DomainTopicSpec)
 
-        except ValidationError as e:
+        except msgspec.ValidationError as e:
             raise ValueError(f"Failed to convert TopicItem to TopicSpec: {e}") from e
 
     @classmethod
@@ -114,9 +103,9 @@ class TopicTypeAdapters:
                 "specs": specs,
             }
 
-            return cls.topic_batch_adapter.validate_python(batch_data)
+            return msgspec.convert(batch_data, DomainTopicBatch)
 
-        except ValidationError as e:
+        except msgspec.ValidationError as e:
             raise ValueError(f"Failed to convert TopicBatchRequest to TopicBatch: {e}") from e
 
     @classmethod
@@ -165,25 +154,21 @@ class TopicTypeAdapters:
         )
 
 
-# 전역 어댑터 인스턴스 (성능 최적화)
-topic_adapters = TopicTypeAdapters()
-
-
 def safe_convert_item_to_spec(item: TopicItem) -> DomainTopicSpec:
     """안전한 TopicItem → TopicSpec 변환 (전역 함수)"""
-    return topic_adapters.convert_item_to_spec(item)
+    return TopicTypeAdapters.convert_item_to_spec(item)
 
 
 def safe_convert_request_to_batch(request: TopicBatchRequest) -> DomainTopicBatch:
     """안전한 TopicBatchRequest → TopicBatch 변환 (전역 함수)"""
-    return topic_adapters.convert_request_to_batch(request)
+    return TopicTypeAdapters.convert_request_to_batch(request)
 
 
 def safe_convert_plan_to_response(
     plan: DomainTopicPlan, request: TopicBatchRequest
 ) -> TopicBatchDryRunResponse:
     """안전한 TopicPlan → TopicBatchDryRunResponse 변환 (전역 함수)"""
-    return topic_adapters.convert_plan_to_response(plan, request)
+    return TopicTypeAdapters.convert_plan_to_response(plan, request)
 
 
 # ===== Kafka 메타데이터 변환 유틸 =====
@@ -237,8 +222,6 @@ def kafka_metadata_to_interface_config(
 
     if (v := cfg.get("cleanup.policy")) is not None:
         data["cleanup_policy"] = v
-    if (v := cfg.get("compression.type")) is not None:
-        data["compression_type"] = v
     if (v := _to_int(cfg.get("retention.ms"))) is not None:
         data["retention_ms"] = v
     if (v := _to_int(cfg.get("min.insync.replicas"))) is not None:
@@ -250,7 +233,9 @@ def kafka_metadata_to_interface_config(
 
     try:
         return InterfaceTopicConfig.model_validate(data)
-    except Exception:
+    except Exception as e:
+        logger = logging.getLogger(__name__)
+        logger.error(f"Failed to convert to InterfaceTopicConfig. " f"data={data}, error={e}")
         return None
 
 
@@ -282,12 +267,13 @@ def kafka_metadata_to_core_metadata(
     created_at_s = str(created_at) if created_at is not None else None
 
     try:
-        return InterfaceKafkaCoreMetadata.model_validate(
+        return msgspec.convert(
             {
                 "partition_count": partitions,
                 "leader_replicas": replicas,
                 "created_at": created_at_s,
-            }
+            },
+            InterfaceKafkaCoreMetadata,
         )
     except Exception:
         return None

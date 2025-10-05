@@ -1,6 +1,6 @@
 """Topic Interface 타입 정의"""
 
-from .enums import CleanupPolicy, CompressionType, Environment, TopicAction
+from .enums import CleanupPolicy, Environment, TopicAction
 from .type_hints import (
     AuditId,
     ChangeId,
@@ -9,42 +9,27 @@ from .type_hints import (
     ErrorMessage,
     ErrorRule,
     ErrorSeverity,
-    MaxMessageBytes,
-    MinInsyncReplicas,
-    PartitionCount,
     PlanAction,
     PlanStatus,
-    ReasonText,
-    ReplicationFactor,
-    RetentionMs,
-    SegmentMs,
-    SlaRequirement,
     TagName,
     TeamName,
     TopicName,
 )
 
 __all__ = [
+    # Type hints
     "AuditId",
     "ChangeId",
+    # Enums
     "CleanupPolicy",
-    "CompressionType",
     "DocumentUrl",
     "Environment",
     "ErrorField",
     "ErrorMessage",
     "ErrorRule",
     "ErrorSeverity",
-    "MaxMessageBytes",
-    "MinInsyncReplicas",
-    "PartitionCount",
     "PlanAction",
     "PlanStatus",
-    "ReasonText",
-    "ReplicationFactor",
-    "RetentionMs",
-    "SegmentMs",
-    "SlaRequirement",
     "TagName",
     "TeamName",
     "TopicAction",

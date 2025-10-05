@@ -7,6 +7,7 @@ import hashlib
 import logging
 from collections.abc import Iterable
 
+import orjson
 from confluent_kafka.schema_registry import AsyncSchemaRegistryClient, Schema
 from confluent_kafka.schema_registry.error import SchemaRegistryError
 
@@ -162,6 +163,28 @@ class ConfluentSchemaRegistryAdapter(ISchemaRegistryRepository):
         try:
             schema_str: str = self._extract_schema_string(spec)
 
+            # 디버깅: 원본 스키마 정보 (WARNING으로 출력)
+            logger.warning(
+                f"[DEBUG] Registering schema for {spec.subject}:\n"
+                f"  - Original length: {len(schema_str)} chars\n"
+                f"  - Original bytes: {len(schema_str.encode('utf-8'))} bytes\n"
+                f"  - Schema type: {spec.schema_type.value}\n"
+                f"  - First 200 chars: {schema_str[:200]}"
+            )
+
+            # 스키마 문자열 정규화 (인코딩 문제 방지)
+            schema_str_before = schema_str
+            schema_str = self._normalize_schema_string(schema_str)
+
+            # 디버깅: 정규화 후 스키마 정보
+            logger.warning(
+                f"[DEBUG] After normalization:\n"
+                f"  - Normalized length: {len(schema_str)} chars\n"
+                f"  - Normalized bytes: {len(schema_str.encode('utf-8'))} bytes\n"
+                f"  - Changed: {schema_str != schema_str_before}\n"
+                f"  - First 200 chars: {schema_str[:200]}"
+            )
+
             # 참조 변환
             references_list: list[dict[str, int | str]] = [
                 Reference(
@@ -172,15 +195,29 @@ class ConfluentSchemaRegistryAdapter(ISchemaRegistryRepository):
                 for ref in spec.references
             ]
 
-            # 스키마 등록
+            # Schema 객체 생성
+            schema_obj = Schema(
+                schema_str=schema_str,
+                schema_type=spec.schema_type.value,
+                references=references_list,
+            )
+
+            # 디버깅: Schema 객체 정보
+            logger.warning(
+                f"[DEBUG] Schema object created:\n"
+                f"  - schema_str type: {type(schema_obj.schema_str)}\n"
+                f"  - schema_str length: {len(schema_obj.schema_str) if schema_obj.schema_str else 0}\n"
+                f"  - schema_type: {schema_obj.schema_type}"
+            )
+
+            # 스키마 등록 (normalize_schemas=True로 Schema Registry가 정규화 처리)
+            logger.warning("[DEBUG] Calling client.register_schema with normalize_schemas=True")
             schema_id = await self.client.register_schema(
                 subject_name=spec.subject,
-                schema=Schema(
-                    schema_str=schema_str,
-                    schema_type=spec.schema_type.value,
-                    references=references_list,
-                ),
+                schema=schema_obj,
+                normalize_schemas=True,  # Schema Registry가 정규화 처리
             )
+            logger.warning(f"[DEBUG] Registration successful! Schema ID: {schema_id}")
 
             # 등록된 버전 조회
             latest_version = await self.client.get_latest_version(spec.subject)
@@ -208,6 +245,16 @@ class ConfluentSchemaRegistryAdapter(ISchemaRegistryRepository):
         except SchemaRegistryError as e:
             logger.error(f"Failed to delete subject {subject}: {e}")
             raise RuntimeError(f"Subject deletion failed: {e}") from e
+
+    async def list_all_subjects(self) -> list[SubjectName]:
+        """Schema Registry의 모든 Subject 목록 조회"""
+        try:
+            subjects: list[str] = await self.client.get_subjects()
+            logger.info(f"Retrieved {len(subjects)} subjects from Schema Registry")
+            return subjects
+        except SchemaRegistryError as e:
+            logger.error(f"Failed to list all subjects: {e}")
+            raise RuntimeError(f"Failed to retrieve subjects: {e}") from e
 
     async def get_schema_versions(self, subject: SubjectName) -> list[int]:
         """Subject의 모든 버전 목록 조회"""
@@ -266,3 +313,32 @@ class ConfluentSchemaRegistryAdapter(ISchemaRegistryRepository):
     def _calculate_schema_hash(self, schema_str: str) -> str:
         """스키마 해시 계산"""
         return hashlib.sha256(schema_str.encode()).hexdigest()[:16]
+
+    def _normalize_schema_string(self, schema_str: str) -> str:
+        """스키마 문자열 정규화
+
+        - BOM 제거
+        - 앞뒤 공백 제거
+        - 유니코드 이스케이프 (Content-Length 버그 해결)
+        """
+        # BOM 제거
+        if schema_str.startswith("\ufeff"):
+            schema_str = schema_str[1:]
+
+        # 앞뒤 공백 제거
+        schema_str = schema_str.strip()
+
+        # JSON 파싱 후 ASCII로 재직렬화 (유니코드 이스케이프)
+        # 이렇게 하면 한글 등 멀티바이트 문자가 \uXXXX로 변환되어
+        # 문자 수 == 바이트 수가 되어 Content-Length 문제 해결
+        try:
+            parsed = orjson.loads(schema_str)
+            # orjson으로 압축 후 ASCII로 인코딩 (유니코드 이스케이프)
+            compressed = orjson.dumps(parsed).decode("utf-8")
+            # UTF-8 문자를 유니코드 이스케이프로 변환
+            schema_str = compressed.encode("ascii", "backslashreplace").decode("ascii")
+        except (orjson.JSONDecodeError, TypeError):
+            # JSON이 아니면 그대로 반환 (Protobuf 등)
+            pass
+
+        return schema_str

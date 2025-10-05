@@ -6,7 +6,6 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from app.topic.application.policy_integration import TopicPolicyAdapter
 from app.topic.domain.repositories.interfaces import (
     IAuditRepository,
     ITopicMetadataRepository,
@@ -42,13 +41,4 @@ def mock_audit_repository() -> IAuditRepository:
     """Mock Audit Repository"""
     mock = AsyncMock(spec=IAuditRepository)
     mock.log_topic_operation.return_value = "audit-123"
-    return mock
-
-
-@pytest.fixture
-def mock_policy_adapter() -> TopicPolicyAdapter:
-    """Mock Policy Adapter"""
-    mock = AsyncMock(spec=TopicPolicyAdapter)
-    mock.validate_topic_specs.return_value = []
-    mock.has_blocking_violations.return_value = False
     return mock

@@ -2,13 +2,17 @@
 
 from __future__ import annotations
 
+import logging
 import uuid
+from collections import defaultdict
 from typing import Any
 
 from ..domain.models import (
     ChangeId,
     DomainTopicApplyResult,
     DomainTopicBatch,
+    DomainTopicDetail,
+    DomainTopicMetadata,
     DomainTopicPlan,
     DomainTopicSpec,
     TopicName,
@@ -20,7 +24,6 @@ from ..domain.repositories.interfaces import (
     PlanMeta,
 )
 from ..domain.services import TopicPlannerService
-from .policy_integration import TopicPolicyAdapter
 
 
 class TopicBatchDryRunUseCase:
@@ -31,13 +34,11 @@ class TopicBatchDryRunUseCase:
         topic_repository: ITopicRepository,
         metadata_repository: ITopicMetadataRepository,
         audit_repository: IAuditRepository,
-        policy_adapter: TopicPolicyAdapter,
     ) -> None:
         self.topic_repository = topic_repository
         self.metadata_repository = metadata_repository
         self.audit_repository = audit_repository
-        self.policy_adapter = policy_adapter
-        self.planner_service = TopicPlannerService(topic_repository, policy_adapter)
+        self.planner_service = TopicPlannerService(topic_repository)
 
     async def execute(self, batch: DomainTopicBatch, actor: str) -> DomainTopicPlan:
         """Dry-Run 실행"""
@@ -92,13 +93,11 @@ class TopicBatchApplyUseCase:
         topic_repository: ITopicRepository,
         metadata_repository: ITopicMetadataRepository,
         audit_repository: IAuditRepository,
-        policy_adapter: TopicPolicyAdapter,
     ) -> None:
         self.topic_repository = topic_repository
         self.metadata_repository = metadata_repository
         self.audit_repository = audit_repository
-        self.policy_adapter = policy_adapter
-        self.planner_service = TopicPlannerService(topic_repository, policy_adapter)
+        self.planner_service = TopicPlannerService(topic_repository)
 
     async def execute(self, batch: DomainTopicBatch, actor: str) -> DomainTopicApplyResult:
         """배치 적용 실행"""
@@ -139,17 +138,47 @@ class TopicBatchApplyUseCase:
             # 결과 저장
             await self.metadata_repository.save_apply_result(result, actor)
 
+            # 액션별로 그룹화 (메타데이터용)
+            actions_map: defaultdict[str, list[str]] = defaultdict(list)
+            for spec in batch.specs:
+                if spec.name in applied:
+                    actions_map[spec.action.value.upper()].append(spec.name)
+
+            # 단일 vs 배치 판단
+            is_single = len(batch.specs) == 1
+            method = "SINGLE" if is_single else "BATCH"
+
+            # 메시지 생성
+            if is_single and actions_map:
+                # 단일 작업
+                action, topics = next(iter(actions_map.items()))
+                message = f"토픽 {action}: {topics[0]}"
+                target = topics[0]
+            else:
+                # 배치 작업
+                action_summary = ", ".join(
+                    [f"{len(topics)}개 {action}" for action, topics in actions_map.items()]
+                )
+                message = f"배치 작업 완료: {action_summary}"
+                target = "BATCH"
+
             # 감사 로그 기록
             await self.audit_repository.log_topic_operation(
                 change_id=batch.change_id,
                 action="APPLY",
-                target="BATCH",
+                target=target,
                 actor=actor,
                 status="COMPLETED",
-                message=f"Apply completed: {len(applied)} applied, {len(failed)} failed",
-                snapshot={"apply_summary": result.summary()},
+                message=message,
+                snapshot={
+                    "method": method,
+                    "total_count": len(applied),
+                    "actions": actions_map,
+                    "apply_summary": result.summary(),
+                },
             )
 
+            # 부분 실패 허용 - 결과 반환 (failed 포함)
             return result
 
         except Exception as e:
@@ -168,26 +197,43 @@ class TopicBatchApplyUseCase:
         self, specs: tuple[DomainTopicSpec, ...], actor: str, change_id: ChangeId
     ) -> tuple[list[TopicName], list[TopicName], list[dict[str, str]]]:
         """토픽 적용 실행"""
-        applied = []
-        skipped = []
-        failed = []
+        applied: list[TopicName] = []
+        skipped: list[TopicName] = []
+        failed: list[dict[str, str]] = []
 
         # 액션별로 그룹화
-        create_specs = [s for s in specs if s.action.value in ("create", "upsert")]
-        delete_specs = [s for s in specs if s.action.value == "delete"]
-        update_specs = [s for s in specs if s.action.value in ("update", "upsert")]
+        create_specs: list[DomainTopicSpec] = [
+            s for s in specs if s.action.value in ("create", "upsert")
+        ]
+        delete_specs: list[DomainTopicSpec] = [s for s in specs if s.action.value == "delete"]
+        update_specs: list[DomainTopicSpec] = [
+            s for s in specs if s.action.value in ("update", "upsert")
+        ]
 
         # 토픽 생성
         if create_specs:
             create_results = await self.topic_repository.create_topics(create_specs)
-            for name, error in create_results.items():
+            for spec in create_specs:
+                name = spec.name
+                error = create_results.get(name)
                 if error is None:
                     applied.append(name)
                     await self._log_topic_operation(name, "CREATE", actor, change_id, "SUCCESS")
+                    # 메타데이터 저장
+                    await self._save_topic_metadata(spec, actor)
                 else:
-                    failed.append({"name": name, "error": str(error), "action": "CREATE"})
+                    error_str = str(error)
+                    # 중복 토픽 에러 메시지 개선
+                    if "already exists" in error_str or "TOPIC_ALREADY_EXISTS" in error_str:
+                        error_msg = (
+                            f"토픽 '{name}'이(가) 이미 존재합니다. 다른 이름을 사용해주세요."
+                        )
+                    else:
+                        error_msg = error_str
+
+                    failed.append({"name": name, "error": error_msg, "action": "CREATE"})
                     await self._log_topic_operation(
-                        name, "CREATE", actor, change_id, "FAILED", str(error)
+                        name, "CREATE", actor, change_id, "FAILED", error_msg
                     )
 
         # 토픽 삭제
@@ -265,7 +311,7 @@ class TopicBatchApplyUseCase:
         status: str,
         message: str | None = None,
     ) -> None:
-        """개별 토픽 작업 감사 로그"""
+        """토픽 작업 로그 기록"""
         await self.audit_repository.log_topic_operation(
             change_id=change_id,
             action=action,
@@ -274,6 +320,28 @@ class TopicBatchApplyUseCase:
             status=status,
             message=message,
         )
+
+    async def _save_topic_metadata(self, spec: DomainTopicSpec, actor: str) -> None:
+        """토픽 메타데이터 저장"""
+        try:
+            # 메타데이터 딕셔너리 생성
+            metadata_dict = {
+                "topic_name": spec.name,
+                "owner": spec.metadata.owner if spec.metadata else None,
+                "doc": spec.metadata.doc if spec.metadata else None,
+                "tags": {"tags": spec.metadata.tags}
+                if spec.metadata and spec.metadata.tags
+                else None,
+                "config": spec.config.to_dict() if spec.config else None,
+                "created_by": actor,
+                "updated_by": actor,
+            }
+
+            await self.metadata_repository.save_topic_metadata(spec.name, metadata_dict)
+
+        except Exception as e:
+            logger = logging.getLogger(__name__)
+            logger.error(f"Failed to save topic metadata for {spec.name}: {e}", exc_info=True)
 
 
 class TopicDetailUseCase:
@@ -287,7 +355,7 @@ class TopicDetailUseCase:
         self.topic_repository = topic_repository
         self.metadata_repository = metadata_repository
 
-    async def execute(self, name: TopicName) -> dict[str, Any] | None:
+    async def execute(self, name: TopicName) -> DomainTopicDetail | None:
         """토픽 상세 정보 조회"""
         # Kafka에서 토픽 정보 조회
         kafka_topics = await self.topic_repository.describe_topics([name])
@@ -296,14 +364,65 @@ class TopicDetailUseCase:
         if kafka_topic is None:
             return None
 
-        # 메타데이터 조회
-        metadata = await self.metadata_repository.get_topic_metadata(name)
+        # 메타데이터 조회 및 변환
+        metadata_dict = await self.metadata_repository.get_topic_metadata(name)
 
-        return {
-            "name": name,
-            "kafka_metadata": kafka_topic,
-            "metadata": metadata or {},
-        }
+        # dict를 DomainTopicMetadata로 변환
+        metadata = None
+        if metadata_dict:
+            metadata = DomainTopicMetadata(
+                owner=metadata_dict.get("owner"),
+                doc=metadata_dict.get("doc"),
+                tags=tuple(metadata_dict.get("tags", [])) if metadata_dict.get("tags") else (),
+            )
+
+        return DomainTopicDetail(
+            name=name,
+            kafka_metadata=kafka_topic,
+            metadata=metadata,
+        )
+
+
+class TopicListUseCase:
+    """토픽 목록 조회 유스케이스"""
+
+    def __init__(
+        self,
+        topic_repository: ITopicRepository,
+        metadata_repository: ITopicMetadataRepository,
+    ) -> None:
+        self.topic_repository = topic_repository
+        self.metadata_repository = metadata_repository
+
+    async def execute(self) -> list[dict[str, Any]]:
+        """토픽 목록 조회"""
+        # Kafka에서 모든 토픽 조회
+        all_topics = await self.topic_repository.list_topics()
+
+        # 메타데이터와 함께 반환
+        topics_with_metadata = []
+        for topic_name in all_topics:
+            metadata = await self.metadata_repository.get_topic_metadata(topic_name)
+            topics_with_metadata.append(
+                {
+                    "name": topic_name,
+                    "owner": metadata.get("owner") if metadata else None,
+                    "environment": self._infer_environment(topic_name),
+                }
+            )
+
+        return topics_with_metadata
+
+    @staticmethod
+    def _infer_environment(topic_name: str) -> str:
+        """토픽 이름에서 환경 추론"""
+        if topic_name.startswith("dev."):
+            return "dev"
+        if topic_name.startswith("stg."):
+            return "stg"
+        if topic_name.startswith("prod."):
+            return "prod"
+        return "unknown"
 
 
 class TopicPlanUseCase:

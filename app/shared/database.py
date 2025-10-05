@@ -113,20 +113,9 @@ class DatabaseManager:
             await conn.run_sync(Base.metadata.drop_all)
             logger.info("Database tables dropped")
 
-
-# 전역 데이터베이스 매니저 인스턴스 (설정에서 초기화)
-db_manager: DatabaseManager | None = None
-
-
-def initialize_database(database_url: str, echo: bool = False) -> None:
-    """데이터베이스 매니저 초기화"""
-    global db_manager
-    db_manager = DatabaseManager(database_url, echo)
-
-
-async def get_db_session() -> AsyncGenerator[AsyncSession, None]:
-    """의존성 주입용 데이터베이스 세션 팩토리"""
-    if db_manager is None:
-        raise RuntimeError("Database not initialized. Call initialize_database() first.")
-    async with db_manager.get_session() as session:
-        yield session
+    @asynccontextmanager
+    async def get_db_session(self) -> AsyncGenerator[AsyncSession, None]:
+        """의존성 주입용 데이터베이스 세션 팩토리"""
+        await self.initialize()
+        async with self.get_session() as session:
+            yield session
