@@ -1,18 +1,15 @@
-import asyncio
+"""Topic 모듈 라우터 - YAML 기반 토픽 배치 관리"""
+
+from __future__ import annotations
+
 import logging
-from datetime import UTC, datetime
 
 from dependency_injector.wiring import Provide, inject
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 
 from app.container import AppContainer
 from app.shared.roles import DEFAULT_USER
-from app.topic.domain.models import (
-    DomainEnvironment,
-    DomainTopicAction,
-    DomainTopicBatch,
-    DomainTopicSpec,
-)
+from app.topic.application.use_cases import TopicBulkDeleteUseCase
 from app.topic.interface.adapters import (
     safe_convert_plan_to_response,
     safe_convert_request_to_batch,
@@ -28,12 +25,11 @@ from app.topic.interface.schema import (
 
 router = APIRouter(prefix="/v1/topics", tags=["topics"])
 
-# =============================================================================
-# Dependency Injection - @inject 데코레이터로 엔드포인트에 직접 주입
-# =============================================================================
-ListTopicDep = Depends(Provide[AppContainer.topic_container.list_use_case])
+# Dependency Injection Shortcuts
 DryTopicDep = Depends(Provide[AppContainer.topic_container.dry_run_use_case])
 ApplyTopicDep = Depends(Provide[AppContainer.topic_container.apply_use_case])
+ListTopicDep = Depends(Provide[AppContainer.topic_container.list_use_case])
+BulkDeleteDep = Depends(Provide[AppContainer.topic_container.bulk_delete_use_case])
 
 
 @router.get(
@@ -55,6 +51,7 @@ async def list_topics(use_case=ListTopicDep) -> TopicListResponse:
             TopicListItem(
                 name=topic["name"],
                 owner=topic.get("owner"),
+                doc=topic.get("doc"),
                 tags=topic.get("tags", []),
                 partition_count=topic.get("partition_count"),
                 replication_factor=topic.get("replication_factor"),
@@ -222,56 +219,19 @@ async def topic_batch_apply(
 )
 @inject
 async def bulk_delete_topics(
-    topic_names: list[str], apply_use_case=ApplyTopicDep
+    topic_names: list[str],
+    bulk_delete_use_case: TopicBulkDeleteUseCase = BulkDeleteDep,
 ) -> TopicBulkDeleteResponse:
-    """토픽 일괄 삭제 - 병렬 처리"""
+    """토픽 일괄 삭제 - Use Case 패턴"""
     try:
-        if not topic_names:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="No topics specified for deletion",
-            )
-
-        async def delete_single_topic(name: str) -> tuple[str, bool]:
-            """단일 토픽 삭제 (성공 여부 반환)"""
-            try:
-                # 개별 배치 생성 (환경 무관)
-                batch = DomainTopicBatch(
-                    change_id=f"delete_{name}_{int(datetime.now(UTC).timestamp())}",
-                    env=DomainEnvironment.UNKNOWN,
-                    specs=(
-                        DomainTopicSpec(
-                            name=name,
-                            action=DomainTopicAction.DELETE,
-                            config=None,
-                            metadata=None,
-                        ),
-                    ),
-                )
-
-                result = await apply_use_case.execute(batch, DEFAULT_USER)
-                return (name, name in result.applied)
-
-            except Exception as e:
-                logging.getLogger(__name__).error(f"Failed to delete topic {name}: {e}")
-                return (name, False)
-
-        # 모든 토픽을 병렬로 삭제 (gather는 이미 리스트 반환)
-        results_tuple = await asyncio.gather(*[delete_single_topic(name) for name in topic_names])
-        results: list[tuple[str, bool]] = list(results_tuple)
-
-        # 결과 분류
-        succeeded: list[str] = [name for name, success in results if success]
-        failed: list[str] = [name for name, success in results if not success]
+        result = await bulk_delete_use_case.execute(topic_names, DEFAULT_USER)
 
         return TopicBulkDeleteResponse(
-            succeeded=succeeded,
-            failed=failed,
-            message=f"Deleted {len(succeeded)} topics, {len(failed)} failed",
+            succeeded=result["succeeded"],
+            failed=result["failed"],
+            message=result["message"],
         )
 
-    except HTTPException:
-        raise
     except Exception as e:
         logging.getLogger(__name__).error(f"Bulk delete failed: {e}", exc_info=True)
         raise HTTPException(
@@ -287,30 +247,18 @@ async def bulk_delete_topics(
     description="지정한 토픽을 Kafka에서 삭제합니다.",
 )
 @inject
-async def delete_topic(name: str, apply_use_case=ApplyTopicDep) -> dict[str, str]:
-    """토픽 삭제"""
+async def delete_topic(
+    name: str,
+    bulk_delete_use_case: TopicBulkDeleteUseCase = BulkDeleteDep,
+) -> dict[str, str]:
+    """토픽 단일 삭제 - BulkDeleteUseCase 재사용"""
     try:
-        # 배치 생성 (환경 무관)
-        batch = DomainTopicBatch(
-            change_id=f"delete_{name}_{int(datetime.now(UTC).timestamp())}",
-            env=DomainEnvironment.UNKNOWN,
-            specs=(
-                DomainTopicSpec(
-                    name=name,
-                    action=DomainTopicAction.DELETE,
-                    config=None,
-                    metadata=None,
-                ),
-            ),
-        )
+        result = await bulk_delete_use_case.execute([name], DEFAULT_USER)
 
-        result = await apply_use_case.execute(batch, DEFAULT_USER)
-
-        if name in result.failed:
-            error = result.failed[name] if isinstance(result.failed, dict) else "Unknown error"
+        if result["failed"]:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f"Failed to delete topic: {error}",
+                detail=f"Failed to delete topic: {name}",
             )
 
         return {"message": f"Topic '{name}' deleted successfully"}

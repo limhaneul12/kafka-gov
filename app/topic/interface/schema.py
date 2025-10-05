@@ -357,6 +357,7 @@ class TopicListItem(BaseModel):
 
     name: TopicName
     owner: TeamName | None = None
+    doc: str | None = None
     tags: list[str] = Field(default_factory=list)
     partition_count: int | None = None
     replication_factor: int | None = None

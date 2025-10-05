@@ -7,6 +7,7 @@ from dependency_injector import containers, providers
 from app.topic.application.use_cases import (
     TopicBatchApplyUseCase,
     TopicBatchDryRunUseCase,
+    TopicBulkDeleteUseCase,
     TopicListUseCase,
 )
 from app.topic.domain.repositories.interfaces import (
@@ -61,6 +62,12 @@ class TopicContainer(containers.DeclarativeContainer):
         TopicListUseCase,
         topic_repository=topic_repository,
         metadata_repository=metadata_repository,
+    )
+
+    bulk_delete_use_case: providers.Provider[TopicBulkDeleteUseCase] = providers.Factory(
+        TopicBulkDeleteUseCase,
+        apply_use_case=apply_use_case,
+        audit_repository=audit_repository,
     )
 
 
