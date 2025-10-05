@@ -122,7 +122,7 @@ class TableRenderer {
         if (!topics || topics.length === 0) {
             tbody.innerHTML = `
                 <tr>
-                    <td colspan="8" style="text-align: center; padding: 2rem; color: var(--text-muted);">
+                    <td colspan="9" style="text-align: center; padding: 2rem; color: var(--text-muted);">
                         토픽이 없습니다.
                     </td>
                 </tr>
@@ -134,6 +134,12 @@ class TableRenderer {
             const rawName = topic.topic_name ?? '';
             const name = this.escapeHtml(rawName);
             const owner = this.escapeHtml(topic.owner || '-');
+            const doc = topic.doc;
+            const docHtml = doc 
+                ? `<a href="${this.escapeHtml(doc)}" target="_blank" rel="noopener noreferrer" title="문서 보기" style="color: var(--primary);">
+                    <i class="fas fa-external-link-alt"></i>
+                   </a>`
+                : '<span style="color: var(--text-muted);">-</span>';
             const tags = topic.tags && topic.tags.length > 0 
                 ? topic.tags.map(tag => `<span class="tag-badge">${this.escapeHtml(tag)}</span>`).join(' ')
                 : '<span style="color: var(--text-muted);">-</span>';
@@ -150,6 +156,7 @@ class TableRenderer {
                     <div style="font-weight: 500;">${name}</div>
                 </td>
                 <td>${owner}</td>
+                <td style="text-align: center;">${docHtml}</td>
                 <td><span style="font-size: 0.875rem;">${tags}</span></td>
                 <td style="text-align: center;">${partitions}</td>
                 <td style="text-align: center;">${replicas}</td>
