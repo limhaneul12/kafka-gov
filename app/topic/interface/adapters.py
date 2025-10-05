@@ -235,7 +235,7 @@ def kafka_metadata_to_interface_config(
         return InterfaceTopicConfig.model_validate(data)
     except Exception as e:
         logger = logging.getLogger(__name__)
-        logger.error(f"Failed to convert to InterfaceTopicConfig. " f"data={data}, error={e}")
+        logger.error(f"Failed to convert to InterfaceTopicConfig. data={data}, error={e}")
         return None
 
 
