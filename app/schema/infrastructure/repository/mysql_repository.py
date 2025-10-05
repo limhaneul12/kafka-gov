@@ -8,6 +8,7 @@ from contextlib import AbstractAsyncContextManager
 from typing import Any
 
 from sqlalchemy import select
+from sqlalchemy.dialects.mysql import insert as mysql_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.schema.domain.models import (
@@ -50,7 +51,7 @@ class MySQLSchemaMetadataRepository(ISchemaMetadataRepository):
         self.session_factory = session_factory
 
     async def save_plan(self, plan: DomainSchemaPlan, created_by: str) -> None:
-        """계획 저장"""
+        """계획 저장 (UPSERT: 동일 change_id면 업데이트)"""
         async with self.session_factory() as session:
             try:
                 # SchemaPlan 도메인 객체를 JSON으로 직렬화
@@ -105,7 +106,8 @@ class MySQLSchemaMetadataRepository(ISchemaMetadataRepository):
                     ],
                 }
 
-                plan_model = SchemaPlanModel(
+                # UPSERT: 동일 change_id가 있으면 업데이트
+                insert_stmt = mysql_insert(SchemaPlanModel).values(
                     change_id=plan.change_id,
                     env=plan.env.value,
                     plan_data=plan_data,
@@ -113,7 +115,16 @@ class MySQLSchemaMetadataRepository(ISchemaMetadataRepository):
                     created_by=created_by,
                 )
 
-                session.add(plan_model)
+                # ON DUPLICATE KEY UPDATE
+                upsert_stmt = insert_stmt.on_duplicate_key_update(
+                    env=insert_stmt.inserted.env,
+                    plan_data=insert_stmt.inserted.plan_data,
+                    can_apply=insert_stmt.inserted.can_apply,
+                    status="pending",  # 다시 pending으로 초기화
+                    updated_by=created_by,
+                )
+
+                await session.execute(upsert_stmt)
                 await session.flush()
 
                 logger.info(f"Schema plan saved: {plan.change_id}")

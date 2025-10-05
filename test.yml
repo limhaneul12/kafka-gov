@@ -12,3 +12,14 @@ items:
       owner: team-commerce
       doc: "https://wiki.example.com"
       tags: ["orders", "events"]
+  
+  - name: prod.orders.updated
+    action: create
+    config:
+      partitions: 12
+      replication_factor: 3
+      retention_ms: 604800000
+    metadata:
+      owner: team-commerce
+      doc: "https://wiki.example.com"
+      tags: ["orders", "events", "updated"]
