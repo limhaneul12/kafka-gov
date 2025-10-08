@@ -13,7 +13,7 @@ class KafkaGovApp {
     }
 
     init() {
-        console.log('KafkaGovApp 초기화 시작...');
+        console.log('KafkaGovApp initialization...');
         this.setupEventListeners();
         this.setupSettingsWatcher();
         // 초기 배치 아이템 리스너 연결
@@ -22,7 +22,7 @@ class KafkaGovApp {
             this.attachBatchItemListeners(firstItem);
         }
         // 초기 탭 로딩
-        console.log('초기 탭 전환:', this.currentTab);
+        console.log('Initial tab switch:', this.currentTab);
         this.switchTab(this.currentTab);
         // 최근 활동 자동 갱신 시작 (30초마다)
         this.startActivityAutoRefresh();
@@ -32,7 +32,7 @@ class KafkaGovApp {
      * 설정 변경 감지 설정
      */
     setupSettingsWatcher() {
-        // Window focus 이벤트로 설정 변경 감지
+        // Detect settings change on window focus
         window.addEventListener('focus', () => {
             const currentSettings = api.getCurrentSettings();
             
@@ -42,7 +42,7 @@ class KafkaGovApp {
                 this.lastSettings.storageId !== currentSettings.storageId ||
                 this.lastSettings.connectId !== currentSettings.connectId) {
                 
-                console.log('설정 변경 감지:', this.lastSettings, '->', currentSettings);
+                console.log('Settings changed:', this.lastSettings, '->', currentSettings);
                 this.lastSettings = currentSettings;
                 
                 // 현재 탭 데이터 새로고침
@@ -87,7 +87,7 @@ class KafkaGovApp {
                 break;
         }
         
-        Toast.success('설정이 변경되어 데이터를 새로고침했습니다.');
+        Toast.success('Settings changed. Data refreshed.');
     }
 
     /**
@@ -98,45 +98,45 @@ class KafkaGovApp {
             <div class="batch-item">
                 <div class="batch-item-row batch-item-header">
                     <label>
-                        작업
+                        Action
                         <select class="batch-action">
-                            <option value="CREATE">생성</option>
-                            <option value="UPDATE">수정</option>
-                            <option value="UPSERT">업서트</option>
-                            <option value="DELETE">삭제</option>
+                            <option value="CREATE">Create</option>
+                            <option value="UPDATE">Update</option>
+                            <option value="UPSERT">Upsert</option>
+                            <option value="DELETE">Delete</option>
                         </select>
                     </label>
-                    <button type="button" class="btn-icon remove-batch-item" title="행 제거">
+                    <button type="button" class="btn-icon remove-batch-item" title="Remove row">
                         <i class="fas fa-trash"></i>
                     </button>
                 </div>
                 <div class="batch-item-row">
-                    <label>토픽명
+                    <label>Topic
                         <input type="text" class="batch-topic-name" placeholder="env.topic.name" required>
                     </label>
-                    <label>파티션
+                    <label>Partitions
                         <input type="number" class="batch-partitions" min="1" value="3" required>
                     </label>
-                    <label>복제
+                    <label>Replication
                         <input type="number" class="batch-replication" min="1" value="3" required>
                     </label>
                 </div>
                 <div class="batch-item-row metadata-fields">
-                    <label>소유자
+                    <label>Owner
                         <input type="text" class="batch-owner" placeholder="team-service" required>
                     </label>
-                    <label>문서 URL
+                    <label>Doc URL
                         <input type="url" class="batch-doc" placeholder="https://...">
                     </label>
                 </div>
                 <div class="batch-item-row metadata-fields">
-                    <label>태그
+                    <label>Tags
                         <input type="text" class="batch-tags" placeholder="tag1, tag2">
                     </label>
                 </div>
                 <div class="batch-item-row reason-field hidden">
-                    <label>삭제 사유
-                        <textarea class="batch-reason" rows="2" placeholder="삭제 사유를 입력하세요"></textarea>
+                    <label>Delete Reason
+                        <textarea class="batch-reason" rows="2" placeholder="Enter reason for deletion"></textarea>
                     </label>
                 </div>
             </div>
@@ -586,9 +586,9 @@ class KafkaGovApp {
                             <div class="env-bar-label">${env.toUpperCase()}</div>
                             <div class="env-bar-track">
                                 <div class="env-bar-fill ${env}" style="width: ${width}%">
-                                    ${showText ? `${stat.count}개 • ${stat.partitions}p` : ''}
+                                    ${showText ? `${stat.count} topics • ${stat.partitions} partitions` : ''}
                                 </div>
-                                ${!showText && stat.count > 0 ? `<span style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); font-size: 0.75rem; color: var(--text-muted);">${stat.count}개 • ${stat.partitions}p</span>` : ''}
+                                ${!showText && stat.count > 0 ? `<span style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); font-size: 0.75rem; color: var(--text-muted);">${stat.count} topics • ${stat.partitions} partitions</span>` : ''}
                             </div>
                         </div>
                     `;
@@ -606,7 +606,7 @@ class KafkaGovApp {
         const container = document.getElementById('cluster-status-info');
         
         if (!clusterStatus) {
-            container.innerHTML = '<p style="text-align: center; color: var(--text-muted);">클러스터 상태를 불러올 수 없습니다.</p>';
+            container.innerHTML = '<p style="text-align: center; color: var(--text-muted);">Cannot load cluster status.</p>';
             return;
         }
 
@@ -616,21 +616,21 @@ class KafkaGovApp {
         const html = `
             <div class="cluster-summary">
                 <div class="cluster-stat">
-                    <div class="stat-label">컨트롤러</div>
+                    <div class="stat-label">Controller</div>
                     <div class="stat-value">Broker ${clusterStatus.controller_id || 'N/A'}</div>
                     <div class="stat-detail">${controllerBroker ? `${controllerBroker.host}:${controllerBroker.port}` : ''}</div>
                 </div>
                 <div class="cluster-stat">
-                    <div class="stat-label">브로커 수</div>
-                    <div class="stat-value">${brokers.length}개</div>
+                    <div class="stat-label">Brokers</div>
+                    <div class="stat-value">${brokers.length}</div>
                 </div>
                 <div class="cluster-stat">
-                    <div class="stat-label">전체 토픽</div>
-                    <div class="stat-value">${clusterStatus.total_topics || 0}개</div>
+                    <div class="stat-label">Total Topics</div>
+                    <div class="stat-value">${clusterStatus.total_topics || 0}</div>
                 </div>
                 <div class="cluster-stat">
-                    <div class="stat-label">전체 파티션</div>
-                    <div class="stat-value">${clusterStatus.total_partitions || 0}개</div>
+                    <div class="stat-label">Total Partitions</div>
+                    <div class="stat-value">${clusterStatus.total_partitions || 0}</div>
                 </div>
             </div>
             
@@ -644,7 +644,7 @@ class KafkaGovApp {
                         <div class="broker-info">
                             <div class="broker-host">${broker.host}:${broker.port}</div>
                             <div class="broker-partitions">
-                                <i class="fas fa-layer-group"></i> ${broker.leader_partition_count || 0} 리더 파티션
+                                <i class="fas fa-layer-group"></i> ${broker.leader_partition_count || 0} leader partitions
                             </div>
                         </div>
                     </div>

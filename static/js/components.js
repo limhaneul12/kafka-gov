@@ -123,7 +123,7 @@ class TableRenderer {
             tbody.innerHTML = `
                 <tr>
                     <td colspan="9" style="text-align: center; padding: 2rem; color: var(--text-muted);">
-                        토픽이 없습니다.
+                        No topics.
                     </td>
                 </tr>
             `;
@@ -187,7 +187,7 @@ class TableRenderer {
             tbody.innerHTML = `
                 <tr>
                     <td colspan="6" style="text-align: center; padding: 2rem; color: var(--text-muted);">
-                        스키마가 없습니다.
+                        No schemas.
                     </td>
                 </tr>
             `;
@@ -210,7 +210,7 @@ class TableRenderer {
                 <td>${compatibilityBadge}</td>
                 <td>
                     <div style="display: flex; gap: 0.5rem;">
-                        <button class="btn-icon analyze-delete-btn" data-subject="${this.escapeHtml(rawSubject)}" title="삭제 영향도 분석">
+                        <button class="btn-icon analyze-delete-btn" data-subject="${this.escapeHtml(rawSubject)}" title="Delete impact analysis">
                             <i class="fas fa-exclamation-circle"></i>
                         </button>
                     </div>
@@ -288,7 +288,7 @@ class TableRenderer {
             tbody.innerHTML = `
                 <tr>
                     <td colspan="7" style="text-align: center; padding: 2rem; color: var(--text-muted);">
-                        활동 내역이 없습니다. 검색 조건을 변경해주세요.
+                        No activity history. Try adjusting the filters.
                     </td>
                 </tr>
             `;
@@ -384,7 +384,7 @@ class ActivityRenderer {
         if (!activities || activities.length === 0) {
             container.innerHTML = `
                 <div style="text-align: center; padding: 2rem; color: var(--text-muted);">
-                    최근 활동이 없습니다.
+                    No recent activities.
                 </div>
             `;
             return;
@@ -397,7 +397,7 @@ class ActivityRenderer {
             
             // 단일/배치 뱃지
             const methodBadge = method 
-                ? `<span class="method-badge ${method.toLowerCase()}">${method === 'BATCH' ? '배치' : '단일'}</span>` 
+                ? `<span class="method-badge ${method.toLowerCase()}">${method === 'BATCH' ? 'BATCH' : 'SINGLE'}</span>` 
                 : '';
             
             // 팀 정보
@@ -411,9 +411,9 @@ class ActivityRenderer {
             // 메시지 생성: "팀명이 토픽명을 생성함"
             let displayMessage = '';
             if (team && target) {
-                displayMessage = `<strong>${this.escapeHtml(team)}</strong>이(가) <strong>${this.escapeHtml(target)}</strong>을(를) ${actionText}`;
+                displayMessage = `<strong>${this.escapeHtml(team)}</strong> ${actionText} <strong>${this.escapeHtml(target)}</strong>`;
             } else if (target) {
-                displayMessage = `<strong>${this.escapeHtml(target)}</strong>이(가) ${actionText}`;
+                displayMessage = `<strong>${this.escapeHtml(target)}</strong> ${actionText}`;
             } else {
                 displayMessage = this.escapeHtml(activity.message || 'N/A');
             }
@@ -450,7 +450,7 @@ class ActivityRenderer {
                     </div>
                     <div class="activity-content">
                         <p>
-                            <span class="activity-type-badge">${activity.activity_type === 'topic' || activity.type === 'topic' ? '토픽' : '스키마'}</span>
+                            <span class="activity-type-badge">${activity.activity_type === 'topic' || activity.type === 'topic' ? 'TOPIC' : 'SCHEMA'}</span>
                             ${methodBadge}
                             ${displayMessage}
                         </p>
@@ -467,11 +467,11 @@ class ActivityRenderer {
      */
     static getActionText(action, metadata) {
         const actionMap = {
-            'CREATE': '생성됨',
-            'UPDATE': '수정됨',
-            'DELETE': '삭제됨',
-            'REGISTER': '등록됨',
-            'UPLOAD': '업로드됨'
+            'CREATE': 'created',
+            'UPDATE': 'updated',
+            'DELETE': 'deleted',
+            'REGISTER': 'registered',
+            'UPLOAD': 'uploaded'
         };
         return actionMap[action] || action;
     }
@@ -485,7 +485,7 @@ class ActivityRenderer {
         if (!violations || violations.length === 0) {
             container.innerHTML = `
                 <div style="text-align: center; padding: 2rem; color: var(--text-muted);">
-                    정책 위반이 없습니다.
+                    No policy violations.
                 </div>
             `;
             return;
@@ -547,10 +547,10 @@ class ActivityRenderer {
         const hours = Math.floor(diff / 3600000);
         const days = Math.floor(diff / 86400000);
         
-        if (minutes < 1) return '방금 전';
-        if (minutes < 60) return `${minutes}분 전`;
-        if (hours < 24) return `${hours}시간 전`;
-        return `${days}일 전`;
+        if (minutes < 1) return 'just now';
+        if (minutes < 60) return `${minutes} min ago`;
+        if (hours < 24) return `${hours} hr ago`;
+        return `${days} days ago`;
     }
 
     /**
@@ -562,7 +562,7 @@ class ActivityRenderer {
         if (!clusterStatus || !clusterStatus.brokers) {
             container.innerHTML = `
                 <div style="text-align: center; padding: 2rem; color: var(--text-muted);">
-                    클러스터 정보를 불러올 수 없습니다.
+                    Cannot load cluster info.
                 </div>
             `;
             return;
@@ -572,7 +572,7 @@ class ActivityRenderer {
             const statusClass = 'online';  // 브로커 상태는 항상 online (metadata에서 가져온 경우)
             const statusIcon = '🟢';
             const controllerBadge = broker.is_controller 
-                ? '<span class="status-badge controller">컨트롤러</span>' 
+                ? '<span class="status-badge controller">CONTROLLER</span>' 
                 : '';
             
             return `

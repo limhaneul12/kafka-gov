@@ -1,5 +1,5 @@
 /**
- * WebSocket 클라이언트 - 실시간 데이터 업데이트
+ * WebSocket Client - Realtime data updates
  */
 
 class WebSocketClient {
@@ -13,7 +13,7 @@ class WebSocketClient {
     }
 
     /**
-     * WebSocket 연결
+     * WebSocket connect
      */
     connect() {
         try {
@@ -23,12 +23,12 @@ class WebSocketClient {
             this.ws = new WebSocket(wsUrl);
             
             this.ws.onopen = () => {
-                console.log('WebSocket 연결됨');
+                console.log('WebSocket connected');
                 this.isConnected = true;
                 this.reconnectAttempts = 0;
                 this.emit('connected');
                 
-                // 연결 상태 UI 업데이트
+                // Update connection status UI
                 this.updateConnectionStatus(true);
             };
 
@@ -37,38 +37,38 @@ class WebSocketClient {
                     const data = JSON.parse(event.data);
                     this.handleMessage(data);
                 } catch (error) {
-                    console.error('WebSocket 메시지 파싱 오류:', error);
+                    console.error('WebSocket message parse error:', error);
                 }
             };
 
             this.ws.onclose = (event) => {
-                console.log('WebSocket 연결 종료:', event.code, event.reason);
+                console.log('WebSocket closed:', event.code, event.reason);
                 this.isConnected = false;
                 this.updateConnectionStatus(false);
                 
-                // 자동 재연결 시도
+                // Auto-reconnect
                 if (this.reconnectAttempts < this.maxReconnectAttempts) {
                     this.reconnectAttempts++;
-                    console.log(`재연결 시도 ${this.reconnectAttempts}/${this.maxReconnectAttempts}`);
+                    console.log(`Reconnect attempt ${this.reconnectAttempts}/${this.maxReconnectAttempts}`);
                     setTimeout(() => this.connect(), this.reconnectInterval);
                 } else {
-                    console.error('WebSocket 재연결 실패');
+                    console.error('WebSocket reconnect failed');
                     this.emit('reconnect_failed');
                 }
             };
 
             this.ws.onerror = (error) => {
-                console.error('WebSocket 오류:', error);
+                console.error('WebSocket error:', error);
                 this.emit('error', error);
             };
 
         } catch (error) {
-            console.error('WebSocket 연결 실패:', error);
+            console.error('WebSocket connection failed:', error);
         }
     }
 
     /**
-     * WebSocket 연결 종료
+     * WebSocket disconnect
      */
     disconnect() {
         if (this.ws) {
@@ -80,18 +80,18 @@ class WebSocketClient {
     }
 
     /**
-     * 메시지 전송
+     * Send message
      */
     send(data) {
         if (this.isConnected && this.ws) {
             this.ws.send(JSON.stringify(data));
         } else {
-            console.warn('WebSocket이 연결되지 않음');
+            console.warn('WebSocket is not connected');
         }
     }
 
     /**
-     * 메시지 처리
+     * Handle message
      */
     handleMessage(data) {
         const { type, payload } = data;
@@ -116,12 +116,12 @@ class WebSocketClient {
                 this.emit('system_alert', payload);
                 break;
             default:
-                console.log('알 수 없는 메시지 타입:', type);
+                console.log('Unknown message type:', type);
         }
     }
 
     /**
-     * 이벤트 리스너 등록
+     * Add event listener
      */
     on(event, callback) {
         if (!this.listeners.has(event)) {
@@ -131,7 +131,7 @@ class WebSocketClient {
     }
 
     /**
-     * 이벤트 리스너 제거
+     * Remove event listener
      */
     off(event, callback) {
         if (this.listeners.has(event)) {
@@ -144,7 +144,7 @@ class WebSocketClient {
     }
 
     /**
-     * 이벤트 발생
+     * Emit event
      */
     emit(event, data = null) {
         if (this.listeners.has(event)) {
@@ -152,27 +152,27 @@ class WebSocketClient {
                 try {
                     callback(data);
                 } catch (error) {
-                    console.error(`이벤트 핸들러 오류 (${event}):`, error);
+                    console.error(`Event handler error (${event}):`, error);
                 }
             });
         }
     }
 
     /**
-     * 연결 상태 UI 업데이트
+     * Update connection status UI
      */
     updateConnectionStatus(connected) {
         const statusElement = document.getElementById('connection-status');
         if (statusElement) {
             statusElement.className = `connection-status ${connected ? 'connected' : 'disconnected'}`;
             statusElement.innerHTML = connected 
-                ? '<i class="fas fa-wifi"></i> 연결됨'
-                : '<i class="fas fa-wifi-slash"></i> 연결 끊김';
+                ? '<i class="fas fa-wifi"></i> Connected'
+                : '<i class="fas fa-wifi-slash"></i> Disconnected';
         }
     }
 
     /**
-     * 특정 토픽 구독
+     * Subscribe topic
      */
     subscribeTopic(topicName) {
         this.send({
@@ -183,7 +183,7 @@ class WebSocketClient {
     }
 
     /**
-     * 특정 스키마 구독
+     * Subscribe schema
      */
     subscribeSchema(subject) {
         this.send({
@@ -195,7 +195,7 @@ class WebSocketClient {
 
 
     /**
-     * 시스템 알림 구독
+     * Subscribe system alerts
      */
     subscribeSystemAlerts() {
         this.send({
@@ -206,7 +206,7 @@ class WebSocketClient {
 }
 
 /**
- * 실시간 알림 관리자
+ * Realtime notification manager
  */
 class RealtimeNotificationManager {
     constructor(wsClient) {
@@ -215,48 +215,48 @@ class RealtimeNotificationManager {
     }
 
     setupEventListeners() {
-        // 토픽 이벤트
+        // Topic events
         this.wsClient.on('topic_created', (data) => {
-            Toast.success(`토픽 '${data.name}'이 생성되었습니다.`);
+            Toast.success(`Topic '${data.name}' has been created.`);
             this.refreshTopicList();
         });
 
         this.wsClient.on('topic_updated', (data) => {
-            Toast.info(`토픽 '${data.name}'이 업데이트되었습니다.`);
+            Toast.info(`Topic '${data.name}' has been updated.`);
             this.refreshTopicList();
         });
 
         this.wsClient.on('topic_deleted', (data) => {
-            Toast.warning(`토픽 '${data.name}'이 삭제되었습니다.`);
+            Toast.warning(`Topic '${data.name}' has been deleted.`);
             this.refreshTopicList();
         });
 
-        // 스키마 이벤트
+        // Schema events
         this.wsClient.on('schema_registered', (data) => {
-            Toast.success(`스키마 '${data.subject}'가 등록되었습니다.`);
+            Toast.success(`Schema '${data.subject}' has been registered.`);
             this.refreshSchemaList();
         });
 
         this.wsClient.on('schema_updated', (data) => {
-            Toast.info(`스키마 '${data.subject}'가 업데이트되었습니다.`);
+            Toast.info(`Schema '${data.subject}' has been updated.`);
             this.refreshSchemaList();
         });
 
 
-        // 시스템 알림
+        // System alerts
         this.wsClient.on('system_alert', (data) => {
             const toastType = data.severity === 'error' ? 'error' : 
                              data.severity === 'warning' ? 'warning' : 'info';
             Toast[toastType](data.message);
         });
 
-        // 연결 상태
+        // Connection state
         this.wsClient.on('connected', () => {
-            Toast.success('실시간 연결이 설정되었습니다.');
+            Toast.success('Realtime connection established.');
         });
 
         this.wsClient.on('reconnect_failed', () => {
-            Toast.error('실시간 연결에 실패했습니다. 페이지를 새로고침해주세요.');
+            Toast.error('Failed to establish realtime connection. Please refresh the page.');
         });
     }
 
@@ -284,20 +284,19 @@ let wsClient = null;
 let notificationManager = null;
 
 /**
- * WebSocket 초기화
- * 
- * 참고: 현재 백엔드에 WebSocket 엔드포인트가 구현되지 않았습니다.
- * WebSocket 기능이 필요한 경우 백엔드에 /ws 엔드포인트를 추가해야 합니다.
+ * WebSocket initialization
+ * Note: Backend WebSocket endpoint is not implemented yet.
+ * If WebSocket is required, implement /ws endpoint in backend.
  */
 function initializeWebSocket() {
     // WebSocket 기능 비활성화됨
-    console.log('WebSocket 기능은 현재 비활성화되어 있습니다.');
+    console.log('WebSocket is currently disabled.');
     
     // 연결 상태를 disconnected로 표시
     const statusElement = document.getElementById('connection-status');
     if (statusElement) {
         statusElement.className = 'connection-status disconnected';
-        statusElement.innerHTML = '<i class="fas fa-plug"></i> 연결 안 함';
+        statusElement.innerHTML = '<i class="fas fa-plug"></i> Not connected';
     }
     
     // 실제 구현 시 아래 코드 활성화

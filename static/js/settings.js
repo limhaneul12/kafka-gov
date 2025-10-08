@@ -28,7 +28,7 @@ class SettingsManager {
             const container = document.getElementById('kafka-clusters-list');
 
             if (!clusters || clusters.length === 0) {
-                container.innerHTML = '<p class="empty-message">등록된 클러스터가 없습니다.</p>';
+                container.innerHTML = '<p class="empty-message">No clusters registered.</p>';
                 return;
             }
 
@@ -38,7 +38,7 @@ class SettingsManager {
                 if (clusters.length > 0) {
                     api.setClusterId(clusters[0].cluster_id);
                     this.currentCluster = clusters[0].cluster_id;
-                    console.log('첫 번째 클러스터 자동 선택:', clusters[0].cluster_id);
+                    console.log('Auto-selected first cluster:', clusters[0].cluster_id);
                 }
             }
 
@@ -53,21 +53,21 @@ class SettingsManager {
                     </div>
                     <div class="cluster-actions">
                         <button class="btn btn-sm btn-primary" onclick="settingsManager.selectCluster('${cluster.cluster_id}')">
-                            <i class="fas fa-check"></i> 선택
+                            <i class="fas fa-check"></i> Select
                         </button>
                         <button class="btn btn-sm btn-secondary" onclick="settingsManager.testCluster('${cluster.cluster_id}')">
-                            <i class="fas fa-plug"></i> 연결 테스트
+                            <i class="fas fa-plug"></i> Test Connection
                         </button>
                         <button class="btn btn-sm btn-danger" onclick="settingsManager.deleteCluster('${cluster.cluster_id}')">
-                            <i class="fas fa-trash"></i> 삭제
+                            <i class="fas fa-trash"></i> Delete
                         </button>
                     </div>
                 </div>
             `).join('');
 
         } catch (error) {
-            console.error('클러스터 로드 실패:', error);
-            showToast('클러스터 목록을 불러오지 못했습니다.', 'error');
+            console.error('Failed to load clusters:', error);
+            showToast('Failed to load clusters list.', 'error');
         }
     }
 
@@ -80,7 +80,7 @@ class SettingsManager {
             const container = document.getElementById('registries-list');
             
             if (!registries || registries.length === 0) {
-                container.innerHTML = '<p class="empty-message">등록된 레지스트리가 없습니다.</p>';
+                container.innerHTML = '<p class="empty-message">No registries registered.</p>';
                 return;
             }
 
@@ -90,7 +90,7 @@ class SettingsManager {
                 if (registries.length > 0) {
                     api.setRegistryId(registries[0].registry_id);
                     this.currentRegistry = registries[0].registry_id;
-                    console.log('첫 번째 레지스트리 자동 선택:', registries[0].registry_id);
+                    console.log('Auto-selected first registry:', registries[0].registry_id);
                 }
             }
 
@@ -105,21 +105,21 @@ class SettingsManager {
                     </div>
                     <div class="cluster-actions">
                         <button class="btn btn-sm btn-primary" onclick="settingsManager.selectRegistry('${registry.registry_id}')">
-                            <i class="fas fa-check"></i> 선택
+                            <i class="fas fa-check"></i> Select
                         </button>
                         <button class="btn btn-sm btn-secondary" onclick="settingsManager.testRegistry('${registry.registry_id}')">
-                            <i class="fas fa-plug"></i> 연결 테스트
+                            <i class="fas fa-plug"></i> Test Connection
                         </button>
                         <button class="btn btn-sm btn-danger" onclick="settingsManager.deleteRegistry('${registry.registry_id}')">
-                            <i class="fas fa-trash"></i> 삭제
+                            <i class="fas fa-trash"></i> Delete
                         </button>
                     </div>
                 </div>
             `).join('');
 
         } catch (error) {
-            console.error('레지스트리 로드 실패:', error);
-            showToast('레지스트리 목록을 불러오지 못했습니다.', 'error');
+            console.error('Failed to load registries:', error);
+            showToast('Failed to load registries list.', 'error');
         }
     }
 
@@ -132,7 +132,7 @@ class SettingsManager {
             const container = document.getElementById('storages-list');
             
             if (!storages || storages.length === 0) {
-                container.innerHTML = '<p class="empty-message">등록된 스토리지가 없습니다.</p>';
+                container.innerHTML = '<p class="empty-message">No storages registered.</p>';
                 return;
             }
 
@@ -160,8 +160,8 @@ class SettingsManager {
             `).join('');
 
         } catch (error) {
-            console.error('스토리지 로드 실패:', error);
-            showToast('스토리지 목록을 불러오지 못했습니다.', 'error');
+            console.error('Failed to load storages:', error);
+            showToast('Failed to load storages list.', 'error');
         }
     }
 
@@ -174,7 +174,7 @@ class SettingsManager {
             const container = document.getElementById('connects-list');
             
             if (!connects || connects.length === 0) {
-                container.innerHTML = '<p class="empty-message">등록된 Kafka Connect가 없습니다.</p>';
+                container.innerHTML = '<p class="empty-message">No Kafka Connect registered.</p>';
                 return;
             }
 
@@ -190,21 +190,21 @@ class SettingsManager {
                     </div>
                     <div class="cluster-actions">
                         <button class="btn btn-sm btn-primary" onclick="settingsManager.selectConnect('${connect.connect_id}')">
-                            <i class="fas fa-check"></i> 선택
+                            <i class="fas fa-check"></i> Select
                         </button>
                         <button class="btn btn-sm btn-secondary" onclick="settingsManager.testConnect('${connect.connect_id}')">
-                            <i class="fas fa-plug"></i> 연결 테스트
+                            <i class="fas fa-plug"></i> Test Connection
                         </button>
                         <button class="btn btn-sm btn-danger" onclick="settingsManager.deleteConnect('${connect.connect_id}')">
-                            <i class="fas fa-trash"></i> 삭제
+                            <i class="fas fa-trash"></i> Delete
                         </button>
                     </div>
                 </div>
             `).join('');
 
         } catch (error) {
-            console.error('Kafka Connect 로드 실패:', error);
-            showToast('Kafka Connect 목록을 불러오지 못했습니다.', 'error');
+            console.error('Failed to load Kafka Connect:', error);
+            showToast('Failed to load Kafka Connect list.', 'error');
         }
     }
 
@@ -214,7 +214,7 @@ class SettingsManager {
     selectCluster(clusterId) {
         api.setClusterId(clusterId);
         this.currentCluster = clusterId;
-        showToast(`클러스터가 선택되었습니다: ${clusterId}`, 'success');
+        showToast(`Cluster selected: ${clusterId}`, 'success');
         this.highlightSelected('kafka-clusters-list', clusterId);
         this.updateCurrentSettings();
     }
@@ -225,7 +225,7 @@ class SettingsManager {
     selectRegistry(registryId) {
         api.setRegistryId(registryId);
         this.currentRegistry = registryId;
-        showToast(`레지스트리가 선택되었습니다: ${registryId}`, 'success');
+        showToast(`Registry selected: ${registryId}`, 'success');
         this.highlightSelected('registries-list', registryId);
         this.updateCurrentSettings();
     }
@@ -236,7 +236,7 @@ class SettingsManager {
     selectStorage(storageId) {
         api.setStorageId(storageId);
         this.currentStorage = storageId;
-        showToast(`스토리지가 선택되었습니다: ${storageId}`, 'success');
+        showToast(`Storage selected: ${storageId}`, 'success');
         this.highlightSelected('storages-list', storageId);
         this.updateCurrentSettings();
     }
@@ -247,7 +247,7 @@ class SettingsManager {
     selectConnect(connectId) {
         api.setConnectId(connectId);
         this.currentConnect = connectId;
-        showToast(`Kafka Connect가 선택되었습니다: ${connectId}`, 'success');
+        showToast(`Kafka Connect selected: ${connectId}`, 'success');
         this.updateCurrentSettings();
     }
 
@@ -269,17 +269,17 @@ class SettingsManager {
      */
     async testCluster(clusterId) {
         try {
-            showToast('연결 테스트 중...', 'info');
+            showToast('Testing connection...', 'info');
             const result = await api.testKafkaConnection(clusterId);
             
             if (result.success) {
-                showToast(`✅ 연결 성공! (${result.latency_ms?.toFixed(0)}ms) - ${result.message}`, 'success');
+                showToast(`✅ Connection successful! (${result.latency_ms?.toFixed(0)}ms) - ${result.message}`, 'success');
             } else {
-                showToast(`❌ 연결 실패: ${result.message}`, 'error');
+                showToast(`❌ Connection failed: ${result.message}`, 'error');
             }
         } catch (error) {
-            console.error('연결 테스트 실패:', error);
-            showToast(`연결 테스트 실패: ${error.message}`, 'error');
+            console.error('Connection test failed:', error);
+            showToast(`Connection test failed: ${error.message}`, 'error');
         }
     }
 
@@ -345,18 +345,18 @@ class SettingsManager {
      * 클러스터 삭제
      */
     async deleteCluster(clusterId) {
-        if (!confirm('정말로 이 Kafka 클러스터를 삭제하시겠습니까?')) {
+        if (!confirm('Are you sure you want to delete this Kafka cluster?')) {
             return;
         }
 
         try {
-            showToast('삭제 중...', 'info');
+            showToast('Deleting...', 'info');
             await api.deleteKafkaCluster(clusterId);
-            showToast('✅ 클러스터가 삭제되었습니다.', 'success');
+            showToast('✅ Cluster deleted.', 'success');
             await this.loadClusters();
         } catch (error) {
-            console.error('삭제 실패:', error);
-            showToast(`❌ 삭제 실패: ${error.message}`, 'error');
+            console.error('Delete failed:', error);
+            showToast(`❌ Delete failed: ${error.message}`, 'error');
         }
     }
 
@@ -364,18 +364,18 @@ class SettingsManager {
      * 레지스트리 삭제
      */
     async deleteRegistry(registryId) {
-        if (!confirm('정말로 이 Schema Registry를 삭제하시겠습니까?')) {
+        if (!confirm('Are you sure you want to delete this Schema Registry?')) {
             return;
         }
 
         try {
-            showToast('삭제 중...', 'info');
+            showToast('Deleting...', 'info');
             await api.deleteSchemaRegistry(registryId);
-            showToast('✅ 레지스트리가 삭제되었습니다.', 'success');
+            showToast('✅ Registry deleted.', 'success');
             await this.loadRegistries();
         } catch (error) {
-            console.error('삭제 실패:', error);
-            showToast(`❌ 삭제 실패: ${error.message}`, 'error');
+            console.error('Delete failed:', error);
+            showToast(`❌ Delete failed: ${error.message}`, 'error');
         }
     }
 
@@ -383,18 +383,18 @@ class SettingsManager {
      * 스토리지 삭제
      */
     async deleteStorage(storageId) {
-        if (!confirm('정말로 이 Object Storage를 삭제하시겠습니까?')) {
+        if (!confirm('Are you sure you want to delete this Object Storage?')) {
             return;
         }
 
         try {
-            showToast('삭제 중...', 'info');
+            showToast('Deleting...', 'info');
             await api.deleteObjectStorage(storageId);
-            showToast('✅ 스토리지가 삭제되었습니다.', 'success');
+            showToast('✅ Storage deleted.', 'success');
             await this.loadStorages();
         } catch (error) {
-            console.error('삭제 실패:', error);
-            showToast(`❌ 삭제 실패: ${error.message}`, 'error');
+            console.error('Delete failed:', error);
+            showToast(`❌ Delete failed: ${error.message}`, 'error');
         }
     }
 
@@ -402,18 +402,18 @@ class SettingsManager {
      * Kafka Connect 삭제
      */
     async deleteConnect(connectId) {
-        if (!confirm('정말로 이 Kafka Connect를 삭제하시겠습니까?')) {
+        if (!confirm('Are you sure you want to delete this Kafka Connect?')) {
             return;
         }
 
         try {
-            showToast('삭제 중...', 'info');
+            showToast('Deleting...', 'info');
             await api.deleteKafkaConnect(connectId);
-            showToast('✅ Kafka Connect가 삭제되었습니다.', 'success');
+            showToast('✅ Kafka Connect deleted.', 'success');
             await this.loadConnects();
         } catch (error) {
-            console.error('삭제 실패:', error);
-            showToast(`❌ 삭제 실패: ${error.message}`, 'error');
+            console.error('Delete failed:', error);
+            showToast(`❌ Delete failed: ${error.message}`, 'error');
         }
     }
 
@@ -465,7 +465,7 @@ class SettingsManager {
         if (refreshBtn) {
             refreshBtn.addEventListener('click', async () => {
                 await this.init();
-                showToast('설정을 새로고침했습니다.', 'success');
+                showToast('Settings refreshed.', 'success');
             });
         }
     }
@@ -499,27 +499,27 @@ class SettingsManager {
     showCreateClusterModal() {
         const content = `
             <div class="modal-header">
-                <h2><i class="fas fa-server"></i> Kafka 클러스터 추가</h2>
+                <h2><i class="fas fa-server"></i> Add Kafka Cluster</h2>
             </div>
             <div class="modal-body">
                 <form id="create-cluster-form">
                     <div class="form-group">
-                        <label for="cluster_id">클러스터 ID *</label>
+                        <label for="cluster_id">Cluster ID *</label>
                         <input type="text" id="cluster_id" name="cluster_id" required placeholder="prod-cluster">
-                        <small>고유한 클러스터 식별자</small>
+                        <small>Unique cluster identifier</small>
                     </div>
                     <div class="form-group">
-                        <label for="name">이름 *</label>
+                        <label for="name">Name *</label>
                         <input type="text" id="name" name="name" required placeholder="Production Cluster">
                     </div>
                     <div class="form-group">
                         <label for="bootstrap_servers">Bootstrap Servers *</label>
                         <input type="text" id="bootstrap_servers" name="bootstrap_servers" required 
                                placeholder="broker1:9092,broker2:9092">
-                        <small>쉼표로 구분된 브로커 주소</small>
+                        <small>Comma-separated broker addresses</small>
                     </div>
                     <div class="form-group">
-                        <label for="description">설명</label>
+                        <label for="description">Description</label>
                         <textarea id="description" name="description" rows="2" 
                                   placeholder="프로덕션 환경 Kafka 클러스터"></textarea>
                     </div>
@@ -527,10 +527,10 @@ class SettingsManager {
             </div>
             <div class="modal-footer">
                 <button class="btn btn-secondary" onclick="settingsManager.closeModal()">
-                    취소
+                    Cancel
                 </button>
                 <button class="btn btn-primary" onclick="settingsManager.createCluster()">
-                    <i class="fas fa-save"></i> 생성
+                    <i class="fas fa-save"></i> Create
                 </button>
             </div>
         `;
@@ -546,9 +546,9 @@ class SettingsManager {
         const data = Object.fromEntries(formData);
 
         try {
-            showToast('클러스터 생성 중...', 'info');
+            showToast('Creating cluster...', 'info');
             await api.createKafkaCluster(data);
-            showToast('✅ 클러스터가 생성되었습니다.', 'success');
+            showToast('✅ Cluster created.', 'success');
             this.closeModal();
             await this.loadClusters();
         } catch (error) {
@@ -563,12 +563,12 @@ class SettingsManager {
     showCreateRegistryModal() {
         const content = `
             <div class="modal-header">
-                <h2><i class="fas fa-database"></i> Schema Registry 추가</h2>
+                <h2><i class="fas fa-database"></i> Add Schema Registry</h2>
             </div>
             <div class="modal-body">
                 <form id="create-registry-form">
                     <div class="form-group">
-                        <label for="registry_id">레지스트리 ID *</label>
+                        <label for="registry_id">Registry ID *</label>
                         <input type="text" id="registry_id" name="registry_id" required placeholder="prod-registry">
                     </div>
                     <div class="form-group">
@@ -586,9 +586,9 @@ class SettingsManager {
                 </form>
             </div>
             <div class="modal-footer">
-                <button class="btn btn-secondary" onclick="settingsManager.closeModal()">취소</button>
+                <button class="btn btn-secondary" onclick="settingsManager.closeModal()">Cancel</button>
                 <button class="btn btn-primary" onclick="settingsManager.createRegistry()">
-                    <i class="fas fa-save"></i> 생성
+                    <i class="fas fa-save"></i> Create
                 </button>
             </div>
         `;
@@ -604,9 +604,9 @@ class SettingsManager {
         const data = Object.fromEntries(formData);
 
         try {
-            showToast('레지스트리 생성 중...', 'info');
+            showToast('Creating registry...', 'info');
             await api.createSchemaRegistry(data);
-            showToast('✅ 레지스트리가 생성되었습니다.', 'success');
+            showToast('✅ Registry created.', 'success');
             this.closeModal();
             await this.loadRegistries();
         } catch (error) {
@@ -621,12 +621,12 @@ class SettingsManager {
     showCreateStorageModal() {
         const content = `
             <div class="modal-header">
-                <h2><i class="fas fa-hdd"></i> Object Storage 추가</h2>
+                <h2><i class="fas fa-hdd"></i> Add Object Storage</h2>
             </div>
             <div class="modal-body">
                 <form id="create-storage-form">
                     <div class="form-group">
-                        <label for="storage_id">스토리지 ID *</label>
+                        <label for="storage_id">Storage ID *</label>
                         <input type="text" id="storage_id" name="storage_id" required placeholder="minio-prod">
                     </div>
                     <div class="form-group">
@@ -652,9 +652,9 @@ class SettingsManager {
                 </form>
             </div>
             <div class="modal-footer">
-                <button class="btn btn-secondary" onclick="settingsManager.closeModal()">취소</button>
+                <button class="btn btn-secondary" onclick="settingsManager.closeModal()">Cancel</button>
                 <button class="btn btn-primary" onclick="settingsManager.createStorage()">
-                    <i class="fas fa-save"></i> 생성
+                    <i class="fas fa-save"></i> Create
                 </button>
             </div>
         `;
@@ -670,9 +670,9 @@ class SettingsManager {
         const data = Object.fromEntries(formData);
 
         try {
-            showToast('스토리지 생성 중...', 'info');
+            showToast('Creating storage...', 'info');
             await api.createObjectStorage(data);
-            showToast('✅ 스토리지가 생성되었습니다.', 'success');
+            showToast('✅ Storage created.', 'success');
             this.closeModal();
             await this.loadStorages();
         } catch (error) {
@@ -687,7 +687,7 @@ class SettingsManager {
     showCreateConnectModal() {
         const content = `
             <div class="modal-header">
-                <h2><i class="fas fa-plug"></i> Kafka Connect 추가</h2>
+                <h2><i class="fas fa-plug"></i> Add Kafka Connect</h2>
             </div>
             <div class="modal-body">
                 <form id="create-connect-form">
@@ -698,7 +698,7 @@ class SettingsManager {
                     <div class="form-group">
                         <label for="cluster_id">Kafka Cluster ID *</label>
                         <input type="text" id="cluster_id" name="cluster_id" required placeholder="prod-cluster">
-                        <small>연관된 Kafka 클러스터 ID</small>
+                        <small>Associated Kafka Cluster ID</small>
                     </div>
                     <div class="form-group">
                         <label for="name">이름 *</label>
@@ -715,9 +715,9 @@ class SettingsManager {
                 </form>
             </div>
             <div class="modal-footer">
-                <button class="btn btn-secondary" onclick="settingsManager.closeModal()">취소</button>
+                <button class="btn btn-secondary" onclick="settingsManager.closeModal()">Cancel</button>
                 <button class="btn btn-primary" onclick="settingsManager.createConnect()">
-                    <i class="fas fa-save"></i> 생성
+                    <i class="fas fa-save"></i> Create
                 </button>
             </div>
         `;
@@ -733,9 +733,9 @@ class SettingsManager {
         const data = Object.fromEntries(formData);
 
         try {
-            showToast('Kafka Connect 생성 중...', 'info');
+            showToast('Creating Kafka Connect...', 'info');
             await api.createKafkaConnect(data);
-            showToast('✅ Kafka Connect가 생성되었습니다.', 'success');
+            showToast('✅ Kafka Connect created.', 'success');
             this.closeModal();
             await this.loadConnects();
         } catch (error) {
