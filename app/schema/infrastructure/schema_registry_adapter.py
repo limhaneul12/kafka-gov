@@ -218,6 +218,7 @@ class ConfluentSchemaRegistryAdapter(ISchemaRegistryRepository):  # type: ignore
         deleted_versions: list[int] = await self.client.delete_subject(subject)
         logger.info(f"Subject deleted: {subject} ({len(deleted_versions)} versions)")
 
+    @handle_schema_registry_error("List all subjects")
     async def list_all_subjects(self) -> list[SubjectName]:  # type: ignore[override]
         """Schema Registry의 모든 Subject 목록 조회"""
         subjects: list[str] = await self.client.get_subjects()
