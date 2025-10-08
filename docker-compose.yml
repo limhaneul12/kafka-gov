@@ -105,8 +105,8 @@ services:
         condition: service_healthy
       minio:
         condition: service_healthy
-      migration:
-        condition: service_completed_successfully
+      # migration:
+      #   condition: service_completed_successfully
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 30s

@@ -20,6 +20,46 @@
                 <i class="fas fa-plug"></i>
                 <span>Kafka Connect Manager</span>
             </div>
+
+    <!-- Validate Connector Config Modal -->
+    <div id="validate-config-modal" class="modal glass">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Validate Connector Config</h3>
+                <button class="modal-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="validate-config-form">
+                    <div class="form-group">
+                        <label>Plugin Class</label>
+                        <input type="text" id="validate-plugin-class" readonly>
+                        <small>Kafka Connect 플러그인 클래스</small>
+                    </div>
+                    <div class="form-group">
+                        <label for="validate-config-json">Configuration (JSON) *</label>
+                        <textarea id="validate-config-json" rows="12" required
+                            placeholder='{
+  "name": "example-connector",
+  "config": {
+    "connector.class": "org.apache.kafka.connect.file.FileStreamSourceConnector",
+    "tasks.max": "1",
+    "topic": "test-topic"
+  }
+}'></textarea>
+                        <small>커넥터 생성 시 사용하는 JSON 설정을 붙여넣으세요.</small>
+                    </div>
+                </form>
+                <div class="form-group">
+                    <label>Validation Result</label>
+                    <pre id="validate-config-result" style="max-height: 320px; overflow: auto; background: #0b1020; color: #e5e7eb; padding: 12px; border-radius: 8px;"></pre>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary modal-close">Cancel</button>
+                <button type="button" class="btn btn-primary" id="validate-config-run-btn">Validate</button>
+            </div>
+        </div>
+    </div>
         </div>
         <div class="nav-center">
             <select id="env-selector" class="env-selector">

@@ -695,8 +695,61 @@ class ConnectManager {
      * Plugin 검증
      */
     async validatePlugin(pluginClass) {
-        // TODO: Implement validation
-        console.log('Validate plugin:', pluginClass);
+        try {
+            // 모달 열기 및 초기화
+            const modalId = 'validate-config-modal';
+            const pluginInput = document.getElementById('validate-plugin-class');
+            const jsonTextarea = document.getElementById('validate-config-json');
+            const resultPre = document.getElementById('validate-config-result');
+            const runBtn = document.getElementById('validate-config-run-btn');
+
+            if (!pluginInput || !jsonTextarea || !resultPre || !runBtn) {
+                console.error('Validate modal elements not found');
+                Toast.error('검증 모달 초기화에 실패했습니다.');
+                return;
+            }
+
+            pluginInput.value = pluginClass;
+            resultPre.textContent = '';
+
+            // 기존 클릭 핸들러 제거 후 재바인딩 (중복 방지)
+            const newRunBtn = runBtn.cloneNode(true);
+            runBtn.parentNode.replaceChild(newRunBtn, runBtn);
+
+            newRunBtn.addEventListener('click', async () => {
+                // JSON 파싱
+                let payload;
+                try {
+                    payload = JSON.parse(jsonTextarea.value);
+                } catch (e) {
+                    Toast.error('유효한 JSON을 입력하세요.');
+                    resultPre.textContent = `JSON Parse Error: ${e.message}`;
+                    return;
+                }
+
+                // Backend 호출
+                try {
+                    const endpoint = `/v1/connect/${this.currentConnectId}/connector-plugins/${encodeURIComponent(pluginClass)}/config/validate`;
+                    const resp = await api.put(endpoint, payload);
+                    resultPre.textContent = JSON.stringify(resp, null, 2);
+                    Toast.success('검증이 완료되었습니다.');
+                } catch (error) {
+                    console.error('Validation failed:', error);
+                    resultPre.textContent = `Validation Error:\n${error.message}`;
+                    Toast.error('검증 요청에 실패했습니다.');
+                }
+            });
+
+            // 모달 닫기 버튼 동작 보장
+            document.querySelectorAll(`#${modalId} .modal-close`).forEach(btn => {
+                btn.addEventListener('click', () => Modal.hide(modalId));
+            });
+
+            Modal.show(modalId);
+        } catch (err) {
+            console.error('Unexpected error in validatePlugin:', err);
+            Toast.error('플러그인 검증 중 오류가 발생했습니다.');
+        }
     }
 }
 

@@ -212,7 +212,8 @@ class ApiClient {
      * 토픽 일괄 삭제
      */
     async bulkDeleteTopics(topicNames) {
-        return this.post('/v1/topics/bulk-delete', topicNames);
+        const id = this.currentClusterId;
+        return this.post(`/v1/topics/bulk-delete?cluster_id=${id}`, topicNames);
     }
 
 
@@ -364,7 +365,7 @@ class ApiClient {
         if (filters.limit) params.append('limit', filters.limit);
         
         const query = params.toString();
-        const url = query ? `/v1/shared/activities/history?${query}` : '/v1/shared/activities/history';
+        const url = query ? `/v1/audit/history?${query}` : '/v1/audit/history';
         return this.get(url);
     }
 
