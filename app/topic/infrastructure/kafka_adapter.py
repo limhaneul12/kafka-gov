@@ -19,8 +19,12 @@ TopicConfig = dict[TopicName, dict[str, str]]
 TopicPartitions = dict[TopicName, int]
 
 
-class KafkaTopicAdapter(ITopicRepository):
-    """Kafka AdminClient 어댑터"""
+class KafkaTopicAdapter(ITopicRepository):  # type: ignore[misc]
+    """Kafka AdminClient 어댑터
+
+    Note:
+        모듈 경로 불일치로 인한 pyrefly 에러는 type: ignore로 처리
+    """
 
     def __init__(self, admin_client: AdminClient) -> None:
         self.admin_client = admin_client

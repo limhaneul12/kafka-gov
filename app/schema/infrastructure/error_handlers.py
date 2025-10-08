@@ -3,10 +3,10 @@
 from __future__ import annotations
 
 import logging
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable
 from contextlib import suppress
 from functools import wraps
-from typing import ParamSpec, TypeVar
+from typing import Any, ParamSpec, TypeVar
 
 from confluent_kafka.schema_registry.error import SchemaRegistryError
 
@@ -19,7 +19,7 @@ R = TypeVar("R")
 
 def handle_schema_registry_error(
     operation: str, context_builder: Callable[..., str] | None = None
-) -> Callable[[Callable[P, R]], Callable[P, R]]:
+) -> Callable[[Callable[P, Awaitable[R]]], Callable[P, Awaitable[R]]]:
     """Schema Registry 에러를 자동으로 처리하는 데코레이터
 
     **이식성**: 이 데코레이터는 다른 모듈/프로젝트에서도 재사용 가능
@@ -54,7 +54,7 @@ def handle_schema_registry_error(
             return await self.client.some_method(param)
     """
 
-    def decorator(func: Callable[P, R]) -> Callable[P, R]:
+    def decorator(func: Callable[P, Awaitable[R]]) -> Callable[P, Awaitable[R]]:
         @wraps(func)
         async def async_wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
             try:
@@ -68,10 +68,12 @@ def handle_schema_registry_error(
                         context = context_builder(*args, **kwargs)
                 else:
                     # 기본 로직: subject 파라미터 자동 추출
-                    if len(args) > 1 and isinstance(args[1], str):
-                        context = args[1]
-                    elif "subject" in kwargs:
-                        context = str(kwargs["subject"])
+                    args_tuple: tuple[Any, ...] = args
+                    kwargs_dict: dict[str, Any] = kwargs
+                    if len(args_tuple) > 1 and isinstance(args_tuple[1], str):
+                        context = args_tuple[1]
+                    elif "subject" in kwargs_dict:
+                        context = str(kwargs_dict["subject"])
 
                 # 에러 메시지 구성 및 로깅
                 context_msg = f" ({context})" if context else ""
@@ -81,6 +83,6 @@ def handle_schema_registry_error(
                 # 도메인 예외로 변환하여 발생
                 raise RuntimeError(error_msg) from e
 
-        return async_wrapper  # type: ignore[return-value]
+        return async_wrapper
 
     return decorator

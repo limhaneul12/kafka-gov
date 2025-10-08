@@ -35,11 +35,17 @@ def _subquery_log_model[AuditLogT: (AuditLogModel, SchemaAuditLogModel)](
     Returns:
         SQLAlchemy Select 쿼리 객체
     """
+    # team 컬럼 존재 여부 확인 후 분기
+    try:
+        team_col = getattr(model, "team", literal(None).label("team"))
+    except AttributeError:
+        team_col = literal(None).label("team")
+
     return select(
         model.action,
         model.target,
         model.actor,
-        model.team if hasattr(model, "team") else literal(None).label("team"),
+        team_col,
         model.timestamp,
         model.message,
         model.snapshot,

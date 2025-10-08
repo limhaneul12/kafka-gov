@@ -7,6 +7,8 @@ import logging
 import msgspec
 
 from ..domain.models import (
+    DomainCleanupPolicy,
+    DomainEnvironment,
     DomainTopicAction,
     DomainTopicBatch,
     DomainTopicConfig,
@@ -45,10 +47,13 @@ class TopicTypeAdapters:
             # 설정 변환 (직접 생성 - 불필요한 중간 dict 제거)
             domain_config = None
             if item.config:
+                # CleanupPolicy -> DomainCleanupPolicy 변환
+                domain_cleanup = DomainCleanupPolicy(item.config.cleanup_policy.value)
+
                 domain_config = DomainTopicConfig(
                     partitions=item.config.partitions,
                     replication_factor=item.config.replication_factor,
-                    cleanup_policy=item.config.cleanup_policy,
+                    cleanup_policy=domain_cleanup,
                     retention_ms=item.config.retention_ms,
                     min_insync_replicas=item.config.min_insync_replicas,
                     max_message_bytes=item.config.max_message_bytes,
@@ -92,10 +97,13 @@ class TopicTypeAdapters:
             # 각 아이템을 TopicSpec으로 변환
             specs = tuple(cls.convert_item_to_spec(item) for item in request.items)
 
+            # Environment -> DomainEnvironment 변환
+            domain_env = DomainEnvironment(request.env.value)
+
             # TopicBatch 생성 (직접 생성 - 불필요한 중간 dict 제거)
             return DomainTopicBatch(
                 change_id=request.change_id,
-                env=request.env,
+                env=domain_env,
                 specs=specs,
             )
 

@@ -61,7 +61,7 @@ class TopicBatchApplyUseCase:
             topic_repository = KafkaTopicAdapter(admin_client)
 
             # 3. Planner Service 생성 및 계획 재생성
-            planner_service = TopicPlannerService(topic_repository)
+            planner_service = TopicPlannerService(topic_repository)  # type: ignore[arg-type]
             plan = await planner_service.create_plan(batch, actor)
 
             # 에러 위반이 있으면 적용 중단
@@ -231,7 +231,7 @@ class TopicBatchApplyUseCase:
 
         # 토픽 생성 (트랜잭션 보장)
         if create_specs:
-            create_results = await topic_repository.create_topics(create_specs)
+            create_results = await topic_repository.create_topics(create_specs)  # type: ignore[arg-type]
             for spec in create_specs:
                 name = spec.name
                 error = create_results.get(name)

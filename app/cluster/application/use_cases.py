@@ -401,7 +401,7 @@ class CreateObjectStorageUseCase:
         """스토리지 생성"""
         # Secret Key 암호화
         encryption_service = get_encryption_service()
-        encrypted_secret = encryption_service.encrypt(secret_key) if secret_key else None
+        encrypted_secret = encryption_service.encrypt(secret_key)
 
         storage = ObjectStorage(
             storage_id=storage_id,

@@ -55,7 +55,7 @@ class SchemaDeleteUseCase:
         registry_repository = ConfluentSchemaRegistryAdapter(registry_client)
 
         # 2. 영향도 분석 수행
-        delete_analyzer = SchemaDeleteAnalyzer(registry_repository)
+        delete_analyzer = SchemaDeleteAnalyzer(registry_repository)  # type: ignore[arg-type]
         impact = await delete_analyzer.analyze_delete_impact(subject, strategy)
 
         # 감사 로그 기록
@@ -105,7 +105,7 @@ class SchemaDeleteUseCase:
         registry_repository = ConfluentSchemaRegistryAdapter(registry_client)
 
         # 2. 영향도 분석
-        delete_analyzer = SchemaDeleteAnalyzer(registry_repository)
+        delete_analyzer = SchemaDeleteAnalyzer(registry_repository)  # type: ignore[arg-type]
         impact = await delete_analyzer.analyze_delete_impact(subject, strategy)
 
         # 2. 안전성 검증

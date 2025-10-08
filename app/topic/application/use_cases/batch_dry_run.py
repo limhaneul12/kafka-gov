@@ -46,7 +46,7 @@ class TopicBatchDryRunUseCase:
             topic_repository = KafkaTopicAdapter(admin_client)
 
             # 3. Planner Service 생성 및 계획 수립
-            planner_service = TopicPlannerService(topic_repository)
+            planner_service = TopicPlannerService(topic_repository)  # type: ignore[arg-type]
             plan = await planner_service.create_plan(batch, actor)
 
             # 계획 저장

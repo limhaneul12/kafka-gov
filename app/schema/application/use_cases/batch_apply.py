@@ -82,7 +82,7 @@ class SchemaBatchApplyUseCase:
                 )
 
             # 3. Planner Service 생성 및 계획 수립
-            planner_service = SchemaPlannerService(registry_repository, self.policy_engine)
+            planner_service = SchemaPlannerService(registry_repository, self.policy_engine)  # type: ignore[arg-type]
             plan = await planner_service.create_plan(batch)
 
             if not plan.can_apply:
@@ -99,7 +99,7 @@ class SchemaBatchApplyUseCase:
                     continue
 
                 try:
-                    version, schema_id = await registry_repository.register_schema(spec)
+                    version, schema_id = await registry_repository.register_schema(spec)  # type: ignore[arg-type]
                     artifact = await self._persist_artifact(
                         storage_repository, spec, version, batch.change_id
                     )

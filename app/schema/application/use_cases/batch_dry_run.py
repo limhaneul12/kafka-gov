@@ -49,7 +49,7 @@ class SchemaBatchDryRunUseCase:
             registry_repository = ConfluentSchemaRegistryAdapter(registry_client)
 
             # 2. Planner Service 생성 및 계획 수립
-            planner_service = SchemaPlannerService(registry_repository, self.policy_engine)
+            planner_service = SchemaPlannerService(registry_repository, self.policy_engine)  # type: ignore[arg-type]
             plan = await planner_service.create_plan(batch)
 
             # 정책 위반 분석

@@ -317,16 +317,16 @@ class SchemaUploadUseCase:
         subject_name = f"{context.env.value}.{Path(filename).stem}"
 
         # 2. Schema Registry 자동 등록
-        try:
-            # 호환성 모드 결정 (파라미터 우선, 없으면 기본값)
-            if context.compatibility_mode is None:
-                final_compatibility = DomainCompatibilityMode.BACKWARD
-            elif isinstance(context.compatibility_mode, str):
-                # 문자열로 들어온 경우 enum으로 변환
-                final_compatibility = DomainCompatibilityMode(context.compatibility_mode)
-            else:
-                final_compatibility = context.compatibility_mode
+        # 호환성 모드 결정 (파라미터 우선, 없으면 기본값)
+        if context.compatibility_mode is None:
+            final_compatibility = DomainCompatibilityMode.BACKWARD
+        elif isinstance(context.compatibility_mode, str):
+            # 문자열로 들어온 경우 enum으로 변환
+            final_compatibility = DomainCompatibilityMode(context.compatibility_mode)
+        else:
+            final_compatibility = context.compatibility_mode
 
+        try:
             # DomainSchemaSpec 생성
             schema_spec = DomainSchemaSpec(
                 subject=subject_name,
@@ -340,7 +340,8 @@ class SchemaUploadUseCase:
             )
 
             # Schema Registry에 등록
-            version = await context.registry_repository.register_schema(schema_spec)
+            version_tuple = await context.registry_repository.register_schema(schema_spec)  # type: ignore[arg-type]
+            version, _schema_id = version_tuple  # (버전, 스키마 ID) 언팩
 
             # 호환성 모드 설정 (Subject 레벨)
             compatibility_str = (

@@ -12,6 +12,7 @@ from minio import Minio
 
 from .models import (
     ConnectionTestResult,
+    ObjectStorage,
 )
 from .repositories import (
     IKafkaClusterRepository,
@@ -39,6 +40,15 @@ class IConnectionManager(ABC):
 
         Returns:
             (Minio 클라이언트, bucket_name) 튜플
+        """
+        ...
+
+    @abstractmethod
+    async def get_storage_info(self, storage_id: str) -> ObjectStorage:
+        """Object Storage 정보 조회
+
+        Returns:
+            ObjectStorage 도메인 모델
         """
         ...
 
@@ -231,11 +241,18 @@ class ConnectionManager(IConnectionManager):
             # Client 생성
             logger.info(f"Creating new MinIO Client: {storage_id}")
             config = storage.to_minio_config()
+
+            # 타입 안전성을 위한 명시적 변환
+            endpoint: str = str(config["endpoint"])
+            access_key: str | None = str(config["access_key"]) if config["access_key"] else None
+            secret_key: str | None = str(config["secret_key"]) if config["secret_key"] else None
+            secure: bool = bool(config["secure"])
+
             client = Minio(
-                endpoint=config["endpoint"],
-                access_key=config["access_key"],
-                secret_key=config["secret_key"],
-                secure=config["secure"],
+                endpoint=endpoint,
+                access_key=access_key,
+                secret_key=secret_key,
+                secure=secure,
             )
 
             # 캐시 저장 (bucket_name과 함께)
@@ -243,6 +260,23 @@ class ConnectionManager(IConnectionManager):
             self._minio_clients[storage_id] = result
 
             return result
+
+    async def get_storage_info(self, storage_id: str) -> ObjectStorage:
+        """Object Storage 정보 조회
+
+        Args:
+            storage_id: 스토리지 ID
+
+        Returns:
+            ObjectStorage 도메인 모델
+        """
+        storage = await self.storage_repo.get_by_id(storage_id)
+        if not storage:
+            raise ValueError(f"Object Storage not found: {storage_id}")
+        if not storage.is_active:
+            raise ValueError(f"Object Storage is inactive: {storage_id}")
+
+        return storage
 
     async def test_kafka_connection(self, cluster_id: str) -> ConnectionTestResult:
         """Kafka 연결 테스트

@@ -34,8 +34,10 @@ class ISchemaRegistryRepository(ABC):
         """호환성 검증"""
 
     @abstractmethod
-    async def register_schema(self, spec: DomainSchemaSpec, compatibility: bool = True) -> int:
-        """스키마 등록 후 버전 반환"""
+    async def register_schema(
+        self, spec: DomainSchemaSpec, compatibility: bool = True
+    ) -> tuple[int, int]:
+        """스키마 등록 후 (버전, 스키마 ID) 반환"""
 
     @abstractmethod
     async def delete_subject(self, subject: SubjectName) -> None:
