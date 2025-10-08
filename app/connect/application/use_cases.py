@@ -77,13 +77,13 @@ class ListConnectorsUseCase(BaseConnectorUseCase):
                     connector_info["description"] = meta.description
                     connector_info["owner"] = meta.owner
                 else:
-                    connector_info["team"] = None
                     connector_info["tags"] = []
                     connector_info["owner"] = None
 
         return connectors
 
 
+class ConnectorOperations(BaseConnectorUseCase):
     """커넥터 기본 CRUD 작업을 통합한 Use Case
 
     하나의 클래스로 여러 작업을 제공하여 중복 제거
@@ -120,6 +120,7 @@ class ListConnectorsUseCase(BaseConnectorUseCase):
         """커넥터 삭제"""
         client = await self._get_client(connect_id)
         await client.delete_connector(connector_name)
+
 
 # ============================================================================
 # Connector State Control Use Cases
@@ -166,6 +167,7 @@ class TaskOperations(BaseConnectorUseCase):
         """태스크 재시작 (Connector RUNNING + Task FAILED 시 사용)"""
         client = await self._get_client(connect_id)
         await client.restart_task(connector_name, task_id)
+
 
 class TopicOperations(BaseConnectorUseCase):
     """커넥터 토픽 관련 작업을 통합한 Use Case"""

@@ -20,7 +20,7 @@ class KafkaConnectRestClient:
 
     def __init__(self, connect: KafkaConnect) -> None:
         """
-            connect: KafkaConnect 도메인 모델 (URL, 인증 정보 포함)
+        connect: KafkaConnect 도메인 모델 (URL, 인증 정보 포함)
         """
         self.connect = connect
         self.base_url = connect.url.rstrip("/")
@@ -31,6 +31,7 @@ class KafkaConnectRestClient:
             self.auth = (connect.auth_username, connect.auth_password)
 
         self.timeout = 30.0
+
     async def _request(
         self,
         method: str,
