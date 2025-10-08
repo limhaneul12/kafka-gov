@@ -349,6 +349,8 @@ class DomainSchemaArtifact(msgspec.Struct, frozen=True):
     version: int | None = None
     checksum: SchemaHash | None = None
     schema_type: DomainSchemaType | None = None
+    compatibility_mode: DomainCompatibilityMode | None = None
+    owner: str | None = None
 
     def __post_init__(self) -> None:
         if self.version is not None and self.version < 1:

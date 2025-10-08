@@ -122,6 +122,7 @@ class IAuditRepository(ABC):
         status: str,
         message: str | None = None,
         snapshot: dict[str, Any] | None = None,
+        team: str | None = None,
     ) -> str:
         """토픽 작업 감사 로그 기록"""
         ...

@@ -8,7 +8,7 @@ import logging
 from collections.abc import Iterable
 
 import orjson
-from confluent_kafka.schema_registry import AsyncSchemaRegistryClient, Schema
+from confluent_kafka.schema_registry import AsyncSchemaRegistryClient, Schema, ServerConfig
 from confluent_kafka.schema_registry.error import SchemaRegistryError
 
 from ..domain.models import (
@@ -22,6 +22,7 @@ from ..domain.models import (
     SubjectName,
 )
 from ..domain.repositories.interfaces import ISchemaRegistryRepository
+from .error_handlers import handle_schema_registry_error
 
 logger = logging.getLogger(__name__)
 
@@ -32,52 +33,48 @@ class ConfluentSchemaRegistryAdapter(ISchemaRegistryRepository):
     def __init__(self, client: AsyncSchemaRegistryClient) -> None:
         self.client = client
 
+    @handle_schema_registry_error("Describe subjects")
     async def describe_subjects(self, subjects: Iterable[SubjectName]) -> DescribeResult:
         subject_list: list[SubjectName] = list(subjects)
         result: DescribeResult = {}
 
-        try:
-            # 모든 subject 목록 조회 (1번의 API 호출)
-            all_subjects: list[str] = await self.client.get_subjects()
+        # 모든 subject 목록 조회 (1번의 API 호출)
+        all_subjects: list[str] = await self.client.get_subjects()
 
-            for subject in subject_list:
-                if subject not in all_subjects:
-                    continue
+        for subject in subject_list:
+            if subject not in all_subjects:
+                continue
 
-                try:
-                    # 최신 버전 조회
-                    latest_version = await self.client.get_latest_version(subject)
+            try:
+                # 최신 버전 조회
+                latest_version = await self.client.get_latest_version(subject)
 
-                    if latest_version and latest_version.schema:
-                        result[subject] = SchemaVersionInfo(
-                            version=latest_version.version,
-                            schema_id=latest_version.schema_id,
-                            schema=latest_version.schema.schema_str,
-                            schema_type=latest_version.schema.schema_type,
-                            references=[
-                                Reference(
-                                    name=ref.name,
-                                    subject=ref.subject,
-                                    version=ref.version,
-                                )
-                                for ref in (getattr(latest_version, "references", None) or [])
-                            ],
-                            hash=self._calculate_schema_hash(
-                                latest_version.schema.schema_str or ""
-                            ),
-                        )
-                except SchemaRegistryError as e:
-                    logger.warning(f"Failed to get schema for subject {subject}: {e}")
-                    continue
+                if latest_version and latest_version.schema:
+                    result[subject] = SchemaVersionInfo(
+                        version=latest_version.version,
+                        schema_id=latest_version.schema_id,
+                        schema=latest_version.schema.schema_str,
+                        schema_type=latest_version.schema.schema_type,
+                        references=[
+                            Reference(
+                                name=ref.name,
+                                subject=ref.subject,
+                                version=ref.version,
+                            )
+                            for ref in (getattr(latest_version, "references", None) or [])
+                        ],
+                        hash=self._calculate_schema_hash(latest_version.schema.schema_str or ""),
+                    )
+            except SchemaRegistryError as e:
+                logger.warning(f"Failed to get schema for subject {subject}: {e}")
+                continue
 
-            return result
-
-        except SchemaRegistryError as e:
-            logger.error(f"Failed to describe subjects: {e}")
-            raise RuntimeError(f"Schema Registry error: {e}") from e
+        return result
 
     async def check_compatibility(
-        self, spec: DomainSchemaSpec, references: list[Reference] | None = None
+        self,
+        spec: DomainSchemaSpec,
+        references: list[Reference] | None = None,
     ) -> DomainSchemaCompatibilityReport:
         """호환성 검증"""
         try:
@@ -123,7 +120,7 @@ class ConfluentSchemaRegistryAdapter(ISchemaRegistryRepository):
 
     async def check_compatibility_batch(self, specs: list[DomainSchemaSpec]) -> CompatibilityResult:
         """배치 호환성 검증 (병렬 처리로 성능 최적화)"""
-        tasks = [
+        tasks: list[DomainSchemaCompatibilityReport] = [
             self.check_compatibility(
                 spec,
                 [
@@ -158,137 +155,117 @@ class ConfluentSchemaRegistryAdapter(ISchemaRegistryRepository):
 
         return compatibility_result
 
-    async def register_schema(self, spec: DomainSchemaSpec, compatibility: bool = True) -> int:
-        """스키마 등록 후 버전 반환"""
-        try:
-            schema_str: str = self._extract_schema_string(spec)
+    @handle_schema_registry_error(
+        "Schema registration", lambda self, spec, compatibility: spec.subject
+    )
+    async def register_schema(
+        self, spec: DomainSchemaSpec, compatibility: bool = True
+    ) -> tuple[int, int]:
+        """스키마 등록 후 (버전, 스키마 ID) 반환
 
-            # 디버깅: 원본 스키마 정보 (WARNING으로 출력)
-            logger.warning(
-                f"[DEBUG] Registering schema for {spec.subject}:\n"
-                f"  - Original length: {len(schema_str)} chars\n"
-                f"  - Original bytes: {len(schema_str.encode('utf-8'))} bytes\n"
-                f"  - Schema type: {spec.schema_type.value}\n"
-                f"  - First 200 chars: {schema_str[:200]}"
+        Returns:
+            tuple[version, schema_id]: 등록된 스키마의 버전과 스키마 ID
+        """
+        schema_str: str = self._extract_schema_string(spec)
+        schema_str = self._normalize_schema_string(schema_str)
+
+        # 참조 변환
+        references_list: list[dict[str, int | str]] = [
+            Reference(
+                name=ref.name,
+                subject=ref.subject,
+                version=ref.version,
+            ).to_dict()
+            for ref in spec.references
+        ]
+
+        # Schema 객체 생성
+        schema_obj = Schema(
+            schema_str=schema_str,
+            schema_type=spec.schema_type.value,
+            references=references_list,
+        )
+
+        # 스키마 등록 (normalize_schemas=True로 Schema Registry가 정규화 처리)
+        schema_id = await self.client.register_schema(
+            subject_name=spec.subject,
+            schema=schema_obj,
+            normalize_schemas=True,
+        )
+
+        # 등록된 버전 조회
+        latest_version = await self.client.get_latest_version(spec.subject)
+
+        if latest_version and latest_version.version is not None:
+            logger.info(
+                f"Schema registered: {spec.subject} v{latest_version.version} (ID: {schema_id})"
             )
+            return (latest_version.version, schema_id)
+        else:
+            logger.warning(f"Could not retrieve version for registered schema {spec.subject}")
+            return (1, schema_id)  # 버전 기본값 1, schema_id는 실제 값
 
-            # 스키마 문자열 정규화 (인코딩 문제 방지)
-            schema_str_before = schema_str
-            schema_str = self._normalize_schema_string(schema_str)
-
-            # 디버깅: 정규화 후 스키마 정보
-            logger.warning(
-                f"[DEBUG] After normalization:\n"
-                f"  - Normalized length: {len(schema_str)} chars\n"
-                f"  - Normalized bytes: {len(schema_str.encode('utf-8'))} bytes\n"
-                f"  - Changed: {schema_str != schema_str_before}\n"
-                f"  - First 200 chars: {schema_str[:200]}"
-            )
-
-            # 참조 변환
-            references_list: list[dict[str, int | str]] = [
-                Reference(
-                    name=ref.name,
-                    subject=ref.subject,
-                    version=ref.version,
-                ).to_dict()
-                for ref in spec.references
-            ]
-
-            # Schema 객체 생성
-            schema_obj = Schema(
-                schema_str=schema_str,
-                schema_type=spec.schema_type.value,
-                references=references_list,
-            )
-
-            # 디버깅: Schema 객체 정보
-            logger.warning(
-                f"[DEBUG] Schema object created:\n"
-                f"  - schema_str type: {type(schema_obj.schema_str)}\n"
-                f"  - schema_str length: {len(schema_obj.schema_str) if schema_obj.schema_str else 0}\n"
-                f"  - schema_type: {schema_obj.schema_type}"
-            )
-
-            # 스키마 등록 (normalize_schemas=True로 Schema Registry가 정규화 처리)
-            logger.warning("[DEBUG] Calling client.register_schema with normalize_schemas=True")
-            schema_id = await self.client.register_schema(
-                subject_name=spec.subject,
-                schema=schema_obj,
-                normalize_schemas=True,  # Schema Registry가 정규화 처리
-            )
-            logger.warning(f"[DEBUG] Registration successful! Schema ID: {schema_id}")
-
-            # 등록된 버전 조회
-            latest_version = await self.client.get_latest_version(spec.subject)
-
-            if latest_version and latest_version.version is not None:
-                logger.info(
-                    f"Schema registered: {spec.subject} v{latest_version.version} (ID: {schema_id})"
-                )
-                return latest_version.version
-            else:
-                logger.warning(f"Could not retrieve version for registered schema {spec.subject}")
-                return 1  # 기본값으로 1 반환
-
-        except SchemaRegistryError as e:
-            logger.error(f"Failed to register schema {spec.subject}: {e}")
-            raise RuntimeError(f"Schema registration failed: {e}") from e
-
+    @handle_schema_registry_error("Delete subject")
     async def delete_subject(self, subject: SubjectName) -> None:
         """Subject 삭제"""
-        try:
-            # 모든 버전 삭제
-            deleted_versions: list[int] = await self.client.delete_subject(subject)
-            logger.info(f"Subject deleted: {subject} ({len(deleted_versions)} versions)")
+        # 모든 버전 삭제
+        deleted_versions: list[int] = await self.client.delete_subject(subject)
+        logger.info(f"Subject deleted: {subject} ({len(deleted_versions)} versions)")
 
-        except SchemaRegistryError as e:
-            logger.error(f"Failed to delete subject {subject}: {e}")
-            raise RuntimeError(f"Subject deletion failed: {e}") from e
-
+    @handle_schema_registry_error("List all subjects")
     async def list_all_subjects(self) -> list[SubjectName]:
         """Schema Registry의 모든 Subject 목록 조회"""
-        try:
-            subjects: list[str] = await self.client.get_subjects()
-            logger.info(f"Retrieved {len(subjects)} subjects from Schema Registry")
-            return subjects
-        except SchemaRegistryError as e:
-            logger.error(f"Failed to list all subjects: {e}")
-            raise RuntimeError(f"Failed to retrieve subjects: {e}") from e
+        subjects: list[str] = await self.client.get_subjects()
+        logger.info(f"Retrieved {len(subjects)} subjects from Schema Registry")
+        return subjects
 
+    @handle_schema_registry_error("Get schema versions")
     async def get_schema_versions(self, subject: SubjectName) -> list[int]:
         """Subject의 모든 버전 목록 조회"""
-        try:
-            versions = await self.client.get_versions(subject)
-            return sorted(versions)
-        except SchemaRegistryError as e:
-            logger.error(f"Failed to get versions for subject {subject}: {e}")
-            raise RuntimeError(f"Version retrieval failed: {e}") from e
+        versions = await self.client.get_versions(subject)
+        return sorted(versions)
 
+    @handle_schema_registry_error(
+        "Get schema by version", lambda self, subject, version: f"{subject} v{version}"
+    )
     async def get_schema_by_version(self, subject: SubjectName, version: int) -> SchemaVersionInfo:
         """특정 버전의 스키마 조회"""
-        try:
-            schema_version = await self.client.get_version(subject, version)
+        schema_version = await self.client.get_version(subject, version)
 
-            if schema_version and schema_version.schema:
-                return SchemaVersionInfo(
-                    version=schema_version.version,
-                    schema_id=schema_version.schema_id,
-                    schema=schema_version.schema.schema_str,
-                    schema_type=schema_version.schema.schema_type,
-                    references=[
-                        Reference(name=ref.name, subject=ref.subject, version=ref.version)
-                        for ref in (getattr(schema_version, "references", None) or [])
-                    ],
-                    hash=self._calculate_schema_hash(schema_version.schema.schema_str or ""),
-                )
+        if schema_version and schema_version.schema:
+            return SchemaVersionInfo(
+                version=schema_version.version,
+                schema_id=schema_version.schema_id,
+                schema=schema_version.schema.schema_str,
+                schema_type=schema_version.schema.schema_type,
+                references=[
+                    Reference(name=ref.name, subject=ref.subject, version=ref.version)
+                    for ref in (getattr(schema_version, "references", None) or [])
+                ],
+                hash=self._calculate_schema_hash(schema_version.schema.schema_str or ""),
+            )
 
-            else:
-                raise RuntimeError(f"Schema not found for {subject} version {version}")
+        else:
+            raise RuntimeError(f"Schema not found for {subject} version {version}")
 
-        except SchemaRegistryError as e:
-            logger.error(f"Failed to get schema {subject} version {version}: {e}")
-            raise RuntimeError(f"Schema retrieval failed: {e}") from e
+    @handle_schema_registry_error("Set compatibility mode")
+    async def set_compatibility_mode(self, subject: SubjectName, mode: str) -> None:
+        """Subject의 호환성 모드 설정
+
+        Args:
+            subject: Subject 이름
+            mode: 호환성 모드 (BACKWARD, FORWARD, FULL, NONE 등)
+
+        Note:
+            - 이후 등록되는 스키마 버전부터 새로운 모드 적용
+            - 기존 버전에는 영향 없음
+        """
+        # ServerConfig 객체 생성
+        config = ServerConfig(compatibility=mode)
+
+        # Subject 레벨 호환성 설정
+        await self.client.set_config(subject_name=subject, config=config)
+        logger.info(f"Compatibility mode set: {subject} -> {mode}")
 
     def _extract_schema_string(self, spec: DomainSchemaSpec) -> str:
         """스키마 명세에서 스키마 문자열 추출"""

@@ -4,6 +4,7 @@ import logging
 from collections.abc import Callable
 from contextlib import AbstractAsyncContextManager
 
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ...schema.infrastructure.models import SchemaMetadataModel
@@ -76,9 +77,6 @@ class SchemaRegisteredHandler:
         """스키마 메타데이터 저장 (Session Factory 패턴)"""
         async with self.session_factory() as session:
             try:
-                # 이미 존재하는지 확인
-                from sqlalchemy import select
-
                 stmt = select(SchemaMetadataModel).where(
                     SchemaMetadataModel.subject == event.subject
                 )

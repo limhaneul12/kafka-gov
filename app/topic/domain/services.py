@@ -14,6 +14,12 @@ from .models import (
 )
 from .policies import TopicPolicyEngine
 from .repositories.interfaces import ITopicRepository
+from .utils import (
+    calculate_dict_diff,
+    format_diff_string,
+    validate_partition_change,
+    validate_replication_factor_change,
+)
 
 
 class TopicPlannerService:
@@ -110,25 +116,14 @@ class TopicPlannerService:
         return config_dict
 
     def _calculate_config_diff(self, current: dict[str, Any], target: dict[str, Any]) -> dict:
-        """설정 변경 사항 계산"""
-        diff = {}
+        """설정 변경 사항 계산 (공통 유틸리티 사용)"""
+        raw_diff = calculate_dict_diff(current, target)
 
-        # 모든 키에 대해 변경 사항 확인
-        all_keys = set(current.keys()) | set(target.keys())
-
-        for key in all_keys:
-            current_value = current.get(key)
-            target_value = target.get(key)
-
-            if current_value != target_value:
-                if current_value is None:
-                    diff[key] = f"none→{target_value}"
-                elif target_value is None:
-                    diff[key] = f"{current_value}→none"
-                else:
-                    diff[key] = f"{current_value}→{target_value}"
-
-        return diff
+        # 사람이 읽기 쉬운 형태로 변환
+        return {
+            key: format_diff_string(curr_val, tgt_val)
+            for key, (curr_val, tgt_val) in raw_diff.items()
+        }
 
 
 class TopicDiffService:
@@ -138,7 +133,7 @@ class TopicDiffService:
     def compare_configs(
         current: DomainTopicConfig | None, target: DomainTopicConfig | None
     ) -> dict[str, tuple[Any, Any]] | None:
-        """토픽 설정 비교"""
+        """토픽 설정 비교 (공통 유틸리티 사용)"""
         if current is None and target is None:
             return {}
 
@@ -161,56 +156,54 @@ class TopicDiffService:
         # 이 시점에서 current와 target 모두 None이 아님이 보장됨
         assert current is not None and target is not None
 
-        diff: dict[str, tuple[Any, Any]] = {}
+        # 기본 설정을 딕셔너리로 변환
+        current_full: dict[str, Any] = {
+            "partitions": current.partitions,
+            "replication_factor": current.replication_factor,
+            **current.to_kafka_config(),
+        }
 
-        # 기본 설정 비교
-        if current.partitions != target.partitions:
-            diff["partitions"] = (current.partitions, target.partitions)
+        target_full: dict[str, Any] = {
+            "partitions": target.partitions,
+            "replication_factor": target.replication_factor,
+            **target.to_kafka_config(),
+        }
 
-        if current.replication_factor != target.replication_factor:
-            diff["replication_factor"] = (current.replication_factor, target.replication_factor)
-
-        # Kafka 설정 비교
-        current_kafka_config = current.to_kafka_config()
-        target_kafka_config = target.to_kafka_config()
-
-        all_keys = set(current_kafka_config.keys()) | set(target_kafka_config.keys())
-
-        for key in all_keys:
-            current_value = current_kafka_config.get(key)
-            target_value = target_kafka_config.get(key)
-
-            if current_value != target_value:
-                diff[key] = (current_value, target_value)
-
-        return diff
+        # 공통 유틸리티 함수 사용
+        return calculate_dict_diff(current_full, target_full)
 
     @staticmethod
     def is_partition_increase_only(current_partitions: int, target_partitions: int) -> bool:
-        """파티션 수가 증가만 하는지 확인 (Kafka는 파티션 감소 불가)"""
-        return target_partitions >= current_partitions
+        """파티션 수가 증가만 하는지 확인 (Kafka는 파티션 감소 불가)
+
+        Note:
+            utils.validate_partition_change()를 사용하는 것을 권장합니다.
+        """
+        return validate_partition_change(current_partitions, target_partitions)
 
     @staticmethod
     def validate_config_changes(
-        current: DomainTopicConfig | None, target: DomainTopicConfig | None
+        current: DomainTopicConfig | None,
+        target: DomainTopicConfig | None,
     ) -> list[str]:
-        """설정 변경 유효성 검증"""
+        """설정 변경 유효성 검증 (공통 유틸리티 사용)"""
         errors = []
 
         if current is None or target is None:
             return errors
 
-        # 파티션 수 감소 불가
-        if target.partitions < current.partitions:
+        # 파티션 수 검증 (utils 사용)
+        if not validate_partition_change(current.partitions, target.partitions):
             errors.append(
-                f"Cannot decrease partitions from {current.partitions} to {target.partitions}"
+                f"Cannot decrease partitions from {current.partitions} to {target.partitions}. "
+                f"Kafka does not support partition reduction. Consider creating a new topic."
             )
 
-        # 복제 팩터 변경 불가 (일반적으로)
-        if target.replication_factor != current.replication_factor:
-            errors.append(
-                f"Cannot change replication factor from {current.replication_factor} "
-                f"to {target.replication_factor} (requires manual intervention)"
-            )
+        # 복제 팩터 검증 (utils 사용)
+        is_valid, error_msg = validate_replication_factor_change(
+            current.replication_factor, target.replication_factor
+        )
+        if not is_valid and error_msg:
+            errors.append(error_msg)
 
         return errors

@@ -141,7 +141,10 @@ class TableRenderer {
                    </a>`
                 : '<span style="color: var(--text-muted);">-</span>';
             const tags = topic.tags && topic.tags.length > 0 
-                ? topic.tags.map(tag => `<span class="tag-badge">${this.escapeHtml(tag)}</span>`).join(' ')
+                ? topic.tags.map(tag => {
+                    const colorClass = TableRenderer.getTagColorClass(tag);
+                    return `<span class="tag-badge ${colorClass}">${TableRenderer.escapeHtml(tag)}</span>`;
+                  }).join(' ')
                 : '<span style="color: var(--text-muted);">-</span>';
             const partitions = topic.partition_count ?? '-';
             const replicas = topic.replication_factor ?? '-';
@@ -161,7 +164,7 @@ class TableRenderer {
                 <td style="text-align: center;">${partitions}</td>
                 <td style="text-align: center;">${replicas}</td>
                 <td>
-                    <span class="status-badge ${this.getEnvClass(environment)}">${environment.toUpperCase()}</span>
+                    <span class="status-badge ${TableRenderer.getEnvClass(environment)}">${environment.toUpperCase()}</span>
                 </td>
                 <td>
                     <button class="btn-icon" onclick="deleteTopic(decodeURIComponent('${encodeURIComponent(rawName)}'))" title="삭제" style="color: var(--danger);">
@@ -183,7 +186,7 @@ class TableRenderer {
         if (!schemas || schemas.length === 0) {
             tbody.innerHTML = `
                 <tr>
-                    <td colspan="7" style="text-align: center; padding: 2rem; color: var(--text-muted);">
+                    <td colspan="6" style="text-align: center; padding: 2rem; color: var(--text-muted);">
                         스키마가 없습니다.
                     </td>
                 </tr>
@@ -195,10 +198,16 @@ class TableRenderer {
             const rawSubject = schema.subject ?? '';
             const subject = this.escapeHtml(rawSubject);
             const environments = schema.environments.length > 0 ? schema.environments.map(env => this.escapeHtml(env)).join(', ') : '-';
+            const owner = this.escapeHtml(schema.owner || '-');
+            const compatibilityMode = this.escapeHtml(schema.compatibility_mode || 'UNKNOWN');
+            const compatibilityBadge = this.getCompatibilityBadge(schema.compatibility_mode);
+            
             const row = document.createElement('tr');
             row.innerHTML = `
                 <td>${subject}</td>
                 <td>${environments}</td>
+                <td>${owner}</td>
+                <td>${compatibilityBadge}</td>
                 <td>
                     <div style="display: flex; gap: 0.5rem;">
                         <button class="btn-icon analyze-delete-btn" data-subject="${this.escapeHtml(rawSubject)}" title="삭제 영향도 분석">
@@ -247,6 +256,28 @@ class TableRenderer {
     }
 
     /**
+     * 호환성 모드 배지 렌더링
+     */
+    static getCompatibilityBadge(mode) {
+        if (!mode || mode === 'UNKNOWN') {
+            return '<span class="badge badge-secondary">UNKNOWN</span>';
+        }
+        
+        const badgeClasses = {
+            'NONE': 'badge-secondary',
+            'BACKWARD': 'badge-primary',
+            'BACKWARD_TRANSITIVE': 'badge-primary',
+            'FORWARD': 'badge-info',
+            'FORWARD_TRANSITIVE': 'badge-info',
+            'FULL': 'badge-success',
+            'FULL_TRANSITIVE': 'badge-success',
+        };
+        
+        const badgeClass = badgeClasses[mode] || 'badge-secondary';
+        return `<span class="badge ${badgeClass}">${this.escapeHtml(mode)}</span>`;
+    }
+
+    /**
      * 히스토리 테이블 렌더링
      */
     static renderHistoryTable(activities) {
@@ -256,7 +287,7 @@ class TableRenderer {
         if (!activities || activities.length === 0) {
             tbody.innerHTML = `
                 <tr>
-                    <td colspan="6" style="text-align: center; padding: 2rem; color: var(--text-muted);">
+                    <td colspan="7" style="text-align: center; padding: 2rem; color: var(--text-muted);">
                         활동 내역이 없습니다. 검색 조건을 변경해주세요.
                     </td>
                 </tr>
@@ -276,6 +307,7 @@ class TableRenderer {
             
             const typeColor = activity.activity_type === 'topic' ? 'primary' : 'info';
             const actionBadge = this.getActionBadge(activity.action);
+            const team = activity.team || '-';
             
             const row = document.createElement('tr');
             row.innerHTML = `
@@ -283,6 +315,7 @@ class TableRenderer {
                 <td><span class="status-badge ${typeColor}">${this.escapeHtml(activity.activity_type.toUpperCase())}</span></td>
                 <td>${actionBadge}</td>
                 <td>${this.escapeHtml(activity.target)}</td>
+                <td>${this.escapeHtml(team)}</td>
                 <td>${this.escapeHtml(activity.actor || '-')}</td>
                 <td>${this.escapeHtml(activity.message || '-')}</td>
             `;
@@ -307,6 +340,35 @@ class TableRenderer {
         const className = badgeClass[action] || 'info';
         return `<span class="status-badge ${className}">${this.escapeHtml(action)}</span>`;
     }
+
+    /**
+     * 태그 색상 클래스 생성 (해시 기반)
+     */
+    static getTagColorClass(tag) {
+        const colors = [
+            'blue', 'green', 'yellow', 'red', 'purple',  
+            'pink', 'indigo', 'cyan', 'orange', 'gray'
+        ];
+        
+        // 태그 문자열을 해시하여 색상 인덱스 결정
+        let hash = 0;
+        for (let i = 0; i < tag.length; i++) {
+            hash = tag.charCodeAt(i) + ((hash << 5) - hash);
+        }
+        const colorIndex = Math.abs(hash) % colors.length;
+        return `tag-badge-${colors[colorIndex]}`;
+    }
+
+    /**
+     * 환경별 CSS 클래스
+     */
+    static getEnvClass(env) {
+        const envLower = (env || '').toLowerCase();
+        if (envLower === 'prod') return 'error';
+        if (envLower === 'stg') return 'warning';
+        if (envLower === 'dev') return 'success';
+        return '';
+    }
 }
 
 // =================
@@ -317,7 +379,7 @@ class ActivityRenderer {
      * 최근 활동 렌더링
      */
     static renderRecentActivities(activities) {
-        const container = document.getElementById('recent-activities');
+        const container = document.getElementById('recent-activities') || document.getElementById('recent-activities-list');
         
         if (!activities || activities.length === 0) {
             container.innerHTML = `
@@ -337,6 +399,24 @@ class ActivityRenderer {
             const methodBadge = method 
                 ? `<span class="method-badge ${method.toLowerCase()}">${method === 'BATCH' ? '배치' : '단일'}</span>` 
                 : '';
+            
+            // 팀 정보
+            const team = activity.team || '';
+            const teamBadge = team ? `<span class="team-badge">${this.escapeHtml(team)}</span>` : '';
+            
+            // 액션 텍스트 생성
+            const actionText = this.getActionText(activity.action);
+            const target = activity.target || 'N/A';
+            
+            // 메시지 생성: "팀명이 토픽명을 생성함"
+            let displayMessage = '';
+            if (team && target) {
+                displayMessage = `<strong>${this.escapeHtml(team)}</strong>이(가) <strong>${this.escapeHtml(target)}</strong>을(를) ${actionText}`;
+            } else if (target) {
+                displayMessage = `<strong>${this.escapeHtml(target)}</strong>이(가) ${actionText}`;
+            } else {
+                displayMessage = this.escapeHtml(activity.message || 'N/A');
+            }
             
             // 상세 정보 생성
             let detailInfo = '';
@@ -372,7 +452,7 @@ class ActivityRenderer {
                         <p>
                             <span class="activity-type-badge">${activity.activity_type === 'topic' || activity.type === 'topic' ? '토픽' : '스키마'}</span>
                             ${methodBadge}
-                            <strong>${this.escapeHtml(activity.message || activity.target || 'N/A')}</strong>
+                            ${displayMessage}
                         </p>
                         ${detailInfo}
                         <small>${this.formatTime(activity.timestamp)} · ${this.escapeHtml(activity.actor)}</small>

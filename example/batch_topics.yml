@@ -114,7 +114,7 @@ items:
     config:
       partitions: 6
       replication_factor: 3
-      retention_ms: 86400000  # 1일
+      retention_ms: 604800000  # 7일 (최소 요구사항)
       min_insync_replicas: 2
     metadata:
       owner: team-notification
@@ -126,7 +126,7 @@ items:
     config:
       partitions: 6
       replication_factor: 3
-      retention_ms: 86400000  # 1일
+      retention_ms: 604800000  # 7일 (최소 요구사항)
       min_insync_replicas: 2
     metadata:
       owner: team-notification

@@ -17,7 +17,7 @@ from app.shared.interface.type_factory import (
 
 # 정규표현식 상수 정의
 # 토픽 이름: 대소문자, 숫자, 점(.), 밑줄(_), 하이픈(-) 허용
-TOPIC_NAME_PATTERN: Final[str] = r"^[a-zA-Z0-9._-]+$"
+TOPIC_NAME_PATTERN: Final[str] = r"^[a-zA-Z0-9_.-]+$"
 TOPIC_PLAN_STATUS_PATTERN: Final[str] = r"^(pending|applied|failed)$"
 TOPIC_PLAN_ACTION_PATTERN: Final[str] = r"^(CREATE|ALTER|DELETE)$"
 

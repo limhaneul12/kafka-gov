@@ -28,264 +28,414 @@
                 </nav>
             </div>
         </div>
+    </header>
+
     <!-- 메인 컨텐츠 -->
     <main class="main">
         <div class="container">
             <div class="page-header">
-                <h1>Kafka 설정</h1>
-                <p>Kafka 클러스터 연결 설정을 관리합니다</p>
+                <h1><i class="fas fa-cog"></i> 연결 관리</h1>
+                <p>Kafka 클러스터, Schema Registry, Object Storage 연결 설정</p>
+                <button class="btn btn-primary" id="refresh-all">
+                    <i class="fas fa-sync"></i> 새로고침
+                </button>
             </div>
 
-            <div class="settings-grid">
-                <!-- Kafka Bootstrap 설정 -->
-                <div class="settings-card">
-                    <div class="card-header">
-                        <h3><i class="fas fa-server"></i> Kafka Bootstrap 서버</h3>
-                    </div>
-                    <div class="settings-content">
-                        <div class="form-group">
-                            <label for="kafka-bootstrap-servers">Bootstrap Servers</label>
-                            <input type="text" id="kafka-bootstrap-servers" value="localhost:9092" placeholder="host1:9092,host2:9092" />
-                            <small>Kafka 브로커 주소 (쉼표로 구분)</small>
-                        </div>
-                        <div class="form-group">
-                            <label for="kafka-timeout">연결 타임아웃 (초)</label>
-                            <input type="number" id="kafka-timeout" value="30" min="5" max="120" />
-                            <small>Kafka 연결 요청의 최대 대기 시간입니다.</small>
-                        </div>
-                    </div>
+            <!-- 현재 선택된 설정 -->
+            <div class="settings-card current-settings-card">
+                <div class="card-header">
+                    <h3><i class="fas fa-check-circle"></i> 현재 사용 중인 설정</h3>
                 </div>
-
-                <!-- Schema Registry 설정 -->
-                <div class="settings-card">
-                    <div class="card-header">
-                        <h3><i class="fas fa-database"></i> Schema Registry</h3>
-                    </div>
-                    <div class="settings-content">
-                        <div class="form-group">
-                            <label for="schema-registry-url">Schema Registry URL</label>
-                            <input type="text" id="schema-registry-url" value="http://localhost:8082" placeholder="http://localhost:8082" />
-                            <small>Schema Registry 서버 URL</small>
-                        </div>
-                    </div>
+                <div class="settings-content">
+                    <div id="current-settings"></div>
                 </div>
+            </div>
 
-                <!-- 환경 설정 -->
-                <div class="settings-card">
-                    <div class="card-header">
-                        <h3><i class="fas fa-layer-group"></i> 환경 설정</h3>
-                    </div>
-                    <div class="settings-content">
-                        <div class="form-group">
-                            <label for="default-env">기본 환경</label>
-                            <select id="default-env">
-                                <option value="dev">개발 (dev)</option>
-                                <option value="stg">스테이징 (stg)</option>
-                                <option value="prod">프로덕션 (prod)</option>
-                            </select>
-                            <small>기본으로 선택될 환경입니다.</small>
-                        </div>
+            <!-- Kafka Clusters -->
+            <div class="settings-card">
+                <div class="card-header">
+                    <h3><i class="fas fa-server"></i> Kafka 클러스터</h3>
+                    <button class="btn btn-sm btn-primary" onclick="settingsManager.showCreateClusterModal()">
+                        <i class="fas fa-plus"></i> 추가
+                    </button>
+                </div>
+                <div class="settings-content">
+                    <div id="kafka-clusters-list" class="clusters-list">
+                        <p class="loading">로딩 중...</p>
                     </div>
                 </div>
             </div>
 
-            <!-- 저장 버튼 -->
-            <div class="settings-actions">
-                <button class="btn btn-secondary" id="reset-settings">
-                    <i class="fas fa-undo"></i>
-                    기본값으로 재설정
-                </button>
-                <button class="btn btn-primary" id="save-settings">
-                    <i class="fas fa-save"></i>
-                    설정 저장
-                </button>
+            <!-- Schema Registries -->
+            <div class="settings-card">
+                <div class="card-header">
+                    <h3><i class="fas fa-database"></i> Schema Registry</h3>
+                    <button class="btn btn-sm btn-primary" onclick="settingsManager.showCreateRegistryModal()">
+                        <i class="fas fa-plus"></i> 추가
+                    </button>
+                </div>
+                <div class="settings-content">
+                    <div id="registries-list" class="clusters-list">
+                        <p class="loading">로딩 중...</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Object Storages -->
+            <div class="settings-card">
+                <div class="card-header">
+                    <h3><i class="fas fa-hdd"></i> Object Storage</h3>
+                    <button class="btn btn-sm btn-primary" onclick="settingsManager.showCreateStorageModal()">
+                        <i class="fas fa-plus"></i> 추가
+                    </button>
+                </div>
+                <div class="settings-content">
+                    <div id="storages-list" class="clusters-list">
+                        <p class="loading">로딩 중...</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Kafka Connect -->
+            <div class="settings-card">
+                <div class="card-header">
+                    <h3><i class="fas fa-plug"></i> Kafka Connect</h3>
+                    <button class="btn btn-sm btn-primary" onclick="settingsManager.showCreateConnectModal()">
+                        <i class="fas fa-plus"></i> 추가
+                    </button>
+                </div>
+                <div class="settings-content">
+                    <div id="connects-list" class="clusters-list">
+                        <p class="loading">로딩 중...</p>
+                    </div>
+                </div>
             </div>
         </div>
     </main>
 
     <div id="toast-container" class="toast-container"></div>
 
+    <!-- 모달 다이얼로그 -->
+    <div id="modal-overlay" class="modal-overlay" onclick="settingsManager.closeModal()"></div>
+    <div id="modal-container" class="modal-container"></div>
+
     <script src="/static/js/api.js"></script>
     <script src="/static/js/components.js"></script>
-    <script>
-        // Kafka 설정 관리 클래스
-        class KafkaSettingsManager {
-            constructor() {
-                this.settings = this.loadSettings();
-                this.init();
-            }
-
-            init() {
-                this.loadSettingsToForm();
-
-                document.getElementById('save-settings').addEventListener('click', () => {
-                    this.saveSettings();
-                });
-
-                document.getElementById('reset-settings').addEventListener('click', () => {
-                    if (confirm('모든 설정을 기본값으로 재설정하시겠습니까?')) {
-                        this.resetSettings();
-                    }
-                });
-            }
-
-            loadSettings() {
-                const defaultSettings = {
-                    kafkaBootstrapServers: 'localhost:9092',
-                    kafkaTimeout: 30,
-                    schemaRegistryUrl: 'http://localhost:8082',
-                    defaultEnv: 'dev'
-                };
-
-                const saved = localStorage.getItem('kafka-gov-settings');
-                return saved ? { ...defaultSettings, ...JSON.parse(saved) } : defaultSettings;
-            }
-
-            loadSettingsToForm() {
-                document.getElementById('kafka-bootstrap-servers').value = this.settings.kafkaBootstrapServers;
-                document.getElementById('kafka-timeout').value = this.settings.kafkaTimeout;
-                document.getElementById('schema-registry-url').value = this.settings.schemaRegistryUrl;
-                document.getElementById('default-env').value = this.settings.defaultEnv;
-            }
-
-            saveSettings() {
-                this.settings = {
-                    kafkaBootstrapServers: document.getElementById('kafka-bootstrap-servers').value,
-                    kafkaTimeout: parseInt(document.getElementById('kafka-timeout').value, 10),
-                    schemaRegistryUrl: document.getElementById('schema-registry-url').value,
-                    defaultEnv: document.getElementById('default-env').value
-                };
-
-                localStorage.setItem('kafka-gov-settings', JSON.stringify(this.settings));
-                Toast.success('Kafka 설정이 저장되었습니다.');
-            }
-
-            resetSettings() {
-                localStorage.removeItem('kafka-gov-settings');
-                this.settings = this.loadSettings();
-                this.loadSettingsToForm();
-                Toast.info('설정이 기본값으로 재설정되었습니다.');
-            }
-        }
-
-        // 설정 관리자 초기화
-        document.addEventListener('DOMContentLoaded', () => {
-            new KafkaSettingsManager();
-        });
-    </script>
+    <script src="/static/js/settings.js"></script>
 
     <style>
-        .settings-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
-            gap: var(--spacing-lg);
-            margin-bottom: var(--spacing-2xl);
+        .page-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 2rem;
         }
 
         .settings-card {
-            background: var(--bg-primary);
+            background: white;
             border-radius: 12px;
-            border: 1px solid var(--border-color);
+            border: 1px solid #e2e8f0;
             overflow: hidden;
+            margin-bottom: 1.5rem;
+        }
+
+        .card-header {
+            background: #f8fafc;
+            padding: 1rem 1.5rem;
+            border-bottom: 1px solid #e2e8f0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .card-header h3 {
+            margin: 0;
+            font-size: 1.125rem;
+            font-weight: 600;
+            color: #1e293b;
+        }
+
+        .card-header i {
+            margin-right: 0.5rem;
+            color: #3b82f6;
         }
 
         .settings-content {
-            padding: var(--spacing-lg);
+            padding: 1.5rem;
         }
 
-        .env-list {
+        .current-settings-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border: none;
+        }
+
+        .current-settings-card .card-header {
+            background: rgba(255, 255, 255, 0.1);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .current-settings-card .card-header h3 {
+            color: white;
+        }
+
+        .current-settings-card .card-header i {
+            color: white;
+        }
+
+        .current-settings-card .settings-content {
+            color: white;
+        }
+
+        .current-setting {
+            display: flex;
+            justify-content: space-between;
+            padding: 0.75rem;
+            margin-bottom: 0.5rem;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+        }
+
+        .current-setting:last-child {
+            margin-bottom: 0;
+        }
+
+        .current-setting .label {
+            font-weight: 600;
+        }
+
+        .current-setting .value {
+            font-family: 'Courier New', monospace;
+            background: rgba(0, 0, 0, 0.2);
+            padding: 0.25rem 0.75rem;
+            border-radius: 4px;
+        }
+
+        .clusters-list {
             display: flex;
             flex-direction: column;
-            gap: var(--spacing-md);
+            gap: 1rem;
         }
 
-        .env-item-config {
-            padding: var(--spacing-md);
-            border: 1px solid var(--border-color);
-            border-radius: 8px;
-            background: var(--bg-secondary);
-        }
-
-        .env-header {
+        .cluster-item {
             display: flex;
-            align-items: center;
             justify-content: space-between;
-            margin-bottom: var(--spacing-sm);
+            align-items: center;
+            padding: 1rem;
+            border: 2px solid #e2e8f0;
+            border-radius: 8px;
+            transition: all 0.2s;
         }
 
-        .env-name {
+        .cluster-item:hover {
+            border-color: #3b82f6;
+            background: #f8fafc;
+        }
+
+        .cluster-item.selected {
+            border-color: #10b981;
+            background: #ecfdf5;
+        }
+
+        .cluster-info h4 {
+            margin: 0 0 0.5rem 0;
+            font-size: 1rem;
             font-weight: 600;
-            color: var(--text-primary);
+            color: #1e293b;
         }
 
-        .env-details p {
-            color: var(--text-secondary);
-            margin-bottom: var(--spacing-xs);
-        }
-
-        .env-details small {
-            color: var(--text-muted);
+        .cluster-info p {
+            margin: 0;
+            font-size: 0.875rem;
+            color: #64748b;
             font-family: 'Courier New', monospace;
         }
 
-        .checkbox-label {
+        .cluster-actions {
             display: flex;
-            align-items: center;
-            gap: var(--spacing-sm);
-            cursor: pointer;
-            font-weight: 500;
+            gap: 0.5rem;
         }
 
-        .checkbox-label input[type="checkbox"] {
-            width: auto;
-            margin: 0;
+        .badge {
+            display: inline-block;
+            padding: 0.25rem 0.75rem;
+            font-size: 0.75rem;
+            font-weight: 600;
+            border-radius: 9999px;
+            margin-top: 0.5rem;
         }
 
-        .settings-actions {
-            display: flex;
-            gap: var(--spacing-md);
-            justify-content: flex-end;
-            padding: var(--spacing-lg);
-            background: var(--bg-primary);
+        .badge-success {
+            background: #dcfce7;
+            color: #166534;
+        }
+
+        .badge-danger {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+
+        .empty-message,
+        .loading {
+            text-align: center;
+            color: #94a3b8;
+            padding: 2rem;
+            font-style: italic;
+        }
+
+        /* Toast 스타일 */
+        .toast {
+            position: fixed;
+            bottom: 2rem;
+            right: 2rem;
+            background: white;
+            padding: 1rem 1.5rem;
+            border-radius: 8px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
+            transform: translateY(100px);
+            opacity: 0;
+            transition: all 0.3s;
+            z-index: 9999;
+            max-width: 400px;
+        }
+
+        .toast.show {
+            transform: translateY(0);
+            opacity: 1;
+        }
+
+        .toast-success {
+            border-left: 4px solid #10b981;
+        }
+
+        .toast-error {
+            border-left: 4px solid #ef4444;
+        }
+
+        .toast-info {
+            border-left: 4px solid #3b82f6;
+        }
+
+        /* Modal 스타일 */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 9998;
+        }
+
+        .modal-overlay.show {
+            display: block;
+        }
+
+        .modal-container {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: white;
             border-radius: 12px;
-            border: 1px solid var(--border-color);
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            z-index: 9999;
+            max-width: 600px;
+            width: 90%;
+            max-height: 90vh;
+            overflow-y: auto;
         }
 
-        /* 테마 클래스 */
-        .theme-light {
-            --bg-primary: #ffffff;
-            --bg-secondary: #f8fafc;
-            --text-primary: #0f172a;
-            --text-secondary: #475569;
+        .modal-container.show {
+            display: block;
         }
 
-        .theme-dark {
-            --bg-primary: #1e293b;
-            --bg-secondary: #0f172a;
-            --text-primary: #f1f5f9;
-            --text-secondary: #cbd5e1;
+        .modal-header {
+            padding: 1.5rem;
+            border-bottom: 1px solid #e2e8f0;
         }
 
-        /* 폰트 크기 클래스 */
-        .font-small {
+        .modal-header h2 {
+            margin: 0;
+            font-size: 1.5rem;
+            color: #1e293b;
+        }
+
+        .modal-body {
+            padding: 1.5rem;
+        }
+
+        .modal-footer {
+            padding: 1rem 1.5rem;
+            border-top: 1px solid #e2e8f0;
+            display: flex;
+            justify-content: flex-end;
+            gap: 0.75rem;
+        }
+
+        .form-group {
+            margin-bottom: 1.25rem;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 600;
+            color: #1e293b;
+        }
+
+        .form-group input,
+        .form-group select,
+        .form-group textarea {
+            width: 100%;
+            padding: 0.75rem;
+            border: 1px solid #cbd5e1;
+            border-radius: 6px;
             font-size: 0.875rem;
+            transition: border-color 0.2s;
         }
 
-        .font-medium {
-            font-size: 1rem;
+        .form-group input:focus,
+        .form-group select:focus,
+        .form-group textarea:focus {
+            outline: none;
+            border-color: #3b82f6;
         }
 
-        .font-large {
-            font-size: 1.125rem;
+        .form-group small {
+            display: block;
+            margin-top: 0.25rem;
+            color: #64748b;
+            font-size: 0.75rem;
         }
 
         @media (max-width: 768px) {
-            .settings-grid {
-                grid-template-columns: 1fr;
+            .page-header {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 1rem;
             }
 
-            .settings-actions {
+            .cluster-item {
                 flex-direction: column;
+                align-items: flex-start;
+                gap: 1rem;
+            }
+
+            .cluster-actions {
+                width: 100%;
+                flex-direction: column;
+            }
+
+            .cluster-actions .btn {
+                width: 100%;
+            }
+
+            .toast {
+                left: 1rem;
+                right: 1rem;
+                bottom: 1rem;
             }
         }
     </style>

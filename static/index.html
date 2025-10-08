@@ -33,6 +33,14 @@
                         <i class="fas fa-code"></i>
                         스키마 관리
                     </a>
+                    <a href="#analytics" class="nav-link" data-tab="analytics">
+                        <i class="fas fa-chart-pie"></i>
+                        팀별 분석
+                    </a>
+                    <a href="/static/connect.html" class="nav-link">
+                        <i class="fas fa-plug"></i>
+                        Connect 관리
+                    </a>
                     <a href="#history" class="nav-link" data-tab="history">
                         <i class="fas fa-history"></i>
                         활동 히스토리
@@ -63,55 +71,72 @@
                     <p>Kafka 클러스터 현황을 한눈에 확인하세요</p>
                 </div>
 
-                <div class="stats-grid">
-                    <div class="stat-card">
-                        <div class="stat-icon">
-                            <i class="fas fa-list"></i>
-                        </div>
-                        <div class="stat-content">
-                            <h3 id="topic-count">-</h3>
-                            <p>등록한 토픽 수</p>
-                        </div>
+                <!-- 메트릭 카드 -->
+                <div class="metrics-grid">
+                    <div class="metric-card">
+                        <div class="metric-label">총 토픽 수</div>
+                        <div class="metric-value" id="metric-total-topics">-</div>
+                        <div class="metric-change" id="metric-topics-change">-</div>
                     </div>
-                    <div class="stat-card">
-                        <div class="stat-icon">
-                            <i class="fas fa-code"></i>
-                        </div>
-                        <div class="stat-content">
-                            <h3 id="schema-count">-</h3>
-                            <p>등록된 스키마</p>
-                        </div>
+                    <div class="metric-card">
+                        <div class="metric-label">등록된 스키마</div>
+                        <div class="metric-value" id="metric-total-schemas">-</div>
+                        <div class="metric-change" id="metric-schemas-change">-</div>
                     </div>
-                    <div class="stat-card">
-                        <div class="stat-icon">
-                            <i class="fas fa-link"></i>
+                    <div class="metric-card">
+                        <div class="metric-label">PROD 토픽</div>
+                        <div class="metric-value" id="metric-prod-topics">-</div>
+                        <div class="metric-change" id="metric-prod-percent">-</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-label">관리 팀 수</div>
+                        <div class="metric-value" id="metric-total-teams">-</div>
+                        <div class="metric-change" id="metric-teams-info">-</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-label">사용 중인 태그</div>
+                        <div class="metric-value" id="metric-total-tags">-</div>
+                        <div class="metric-change" id="metric-tags-info">-</div>
+                    </div>
+                </div>
+
+                <!-- Kafka 클러스터 상태 (전체 너비) -->
+                <div class="cluster-status-section">
+                    <div class="cluster-status-card">
+                        <div class="cluster-status-header">
+                            <h3>Kafka 클러스터 상태</h3>
+                            <button class="btn-icon" id="refresh-cluster-btn" title="새로고침">
+                                <i class="fas fa-sync-alt"></i>
+                            </button>
                         </div>
-                        <div class="stat-content">
-                            <h3 id="correlation-count">-</h3>
-                            <p>연결 관계</p>
+                        <div class="cluster-status-content" id="cluster-status-info">
+                            <!-- 클러스터 상태가 동적으로 렌더링됩니다 -->
                         </div>
                     </div>
                 </div>
 
-                <div class="dashboard-grid">
-                    <div class="dashboard-card">
-                        <div class="card-header">
-                            <h3>최근 활동</h3>
-                            <button class="btn-icon" id="refresh-activities-btn" title="새로고침">
-                                <i class="fas fa-refresh"></i>
-                            </button>
+                <!-- 차트 영역 -->
+                <div class="dashboard-charts">
+                    <div class="chart-card">
+                        <div class="chart-header">
+                            <h3>환경별 토픽 분포</h3>
+                            <span class="chart-subtitle">파티션 수 기준</span>
                         </div>
-                        <div class="activity-list" id="recent-activities">
-                            <!-- 최근 활동 항목이 동적으로 렌더링됩니다. -->
+                        <div class="chart-container" id="env-distribution-chart">
+                            <!-- 차트가 동적으로 렌더링됩니다 -->
                         </div>
                     </div>
 
-                    <div class="dashboard-card">
-                        <div class="card-header">
-                            <h3>클러스터 상태</h3>
+                    <div class="chart-card">
+                        <div class="chart-header">
+                            <h3>최근 활동</h3>
+                            <button class="btn-icon" id="refresh-activities-btn" title="새로고침">
+                                <i class="fas fa-sync-alt"></i>
+                            </button>
                         </div>
-                        <div class="env-status" id="env-status">
-                            <!-- 클러스터 상태 정보가 동적으로 렌더링됩니다. -->
+                        <div class="chart-container" id="recent-activities-list"
+                            style="max-height: 400px; overflow-y: auto;">
+                            <!-- 최근 활동이 동적으로 렌더링됩니다 -->
                         </div>
                     </div>
                 </div>
@@ -159,6 +184,24 @@
                             <option value="dev">개발(dev)</option>
                             <option value="stg">스테이징(stg)</option>
                             <option value="prod">프로덕션(prod)</option>
+                        </select>
+                    </div>
+                    <div class="filter-group">
+                        <label>
+                            <i class="fas fa-users"></i>
+                            팀
+                        </label>
+                        <select id="topic-team-filter">
+                            <option value="">전체 팀</option>
+                        </select>
+                    </div>
+                    <div class="filter-group">
+                        <label>
+                            <i class="fas fa-tags"></i>
+                            태그
+                        </label>
+                        <select id="topic-tag-filter">
+                            <option value="">전체 태그</option>
                         </select>
                     </div>
                 </div>
@@ -243,12 +286,105 @@
                             <tr>
                                 <th>Subject</th>
                                 <th>환경</th>
+                                <th>팀</th>
+                                <th>호환성 모드</th>
                                 <th>분석</th>
                                 <th>삭제</th>
                             </tr>
                         </thead>
                         <tbody id="schemas-table-body">
                             <!-- 동적으로 생성 -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- 팀별 분석 탭 -->
+            <div id="analytics" class="tab-content">
+                <div class="page-header">
+                    <h1>팀별 분석</h1>
+                    <p>각 팀의 토픽 분포, 소유 현황, 활동을 상세히 분석합니다</p>
+                </div>
+
+                <!-- 팀 선택 필터 -->
+                <div class="filters">
+                    <div class="filter-group">
+                        <label>
+                            <i class="fas fa-users"></i>
+                            팀 선택
+                        </label>
+                        <select id="analytics-team-filter">
+                            <option value="">전체 팀</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- 팀 메트릭 카드 -->
+                <div class="metrics-grid">
+                    <div class="metric-card">
+                        <div class="metric-label">총 토픽 수</div>
+                        <div class="metric-value" id="team-total-topics">-</div>
+                        <div class="metric-change" id="team-topics-change">-</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-label">환경별 분포</div>
+                        <div class="metric-value" id="team-env-distribution">-</div>
+                        <div class="metric-change" id="team-env-info">-</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-label">평균 파티션 수</div>
+                        <div class="metric-value" id="team-avg-partitions">-</div>
+                        <div class="metric-change" id="team-partitions-info">-</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-label">최근 7일 활동</div>
+                        <div class="metric-value" id="team-recent-activities">-</div>
+                        <div class="metric-change" id="team-activities-info">-</div>
+                    </div>
+                </div>
+
+                <!-- 차트 영역 -->
+                <div class="dashboard-charts">
+                    <div class="chart-card">
+                        <div class="chart-header">
+                            <h3>환경별 토픽 분포</h3>
+                            <span class="chart-subtitle">DEV, STG, PROD</span>
+                        </div>
+                        <div class="chart-container" id="team-env-chart">
+                            <!-- 차트가 동적으로 렌더링됩니다 -->
+                        </div>
+                    </div>
+
+                    <div class="chart-card">
+                        <div class="chart-header">
+                            <h3>최근 활동 추이</h3>
+                            <span class="chart-subtitle">생성, 수정, 삭제</span>
+                        </div>
+                        <div class="chart-container" id="team-activity-chart">
+                            <!-- 차트가 동적으로 렌더링됩니다 -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 토픽 목록 테이블 -->
+                <div class="table-container">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>토픽명</th>
+                                <th>환경</th>
+                                <th>파티션</th>
+                                <th>복제</th>
+                                <th>태그</th>
+                                <th>문서</th>
+                            </tr>
+                        </thead>
+                        <tbody id="team-topics-table-body">
+                            <tr>
+                                <td colspan="6" style="text-align: center; padding: 2rem;">
+                                    팀을 선택하세요
+                                </td>
+                            </tr>
                         </tbody>
                     </table>
                 </div>
@@ -304,6 +440,15 @@
                     </div>
                     <div class="filter-group">
                         <label>
+                            <i class="fas fa-users"></i>
+                            팀
+                        </label>
+                        <select id="history-team-filter">
+                            <option value="">전체</option>
+                        </select>
+                    </div>
+                    <div class="filter-group">
+                        <label>
                             <i class="fas fa-user"></i>
                             수행자
                         </label>
@@ -329,6 +474,7 @@
                                 <th>타입</th>
                                 <th>액션</th>
                                 <th>대상</th>
+                                <th>팀</th>
                                 <th>수행자</th>
                                 <th>메시지</th>
                             </tr>
@@ -337,6 +483,57 @@
                             <!-- 동적으로 생성 -->
                         </tbody>
                     </table>
+                </div>
+            </div>
+
+            <!-- Kafka Connect 관리 탭 -->
+            <div id="connectors" class="tab-content">
+                <div class="page-header">
+                    <h1><i class="fas fa-plug"></i> Kafka Connect 관리</h1>
+                    <p>Kafka Connect 커넥터를 관리하고 모니터링합니다</p>
+                </div>
+
+                <!-- 현재 Connect 정보 -->
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h3><i class="fas fa-server"></i> 현재 Connect</h3>
+                        <button class="btn btn-primary" id="refresh-connectors-btn">
+                            <i class="fas fa-sync"></i> 새로고침
+                        </button>
+                    </div>
+                    <div class="card-body">
+                        <div id="current-connect-info">
+                            <p class="text-muted">Connect를 선택해주세요. (설정 > Kafka Connect)</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 액션 버튼 -->
+                <div class="actions-bar mb-4">
+                    <button class="btn btn-primary" id="create-connector-btn">
+                        <i class="fas fa-plus"></i> 커넥터 생성
+                    </button>
+                </div>
+
+                <!-- 커넥터 목록 -->
+                <div class="card">
+                    <div class="card-header">
+                        <h3><i class="fas fa-list"></i> 커넥터 목록</h3>
+                        <div class="filters">
+                            <input type="text" id="connector-search" placeholder="커넥터 검색..." class="search-input">
+                            <select id="connector-status-filter" class="filter-select">
+                                <option value="">전체 상태</option>
+                                <option value="RUNNING">실행 중</option>
+                                <option value="PAUSED">일시정지</option>
+                                <option value="FAILED">실패</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <div id="connectors-list">
+                            <!-- 동적으로 생성 -->
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -364,36 +561,41 @@
                     </div>
                     <div class="form-group">
                         <label for="single-topic-name">토픽명 *</label>
-                        <input type="text" id="single-topic-name" name="single-topic-name" 
-                               placeholder="예: orders.created 또는 dev.orders.created" 
-                               pattern="^[a-z0-9._-]+$"
-                               required>
+                        <input type="text" id="single-topic-name" name="single-topic-name"
+                            placeholder="예: orders.created 또는 dev.orders.created" pattern="^[a-z0-9._\-]+$" required>
                         <small>형식: 소문자, 숫자, ., _, - 만 사용 가능</small>
                     </div>
                     <div class="form-group">
                         <label for="single-topic-partitions">파티션 수 *</label>
-                        <input type="number" id="single-topic-partitions" name="single-topic-partitions" min="1" value="3" required>
+                        <input type="number" id="single-topic-partitions" name="single-topic-partitions" min="1"
+                            value="3" required>
                     </div>
                     <div class="form-group">
                         <label for="single-topic-replication">복제 계수 *</label>
-                        <input type="number" id="single-topic-replication" name="single-topic-replication" min="1" value="3" required>
+                        <input type="number" id="single-topic-replication" name="single-topic-replication" min="1"
+                            value="3" required>
                     </div>
                     <div class="form-group">
                         <label for="single-topic-min-insync">Min In-Sync Replicas *</label>
-                        <input type="number" id="single-topic-min-insync" name="single-topic-min-insync" min="1" value="2" required>
+                        <input type="number" id="single-topic-min-insync" name="single-topic-min-insync" min="1"
+                            value="2" required>
                         <small>Production 환경에서는 최소 2 이상 권장</small>
                     </div>
                     <div class="form-group">
                         <label for="single-topic-owner">소유자 *</label>
-                        <input type="text" id="single-topic-owner" name="single-topic-owner" placeholder="예: team-commerce" required>
+                        <input type="text" id="single-topic-owner" name="single-topic-owner"
+                            placeholder="예: team-commerce" required>
                     </div>
                     <div class="form-group">
-                        <label for="single-topic-doc">문서 URL</label>
-                        <input type="url" id="single-topic-doc" name="single-topic-doc" placeholder="https://wiki.example.com">
+                        <label for="single-topic-doc">문서 URL *</label>
+                        <input type="url" id="single-topic-doc" name="single-topic-doc"
+                            placeholder="https://wiki.example.com" required>
+                        <small>토픽 문서화를 위한 Wiki 또는 Confluence URL</small>
                     </div>
                     <div class="form-group">
                         <label for="single-topic-tags">태그</label>
-                        <input type="text" id="single-topic-tags" name="single-topic-tags" placeholder="tag1, tag2, tag3">
+                        <input type="text" id="single-topic-tags" name="single-topic-tags"
+                            placeholder="tag1, tag2, tag3">
                     </div>
                 </form>
             </div>
@@ -567,6 +769,20 @@ items:
                         <small>스키마를 관리하는 팀 이름을 입력하세요</small>
                     </div>
                     <div class="form-group">
+                        <label for="schema-compatibility-mode">호환성 모드</label>
+                        <select id="schema-compatibility-mode">
+                            <option value="">기본값 (BACKWARD)</option>
+                            <option value="NONE">NONE</option>
+                            <option value="BACKWARD" selected>BACKWARD</option>
+                            <option value="BACKWARD_TRANSITIVE">BACKWARD_TRANSITIVE</option>
+                            <option value="FORWARD">FORWARD</option>
+                            <option value="FORWARD_TRANSITIVE">FORWARD_TRANSITIVE</option>
+                            <option value="FULL">FULL</option>
+                            <option value="FULL_TRANSITIVE">FULL_TRANSITIVE</option>
+                        </select>
+                        <small>이후 등록되는 스키마 버전에 적용됩니다</small>
+                    </div>
+                    <div class="form-group">
                         <label for="schema-files">스키마 파일</label>
                         <input type="file" id="schema-files" multiple accept=".avsc,.json,.proto,.zip">
                         <small>AVRO (.avsc), JSON (.json), Protobuf (.proto), ZIP 번들을 선택하세요</small>
@@ -598,6 +814,82 @@ items:
         </div>
     </div>
 
+    <!-- 커넥터 생성 모달 -->
+    <div id="create-connector-modal" class="modal">
+        <div class="modal-content modal-lg">
+            <div class="modal-header">
+                <h3>커넥터 생성</h3>
+                <button class="modal-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="create-connector-form">
+                    <div class="form-group">
+                        <label for="connector-name">커넥터 이름 *</label>
+                        <input type="text" id="connector-name" placeholder="예: my-source-connector" required>
+                        <small>영문, 숫자, 하이픈(-), 언더스코어(_)만 사용 가능</small>
+                    </div>
+                    <div class="form-group">
+                        <label for="connector-class">커넥터 클래스 *</label>
+                        <select id="connector-class" required>
+                            <option value="">선택하세요</option>
+                            <optgroup label="Source Connectors">
+                                <option value="io.debezium.connector.mysql.MySqlConnector">Debezium MySQL CDC</option>
+                                <option value="io.debezium.connector.postgresql.PostgresConnector">Debezium PostgreSQL
+                                    CDC</option>
+                                <option value="org.apache.kafka.connect.file.FileStreamSourceConnector">File Source
+                                </option>
+                            </optgroup>
+                            <optgroup label="Sink Connectors">
+                                <option value="io.confluent.connect.s3.S3SinkConnector">S3 Sink</option>
+                                <option value="io.confluent.connect.jdbc.JdbcSinkConnector">JDBC Sink</option>
+                                <option value="io.confluent.connect.elasticsearch.ElasticsearchSinkConnector">
+                                    Elasticsearch Sink</option>
+                            </optgroup>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="connector-tasks">태스크 수</label>
+                        <input type="number" id="connector-tasks" value="1" min="1" max="10">
+                    </div>
+                    <div class="form-group">
+                        <label for="connector-config">설정 (JSON) *</label>
+                        <textarea id="connector-config" rows="12" placeholder='예:
+{
+  "topics": "my-topic",
+  "key.converter": "org.apache.kafka.connect.json.JsonConverter",
+  "value.converter": "org.apache.kafka.connect.json.JsonConverter"
+}' required></textarea>
+                        <small>커넥터별 필수 설정을 JSON 형식으로 입력하세요</small>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeModal('create-connector-modal')">취소</button>
+                <button class="btn btn-primary" id="submit-connector-btn">
+                    <i class="fas fa-save"></i> 생성
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 커넥터 상세 정보 모달 -->
+    <div id="connector-detail-modal" class="modal">
+        <div class="modal-content modal-lg">
+            <div class="modal-header">
+                <h3 id="connector-detail-title">커넥터 상세</h3>
+                <button class="modal-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div id="connector-detail-content">
+                    <!-- 동적으로 생성 -->
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeModal('connector-detail-modal')">닫기</button>
+            </div>
+        </div>
+    </div>
+
     <!-- 토스트 알림 -->
     <div id="toast-container" class="toast-container"></div>
 
@@ -608,9 +900,10 @@ items:
 
     <!-- JS-YAML 라이브러리 (YAML 파싱용) -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/js-yaml/4.1.0/js-yaml.min.js"></script>
-    
+
     <script src="/static/js/api.js"></script>
     <script src="/static/js/components.js"></script>
+    <script src="/static/js/connectors.js"></script>
     <script src="/static/js/app.js"></script>
 </body>
 

@@ -266,19 +266,28 @@ class MySQLSchemaMetadataRepository(ISchemaMetadataRepository):
                 raise
 
     async def record_artifact(self, artifact: DomainSchemaArtifact, change_id: ChangeId) -> None:
-        """아티팩트 기록"""
+        """아티팩트 기록 (Upsert 패턴)"""
         async with self.session_factory() as session:
             try:
-                artifact_model = SchemaArtifactModel(
+                # MySQL INSERT ... ON DUPLICATE KEY UPDATE
+                stmt = mysql_insert(SchemaArtifactModel).values(
                     subject=artifact.subject,
                     version=artifact.version,
                     storage_url=artifact.storage_url,
                     checksum=artifact.checksum,
                     change_id=change_id,
-                    schema_type="UNKNOWN",  # 실제 구현에서는 artifact에서 가져와야 함
+                    schema_type=artifact.schema_type.value if artifact.schema_type else "UNKNOWN",
                 )
 
-                session.add(artifact_model)
+                # 중복 시 업데이트
+                stmt = stmt.on_duplicate_key_update(
+                    storage_url=artifact.storage_url,
+                    checksum=artifact.checksum,
+                    change_id=change_id,
+                    schema_type=artifact.schema_type.value if artifact.schema_type else "UNKNOWN",
+                )
+
+                await session.execute(stmt)
                 await session.flush()
 
                 logger.info(f"Schema artifact recorded: {artifact.subject} v{artifact.version}")
@@ -327,21 +336,53 @@ class MySQLSchemaMetadataRepository(ISchemaMetadataRepository):
                 # 업로드 결과 저장 실패는 치명적이지 않으므로 예외를 발생시키지 않음
 
     async def list_artifacts(self) -> list[DomainSchemaArtifact]:
-        """모든 스키마 아티팩트 목록 조회"""
+        """모든 스키마 아티팩트 목록 조회 (호환성 모드 포함)"""
         async with self.session_factory() as session:
             try:
-                stmt = select(SchemaArtifactModel).order_by(
+                # 1. 모든 artifact 조회
+                stmt_artifacts = select(SchemaArtifactModel).order_by(
                     SchemaArtifactModel.subject, SchemaArtifactModel.version.desc()
                 )
-                result = await session.execute(stmt)
-                artifact_models = result.scalars().all()
+                result_artifacts = await session.execute(stmt_artifacts)
+                artifact_models = result_artifacts.scalars().all()
 
+                # 2. 모든 subject의 metadata 조회 (N+1 방지)
+                subjects = {artifact.subject for artifact in artifact_models}
+                stmt_metadata = select(SchemaMetadataModel).where(
+                    SchemaMetadataModel.subject.in_(subjects)
+                )
+                result_metadata = await session.execute(stmt_metadata)
+                metadata_models = result_metadata.scalars().all()
+
+                # 3. subject -> (compatibility_mode, owner) 매핑
+                compat_map: dict[str, DomainCompatibilityMode | None] = {}
+                owner_map: dict[str, str | None] = {}
+
+                for metadata in metadata_models:
+                    # 호환성 모드 추출
+                    if metadata.description and "Compatibility:" in metadata.description:
+                        parts = metadata.description.split("Compatibility:")
+                        if len(parts) > 1:
+                            mode_str = parts[1].strip()
+                            try:
+                                compat_map[metadata.subject] = DomainCompatibilityMode(mode_str)
+                            except ValueError:
+                                compat_map[metadata.subject] = None
+                    else:
+                        compat_map[metadata.subject] = None
+
+                    # Owner 정보
+                    owner_map[metadata.subject] = metadata.owner
+
+                # 4. DomainSchemaArtifact 생성 (owner 포함)
                 return [
                     DomainSchemaArtifact(
                         subject=artifact.subject,
                         version=artifact.version,
                         storage_url=artifact.storage_url,
                         checksum=artifact.checksum,
+                        compatibility_mode=compat_map.get(artifact.subject),
+                        owner=owner_map.get(artifact.subject),
                     )
                     for artifact in artifact_models
                 ]
@@ -380,7 +421,7 @@ class MySQLSchemaMetadataRepository(ISchemaMetadataRepository):
                 raise
 
     async def save_schema_metadata(self, subject: str, metadata: dict[str, Any]) -> None:
-        """스키마 메타데이터 저장"""
+        """스키마 메타데이터 저장 (호환성 모드 포함)"""
         async with self.session_factory() as session:
             try:
                 # 기존 메타데이터 조회
@@ -388,10 +429,15 @@ class MySQLSchemaMetadataRepository(ISchemaMetadataRepository):
                 result = await session.execute(stmt)
                 existing = result.scalar_one_or_none()
 
+                # description 생성 (호환성 모드 포함)
+                compatibility_mode = metadata.get("compatibility_mode", "BACKWARD")
+                description = f"Compatibility: {compatibility_mode}"
+
                 if existing:
                     # 업데이트
                     existing.owner = metadata.get("owner", existing.owner)
                     existing.updated_by = metadata.get("updated_by", "system")
+                    existing.description = description
                 else:
                     # 새로 생성
                     metadata_model = SchemaMetadataModel(
@@ -399,11 +445,14 @@ class MySQLSchemaMetadataRepository(ISchemaMetadataRepository):
                         owner=metadata.get("owner"),
                         created_by=metadata.get("created_by", "system"),
                         updated_by=metadata.get("updated_by", "system"),
+                        description=description,
                     )
                     session.add(metadata_model)
 
                 await session.flush()
-                logger.info(f"Schema metadata saved: {subject}")
+                logger.info(
+                    f"Schema metadata saved: {subject} (compatibility: {compatibility_mode})"
+                )
 
             except Exception as e:
                 logger.error(f"Failed to save schema metadata {subject}: {e}")

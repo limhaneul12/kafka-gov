@@ -55,26 +55,23 @@ DBMetadata: TypeAlias = dict[str, str | None]  # DB 메타데이터
 
 
 class DomainTopicMetadata(msgspec.Struct):
-    """토픽 메타데이터 값 객체"""
+    """토픽 메타데이터 값 객체
+
+    Note:
+        딕셔너리 변환이 필요한 경우 `msgspec.structs.asdict(instance)` 사용
+    """
 
     owner: TeamName | None = None
     doc: DocumentUrl | None = None
     tags: tuple[str, ...] = ()
 
-    def to_dict(self) -> dict[str, Any]:
-        """Struct 인스턴스를 딕셔너리로 변환"""
-        return {
-            field_name: (
-                getattr(self, field_name).value
-                if hasattr(getattr(self, field_name), "value")
-                else getattr(self, field_name)
-            )
-            for field_name in self.__struct_fields__
-        }
-
 
 class DomainTopicConfig(msgspec.Struct):
-    """토픽 설정 값 객체"""
+    """토픽 설정 값 객체
+
+    Note:
+        딕셔너리 변환이 필요한 경우 `msgspec.structs.asdict(instance)` 사용
+    """
 
     partitions: int
     replication_factor: int
@@ -98,17 +95,6 @@ class DomainTopicConfig(msgspec.Struct):
                 f"replication_factor ({self.replication_factor})"
             )
 
-    def to_dict(self) -> dict[str, Any]:
-        """Struct 인스턴스를 딕셔너리로 변환"""
-        return {
-            field_name: (
-                getattr(self, field_name).value
-                if hasattr(getattr(self, field_name), "value")
-                else getattr(self, field_name)
-            )
-            for field_name in self.__struct_fields__
-        }
-
     def to_kafka_config(self) -> dict[str, str]:
         """Kafka 설정 딕셔너리로 변환"""
         config = {
@@ -121,6 +107,7 @@ class DomainTopicConfig(msgspec.Struct):
             config["min.insync.replicas"] = str(self.min_insync_replicas)
         if self.max_message_bytes is not None:
             config["max.message.bytes"] = str(self.max_message_bytes)
+        if self.segment_ms is not None:
             config["segment.ms"] = str(self.segment_ms)
 
         return config
@@ -171,6 +158,17 @@ class DomainTopicSpec(msgspec.Struct):
             content += f":{config_str}"
         return hashlib.sha256(content.encode()).hexdigest()[:16]
 
+    def to_dict(self) -> dict[str, Any]:
+        """Struct 인스턴스를 딕셔너리로 변환"""
+        return {
+            field_name: (
+                getattr(self, field_name).value
+                if hasattr(getattr(self, field_name), "value")
+                else getattr(self, field_name)
+            )
+            for field_name in self.__struct_fields__
+        }
+
 
 class DomainTopicBatch(msgspec.Struct):
     """토픽 배치 엔티티"""
@@ -192,7 +190,7 @@ class DomainTopicBatch(msgspec.Struct):
             raise ValueError(f"Duplicate topic names found: {duplicates}")
 
     def fingerprint(self) -> str:
-        """배치 지문 생성"""
+        """배치의 지문 생성 (내용 기반 해시)"""
         spec_fingerprints = [spec.fingerprint() for spec in self.specs]
         content = f"{self.change_id}:{self.env.value}:{':'.join(sorted(spec_fingerprints))}"
         return hashlib.sha256(content.encode()).hexdigest()[:16]

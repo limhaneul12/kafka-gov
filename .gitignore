@@ -211,4 +211,4 @@ __marimo__/
 .windsurfrules
 alembic
 alembic.ini
-migrations
+cluster.md

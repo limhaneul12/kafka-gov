@@ -14,7 +14,7 @@ from ..domain.models import (
     DomainTopicPlan,
     DomainTopicSpec,
 )
-from .schema import (
+from .schemas import (
     KafkaCoreMetadata as InterfaceKafkaCoreMetadata,
     PolicyViolation as ResponseViolation,
     TopicBatchDryRunResponse,
@@ -42,41 +42,37 @@ class TopicTypeAdapters:
             ValidationError: 변환 중 검증 실패 시
         """
         try:
-            # 설정 변환
+            # 설정 변환 (직접 생성 - 불필요한 중간 dict 제거)
             domain_config = None
             if item.config:
-                config_data = {
-                    "partitions": item.config.partitions,
-                    "replication_factor": item.config.replication_factor,
-                    "cleanup_policy": item.config.cleanup_policy,
-                    "retention_ms": item.config.retention_ms,
-                    "min_insync_replicas": item.config.min_insync_replicas,
-                    "max_message_bytes": item.config.max_message_bytes,
-                    "segment_ms": item.config.segment_ms,
-                }
-                domain_config = msgspec.convert(config_data, DomainTopicConfig)
+                domain_config = DomainTopicConfig(
+                    partitions=item.config.partitions,
+                    replication_factor=item.config.replication_factor,
+                    cleanup_policy=item.config.cleanup_policy,
+                    retention_ms=item.config.retention_ms,
+                    min_insync_replicas=item.config.min_insync_replicas,
+                    max_message_bytes=item.config.max_message_bytes,
+                    segment_ms=item.config.segment_ms,
+                )
 
-            # 메타데이터 변환
+            # 메타데이터 변환 (직접 생성)
             domain_metadata = None
             if item.metadata:
-                metadata_data = {
-                    "owner": item.metadata.owner,
-                    "doc": item.metadata.doc,
-                    "tags": tuple(item.metadata.tags),
-                }
-                domain_metadata = msgspec.convert(metadata_data, DomainTopicMetadata)
+                domain_metadata = DomainTopicMetadata(
+                    owner=item.metadata.owner,
+                    doc=item.metadata.doc,
+                    tags=tuple(item.metadata.tags),
+                )
 
-            # TopicSpec 생성
-            spec_data = {
-                "name": item.name,
-                "action": DomainTopicAction(item.action.value),
-                "config": domain_config,
-                "metadata": domain_metadata,
-            }
+            # TopicSpec 생성 (직접 생성)
+            return DomainTopicSpec(
+                name=item.name,
+                action=DomainTopicAction(item.action.value),
+                config=domain_config,
+                metadata=domain_metadata,
+            )
 
-            return msgspec.convert(spec_data, DomainTopicSpec)
-
-        except msgspec.ValidationError as e:
+        except (msgspec.ValidationError, ValueError) as e:
             raise ValueError(f"Failed to convert TopicItem to TopicSpec: {e}") from e
 
     @classmethod
@@ -96,16 +92,14 @@ class TopicTypeAdapters:
             # 각 아이템을 TopicSpec으로 변환
             specs = tuple(cls.convert_item_to_spec(item) for item in request.items)
 
-            # TopicBatch 생성
-            batch_data = {
-                "change_id": request.change_id,
-                "env": request.env,
-                "specs": specs,
-            }
+            # TopicBatch 생성 (직접 생성 - 불필요한 중간 dict 제거)
+            return DomainTopicBatch(
+                change_id=request.change_id,
+                env=request.env,
+                specs=specs,
+            )
 
-            return msgspec.convert(batch_data, DomainTopicBatch)
-
-        except msgspec.ValidationError as e:
+        except (msgspec.ValidationError, ValueError) as e:
             raise ValueError(f"Failed to convert TopicBatchRequest to TopicBatch: {e}") from e
 
     @classmethod

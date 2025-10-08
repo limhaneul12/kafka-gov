@@ -11,11 +11,19 @@ from app.shared.interface.schema import BrokerResponse, ClusterStatusResponse
 
 router = APIRouter(prefix="/v1", tags=["shared"])
 
+RecentActivitiesResponse = Depends(
+    Provide[AppContainer.infrastructure_container.get_recent_activities_use_case]
+)
+ActivityHistoryResponse = Depends(
+    Provide[AppContainer.infrastructure_container.get_activity_history_use_case]
+)
+ClusterStatus = Depends(Provide[AppContainer.infrastructure_container.get_cluster_status_use_case])
+
 
 @router.get("/audit/recent")
 @inject
 async def get_recent_activities(
-    use_case=Depends(Provide[AppContainer.infrastructure_container.get_recent_activities_use_case]),
+    use_case=RecentActivitiesResponse,
     limit: int = Query(default=20, ge=1, le=100, description="조회할 활동 수"),
 ) -> list[dict[str, Any]]:
     """
@@ -30,18 +38,19 @@ async def get_recent_activities(
     activities = await use_case.execute(limit=limit)
 
     # msgspec.Struct를 dict로 변환 (FastAPI가 자동으로 JSON 직렬화)
-    result: list[dict[str, Any]] = []
-    for activity in activities:
-        activity_dict: dict[str, Any] = {
+    result: list[dict[str, Any]] = [
+        {
             "activity_type": activity.activity_type,
             "action": activity.action,
             "target": activity.target,
             "message": activity.message,
             "actor": activity.actor,
+            "team": activity.team,
             "timestamp": activity.timestamp.isoformat(),
             "metadata": activity.metadata,
         }
-        result.append(activity_dict)
+        for activity in activities
+    ]
 
     return result
 
@@ -49,7 +58,7 @@ async def get_recent_activities(
 @router.get("/audit/history")
 @inject
 async def get_activity_history(
-    use_case=Depends(Provide[AppContainer.infrastructure_container.get_activity_history_use_case]),
+    use_case=ActivityHistoryResponse,
     from_date: datetime | None = Query(default=None, description="시작 날짜/시간 (ISO 8601)"),
     to_date: datetime | None = Query(default=None, description="종료 날짜/시간 (ISO 8601)"),
     activity_type: str | None = Query(default=None, description="활동 타입 (topic/schema)"),
@@ -81,18 +90,19 @@ async def get_activity_history(
     )
 
     # msgspec.Struct를 dict로 변환
-    result: list[dict[str, Any]] = []
-    for activity in activities:
-        activity_dict: dict[str, Any] = {
+    result: list[dict[str, Any]] = [
+        {
             "activity_type": activity.activity_type,
             "action": activity.action,
             "target": activity.target,
             "message": activity.message,
             "actor": activity.actor,
+            "team": activity.team,
             "timestamp": activity.timestamp.isoformat(),
             "metadata": activity.metadata,
         }
-        result.append(activity_dict)
+        for activity in activities
+    ]
 
     return result
 
@@ -100,15 +110,19 @@ async def get_activity_history(
 @router.get("/cluster/status", response_model=ClusterStatusResponse)
 @inject
 async def get_cluster_status(
-    use_case=Depends(Provide[AppContainer.infrastructure_container.get_cluster_status_use_case]),
+    use_case=ClusterStatus,
+    cluster_id: str = Query(..., description="클러스터 ID"),
 ) -> ClusterStatusResponse:
     """
     Kafka 클러스터 상태 조회
 
+    Args:
+        cluster_id: 클러스터 ID
+
     Returns:
         클러스터 상태 (브로커 목록, 토픽/파티션 수)
     """
-    cluster_status = await use_case.execute()
+    cluster_status = await use_case.execute(cluster_id=cluster_id)
 
     # msgspec.Struct를 Pydantic 모델로 변환
     return ClusterStatusResponse(

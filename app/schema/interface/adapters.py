@@ -16,7 +16,7 @@ from ..domain.models import (
     DomainSchemaType,
     DomainSubjectStrategy,
 )
-from .schema import (
+from .schemas import (
     PolicyViolation,
     SchemaArtifact,
     SchemaBatchApplyResponse,
@@ -227,7 +227,7 @@ class SchemaConverter:
             change_id=result.change_id,
             registered=list(result.registered),
             skipped=list(result.skipped),
-            failed=[entry.copy() for entry in result.failed],
+            failed=list(result.failed),  # tuple of dicts → list (no copy needed, immutable)
             audit_id=result.audit_id,
             artifacts=artifacts,
             summary=result.summary(),

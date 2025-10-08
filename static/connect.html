@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kafka Connect Manager</title>
+    <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
+    <link rel="stylesheet" href="/static/css/styles.css">
+    <link rel="stylesheet" href="/static/css/connect.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+
+<body class="connect-page">
+    <!-- Top Navigation Bar -->
+    <header class="top-nav">
+        <div class="nav-left">
+            <div class="logo">
+                <i class="fas fa-plug"></i>
+                <span>Kafka Connect Manager</span>
+            </div>
+        </div>
+        <div class="nav-center">
+            <select id="env-selector" class="env-selector">
+                <option value="dev">Dev</option>
+                <option value="stage">Stage</option>
+                <option value="prod" selected>Prod</option>
+            </select>
+        </div>
+        <div class="nav-right">
+            <div class="search-box">
+                <i class="fas fa-search"></i>
+                <input type="text" id="global-search" placeholder="Search connectors...">
+            </div>
+            <button class="btn-icon" id="auto-refresh-toggle" title="Auto-Refresh">
+                <i class="fas fa-sync-alt"></i>
+            </button>
+            <button class="btn-icon" id="theme-toggle" title="Toggle Theme">
+                <i class="fas fa-sun"></i>
+            </button>
+            <a href="/static/index.html" class="btn-icon" title="Back to Dashboard">
+                <i class="fas fa-home"></i>
+            </a>
+        </div>
+    </header>
+
+    <!-- Left Sidebar -->
+    <aside class="left-sidebar">
+        <nav class="sidebar-nav">
+            <a href="#overview" class="sidebar-link active" data-section="overview">
+                <i class="fas fa-tachometer-alt"></i>
+                <span>Overview</span>
+            </a>
+            <a href="#connectors" class="sidebar-link" data-section="connectors">
+                <i class="fas fa-plug"></i>
+                <span>Connectors</span>
+            </a>
+            <a href="#tasks" class="sidebar-link" data-section="tasks">
+                <i class="fas fa-tasks"></i>
+                <span>Tasks</span>
+            </a>
+            <a href="#workers" class="sidebar-link" data-section="workers">
+                <i class="fas fa-server"></i>
+                <span>Workers</span>
+            </a>
+            <a href="#plugins" class="sidebar-link" data-section="plugins">
+                <i class="fas fa-puzzle-piece"></i>
+                <span>Plugins</span>
+            </a>
+            <a href="#dlq" class="sidebar-link" data-section="dlq">
+                <i class="fas fa-exclamation-triangle"></i>
+                <span>DLQ / Errors</span>
+            </a>
+            <a href="#settings" class="sidebar-link" data-section="settings">
+                <i class="fas fa-cog"></i>
+                <span>Settings</span>
+            </a>
+        </nav>
+    </aside>
+
+    <!-- Main Content Area -->
+    <main class="main-content">
+        <!-- Overview Section -->
+        <section id="overview-section" class="content-section active">
+            <div class="section-header">
+                <h1>Overview</h1>
+                <p>Cluster health and real-time metrics at a glance</p>
+            </div>
+
+            <!-- Metric Cards -->
+            <div class="metrics-grid">
+                <div class="metric-card">
+                    <div class="metric-icon health">
+                        <i class="fas fa-heartbeat"></i>
+                    </div>
+                    <div class="metric-content">
+                        <div class="metric-label">Cluster Health</div>
+                        <div class="metric-value" id="health-score">98</div>
+                        <div class="metric-unit">/100</div>
+                    </div>
+                </div>
+
+                <div class="metric-card">
+                    <div class="metric-icon connectors">
+                        <i class="fas fa-plug"></i>
+                    </div>
+                    <div class="metric-content">
+                        <div class="metric-label">Total Connectors</div>
+                        <div class="metric-value" id="total-connectors">0</div>
+                        <div class="metric-trend">
+                            <i class="fas fa-arrow-up"></i>
+                            <span id="connectors-trend">0</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="metric-card">
+                    <div class="metric-icon tasks">
+                        <i class="fas fa-tasks"></i>
+                    </div>
+                    <div class="metric-content">
+                        <div class="metric-label">Tasks Status</div>
+                        <div class="metric-value" id="running-tasks">0</div>
+                        <div class="metric-subtitle">
+                            <span class="badge badge-success" id="tasks-running">0 running</span>
+                            <span class="badge badge-danger" id="tasks-failed">0 failed</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="metric-card">
+                    <div class="metric-icon rebalances">
+                        <i class="fas fa-exchange-alt"></i>
+                    </div>
+                    <div class="metric-content">
+                        <div class="metric-label">Rebalances (1h)</div>
+                        <div class="metric-value" id="rebalances-count">0</div>
+                        <div class="metric-trend">
+                            <i class="fas fa-arrow-down"></i>
+                            <span>-2 from last hour</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Charts Row -->
+            <div class="charts-grid">
+                <div class="chart-card">
+                    <div class="chart-header">
+                        <h3>Throughput (msg/s)</h3>
+                        <div class="chart-legend">
+                            <span class="legend-item"><span class="dot source"></span> Source</span>
+                            <span class="legend-item"><span class="dot sink"></span> Sink</span>
+                        </div>
+                    </div>
+                    <div class="chart-body">
+                        <canvas id="throughput-chart"></canvas>
+                    </div>
+                </div>
+
+                <div class="chart-card">
+                    <div class="chart-header">
+                        <h3>Failed Tasks Over Time</h3>
+                    </div>
+                    <div class="chart-body">
+                        <canvas id="failed-tasks-chart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Mini Topology View -->
+            <div class="topology-card">
+                <div class="topology-header">
+                    <h3>Data Flow Topology</h3>
+                    <button class="btn-icon" id="refresh-topology">
+                        <i class="fas fa-sync-alt"></i>
+                    </button>
+                </div>
+                <div class="topology-body" id="topology-view">
+                    <!-- 동적 생성 -->
+                </div>
+            </div>
+        </section>
+
+        <!-- Connectors Section -->
+        <section id="connectors-section" class="content-section">
+            <div class="section-header">
+                <h1>Connectors</h1>
+                <div class="header-actions">
+                    <button class="btn btn-secondary" id="batch-add-connectors">
+                        <i class="fas fa-file-csv"></i>
+                        Batch Add
+                    </button>
+                    <button class="btn btn-primary" id="add-connector-btn">
+                        <i class="fas fa-plus"></i>
+                        Add Connector
+                    </button>
+                </div>
+            </div>
+
+            <!-- Filters -->
+            <div class="filters-bar">
+                <div class="filter-group">
+                    <input type="text" id="connector-search" placeholder="Search connectors..." class="search-input">
+                </div>
+                <div class="filter-group">
+                    <select id="connector-type-filter">
+                        <option value="">All Types</option>
+                        <option value="source">Source</option>
+                        <option value="sink">Sink</option>
+                    </select>
+                </div>
+                <div class="filter-group">
+                    <select id="connector-status-filter">
+                        <option value="">All Status</option>
+                        <option value="RUNNING">Running</option>
+                        <option value="PAUSED">Paused</option>
+                        <option value="FAILED">Failed</option>
+                    </select>
+                </div>
+                <div class="filter-group">
+                    <select id="connector-team-filter">
+                        <option value="">All Teams</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Connectors Table -->
+            <div class="table-card">
+                <table class="connectors-table">
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>Type</th>
+                            <th>Team</th>
+                            <th>Tasks</th>
+                            <th>Status</th>
+                            <th>Errors</th>
+                            <th>DLQ</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="connectors-table-body">
+                        <!-- 동적 생성 -->
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- Tasks Section -->
+        <section id="tasks-section" class="content-section">
+            <div class="section-header">
+                <h1>Tasks</h1>
+                <div class="header-actions">
+                    <button class="btn btn-secondary" id="bulk-restart-tasks" disabled>
+                        <i class="fas fa-redo"></i>
+                        Restart Selected
+                    </button>
+                </div>
+            </div>
+
+            <!-- Task Filters -->
+            <div class="filters-bar">
+                <div class="filter-group">
+                    <input type="text" id="task-search" placeholder="Search tasks..." class="search-input">
+                </div>
+                <div class="filter-group">
+                    <select id="task-state-filter">
+                        <option value="">All States</option>
+                        <option value="RUNNING">Running</option>
+                        <option value="FAILED">Failed</option>
+                        <option value="PAUSED">Paused</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Tasks Table -->
+            <div class="table-card">
+                <table class="tasks-table">
+                    <thead>
+                        <tr>
+                            <th><input type="checkbox" id="select-all-tasks"></th>
+                            <th>Connector</th>
+                            <th>Task ID</th>
+                            <th>State</th>
+                            <th>Worker</th>
+                            <th>Retries</th>
+                            <th>Failing Since</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tasks-table-body">
+                        <!-- 동적 생성 -->
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- Plugins Section -->
+        <section id="plugins-section" class="content-section">
+            <div class="section-header">
+                <h1>Plugins</h1>
+                <p>Installed connector plugins</p>
+            </div>
+
+            <!-- Plugins Grid -->
+            <div class="plugins-grid" id="plugins-grid">
+                <!-- 동적 생성 -->
+            </div>
+        </section>
+
+        <!-- Workers Section -->
+        <section id="workers-section" class="content-section">
+            <div class="section-header">
+                <h1>Workers</h1>
+                <p>Worker nodes status and distribution</p>
+            </div>
+
+            <!-- Workers Grid -->
+            <div class="workers-grid" id="workers-grid">
+                <!-- 동적 생성 -->
+            </div>
+        </section>
+
+        <!-- DLQ Section -->
+        <section id="dlq-section" class="content-section">
+            <div class="section-header">
+                <h1>DLQ / Errors</h1>
+                <p>Dead Letter Queue and error tracking</p>
+            </div>
+
+            <div class="dlq-layout">
+                <div class="dlq-topics">
+                    <h3>DLQ Topics</h3>
+                    <div class="table-card">
+                        <table class="dlq-table">
+                            <thead>
+                                <tr>
+                                    <th>Topic</th>
+                                    <th>Msg/s</th>
+                                    <th>Size</th>
+                                    <th>Trend</th>
+                                </tr>
+                            </thead>
+                            <tbody id="dlq-table-body">
+                                <!-- 동적 생성 -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="error-panel">
+                    <h3>Recent Errors</h3>
+                    <div id="error-traces">
+                        <!-- 동적 생성 -->
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Settings Section -->
+        <section id="settings-section" class="content-section">
+            <div class="section-header">
+                <h1>Settings</h1>
+                <p>Kafka Connect configuration</p>
+            </div>
+
+            <div class="settings-card">
+                <h3>Current Connect</h3>
+                <div id="connect-settings">
+                    <!-- 동적 생성 -->
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Modals -->
+    <!-- Add Connector Modal -->
+    <div id="add-connector-modal" class="modal glass">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Add Connector</h3>
+                <button class="modal-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="add-connector-form">
+                    <div class="form-group">
+                        <label for="connector-name">Connector Name *</label>
+                        <input type="text" id="connector-name" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="connector-class">Connector Class *</label>
+                        <select id="connector-class" required>
+                            <option value="">Select plugin...</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="connector-config">Configuration (JSON) *</label>
+                        <textarea id="connector-config" rows="10" required></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label for="connector-team">Team</label>
+                        <input type="text" id="connector-team">
+                    </div>
+                    <div class="form-group">
+                        <label for="connector-tags">Tags (comma separated)</label>
+                        <input type="text" id="connector-tags">
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary modal-close">Cancel</button>
+                <button type="submit" class="btn btn-primary" form="add-connector-form">Create</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="/static/js/api.js"></script>
+    <script src="/static/js/components.js"></script>
+    <script src="/static/js/connect-ui.js"></script>
+</body>
+
+</html>

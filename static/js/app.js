@@ -6,12 +6,16 @@ class KafkaGovApp {
     constructor() {
         this.currentTab = 'dashboard';
         this.selectedFiles = [];
+        this.activityRefreshInterval = null;
+        // 현재 설정 추적
+        this.lastSettings = api.getCurrentSettings();
         this.init();
     }
 
     init() {
         console.log('KafkaGovApp 초기화 시작...');
         this.setupEventListeners();
+        this.setupSettingsWatcher();
         // 초기 배치 아이템 리스너 연결
         const firstItem = document.getElementById('batch-items')?.firstElementChild;
         if (firstItem && firstItem.classList.contains('batch-item')) {
@@ -20,6 +24,70 @@ class KafkaGovApp {
         // 초기 탭 로딩
         console.log('초기 탭 전환:', this.currentTab);
         this.switchTab(this.currentTab);
+        // 최근 활동 자동 갱신 시작 (30초마다)
+        this.startActivityAutoRefresh();
+    }
+
+    /**
+     * 설정 변경 감지 설정
+     */
+    setupSettingsWatcher() {
+        // Window focus 이벤트로 설정 변경 감지
+        window.addEventListener('focus', () => {
+            const currentSettings = api.getCurrentSettings();
+            
+            // 설정이 변경되었는지 확인
+            if (this.lastSettings.clusterId !== currentSettings.clusterId ||
+                this.lastSettings.registryId !== currentSettings.registryId ||
+                this.lastSettings.storageId !== currentSettings.storageId ||
+                this.lastSettings.connectId !== currentSettings.connectId) {
+                
+                console.log('설정 변경 감지:', this.lastSettings, '->', currentSettings);
+                this.lastSettings = currentSettings;
+                
+                // 현재 탭 데이터 새로고침
+                this.refreshCurrentTab();
+            }
+        });
+
+        // Storage 이벤트로 다른 탭에서의 변경 감지 (선택적)
+        window.addEventListener('storage', (e) => {
+            if (e.key && (e.key === 'currentClusterId' || 
+                          e.key === 'currentRegistryId' || 
+                          e.key === 'currentStorageId' ||
+                          e.key === 'currentConnectId')) {
+                console.log('Storage 이벤트 감지:', e.key, e.oldValue, '->', e.newValue);
+                this.lastSettings = api.getCurrentSettings();
+                this.refreshCurrentTab();
+            }
+        });
+    }
+
+    /**
+     * 현재 탭 데이터 새로고침
+     */
+    async refreshCurrentTab() {
+        console.log('현재 탭 새로고침:', this.currentTab);
+        
+        switch(this.currentTab) {
+            case 'dashboard':
+                await this.loadDashboard();
+                break;
+            case 'topics':
+                await this.loadTopics();
+                break;
+            case 'schemas':
+                await this.loadSchemas();
+                break;
+            case 'analytics':
+                await this.loadAnalytics();
+                break;
+            case 'history':
+                await this.loadHistory();
+                break;
+        }
+        
+        Toast.success('설정이 변경되어 데이터를 새로고침했습니다.');
     }
 
     /**
@@ -101,8 +169,8 @@ class KafkaGovApp {
      * 이벤트 리스너 설정
      */
     setupEventListeners() {
-        // 탭 네비게이션
-        document.querySelectorAll('.nav-link').forEach(link => {
+        // 탭 네비게이션 (data-tab 속성이 있는 링크만)
+        document.querySelectorAll('.nav-link[data-tab]').forEach(link => {
             link.addEventListener('click', (e) => {
                 e.preventDefault();
                 const tab = e.currentTarget.dataset.tab;
@@ -264,8 +332,31 @@ class KafkaGovApp {
             }
         });
 
+        // 클러스터 상태 새로고침 버튼
+        document.getElementById('refresh-cluster-btn')?.addEventListener('click', async () => {
+            try {
+                Loading.show();
+                const clusterStatus = await api.getClusterStatus();
+                this.renderClusterStatus(clusterStatus);
+                Toast.success('클러스터 상태가 새로고침되었습니다.');
+            } catch (error) {
+                console.error('클러스터 상태 새로고침 실패:', error);
+                Toast.error('클러스터 상태를 새로고침할 수 없습니다.');
+            } finally {
+                Loading.hide();
+            }
+        });
+
         // 필터 이벤트
         document.getElementById('topic-env-filter')?.addEventListener('change', () => {
+            this.loadTopics();
+        });
+
+        document.getElementById('topic-team-filter')?.addEventListener('change', () => {
+            this.loadTopics();
+        });
+
+        document.getElementById('topic-tag-filter')?.addEventListener('change', () => {
             this.loadTopics();
         });
 
@@ -314,6 +405,31 @@ class KafkaGovApp {
     }
 
     /**
+     * 최근 활동 자동 갱신 시작
+     */
+    startActivityAutoRefresh() {
+        // 기존 인터벌 정리
+        if (this.activityRefreshInterval) {
+            clearInterval(this.activityRefreshInterval);
+        }
+        
+        // 30초마다 최근 활동 갱신
+        this.activityRefreshInterval = setInterval(async () => {
+            if (this.currentTab === 'dashboard') {
+                try {
+                    const activities = await api.getRecentActivities(10);
+                    ActivityRenderer.renderRecentActivities(activities);
+                    console.log('최근 활동 자동 갱신 완료');
+                } catch (error) {
+                    console.error('최근 활동 자동 갱신 실패:', error);
+                }
+            }
+        }, 30000); // 30초
+        
+        console.log('최근 활동 자동 갱신 시작 (30초 간격)');
+    }
+
+    /**
      * 탭 전환
      */
     async switchTab(tabName) {
@@ -357,9 +473,24 @@ class KafkaGovApp {
             case 'schemas':
                 await this.loadSchemas();
                 break;
+            case 'analytics':
+                await this.loadAnalytics();
+                break;
+            case 'connectors':
+                await this.loadConnectors();
+                break;
             case 'history':
                 await this.loadHistory();
                 break;
+        }
+    }
+
+    /**
+     * Kafka Connect 커넥터 관리 로드
+     */
+    async loadConnectors() {
+        if (typeof connectorManager !== 'undefined') {
+            await connectorManager.init();
         }
     }
 
@@ -369,35 +500,37 @@ class KafkaGovApp {
     async loadDashboard() {
         try {
             Loading.show();
-            console.log('대시보드 로딩 시작...');
 
-            // 개별 API 호출 (병렬 처리)
-            const [topicCount, schemaCount, correlations, activities, clusterStatus] = await Promise.all([
-                api.getTopicCount().catch(err => { console.error('토픽 카운트 실패:', err); return { count: 0 }; }),
+            // 클러스터 선택 확인
+            const settings = api.getCurrentSettings();
+            if (!settings.clusterId || settings.clusterId === 'default') {
+                Toast.warning('Settings에서 Kafka 클러스터를 먼저 선택해주세요.');
+                this.renderDashboardMetrics([], 0);
+                Loading.hide();
+                return;
+            }
+
+            // 토픽과 스키마 데이터 가져오기
+            const [topicsData, schemaCount, activities, clusterStatus] = await Promise.all([
+                api.getTopics().catch(err => { console.error('토픽 조회 실패:', err); return { topics: [] }; }),
                 api.getSchemaCount().catch(err => { console.error('스키마 카운트 실패:', err); return { count: 0 }; }),
-                api.getAllCorrelations().catch(err => { console.error('상관관계 조회 실패:', err); return []; }),
-                api.getRecentActivities(10).catch(err => { console.error('최근 활동 조회 실패:', err); return []; }),
+                api.getRecentActivities(15).catch(err => { console.error('최근 활동 조회 실패:', err); return []; }),
                 api.getClusterStatus().catch(err => { console.error('클러스터 상태 조회 실패:', err); return null; })
             ]);
 
-            console.log('API 응답:', { topicCount, schemaCount, correlations: correlations.length, activities: activities.length, clusterStatus });
+            const topics = topicsData.topics || [];
 
-            // 통계 업데이트
-            const topicCountEl = document.getElementById('topic-count');
-            const schemaCountEl = document.getElementById('schema-count');
-            const correlationCountEl = document.getElementById('correlation-count');
-            
-            if (topicCountEl) topicCountEl.textContent = topicCount.count;
-            if (schemaCountEl) schemaCountEl.textContent = schemaCount.count;
-            if (correlationCountEl) correlationCountEl.textContent = correlations.length || 0;
+            // 1. 메트릭 계산
+            this.renderDashboardMetrics(topics, schemaCount.count);
 
-            // 클러스터 상태 렌더링
-            ActivityRenderer.renderClusterStatus(clusterStatus);
+            // 2. 환경별 분포 차트
+            this.renderEnvDistribution(topics);
 
-            // 최근 활동 렌더링
-            ActivityRenderer.renderRecentActivities(activities);
+            // 3. Kafka 클러스터 상태
+            this.renderClusterStatus(clusterStatus);
 
-            console.log('대시보드 로딩 완료');
+            // 4. 최근 활동
+            this.renderRecentActivitiesList(activities);
 
         } catch (error) {
             console.error('대시보드 로드 실패:', error);
@@ -405,6 +538,165 @@ class KafkaGovApp {
         } finally {
             Loading.hide();
         }
+    }
+
+    renderDashboardMetrics(topics, schemaCount) {
+        const totalTopics = topics.length;
+        const prodTopics = topics.filter(t => t.environment === 'prod').length;
+        const teams = [...new Set(topics.map(t => t.owner).filter(o => o))];
+        const tags = [...new Set(topics.flatMap(t => t.tags || []))];
+
+        document.getElementById('metric-total-topics').textContent = totalTopics;
+        document.getElementById('metric-topics-change').textContent = '전체 토픽';
+
+        document.getElementById('metric-total-schemas').textContent = schemaCount;
+        document.getElementById('metric-schemas-change').textContent = '등록된 스키마';
+
+        document.getElementById('metric-prod-topics').textContent = prodTopics;
+        const prodPercent = totalTopics > 0 ? Math.round((prodTopics / totalTopics) * 100) : 0;
+        document.getElementById('metric-prod-percent').textContent = `${prodPercent}% of total`;
+
+        document.getElementById('metric-total-teams').textContent = teams.length;
+        document.getElementById('metric-teams-info').textContent = '관리 중인 팀';
+
+        document.getElementById('metric-total-tags').textContent = tags.length;
+        document.getElementById('metric-tags-info').textContent = '사용 중인 태그';
+    }
+
+    renderEnvDistribution(topics) {
+        const envStats = topics.reduce((acc, topic) => {
+            const env = topic.environment || 'unknown';
+            if (!acc[env]) acc[env] = { count: 0, partitions: 0 };
+            acc[env].count += 1;
+            acc[env].partitions += topic.partition_count || 0;
+            return acc;
+        }, {});
+
+        const maxPartitions = Math.max(...Object.values(envStats).map(s => s.partitions), 1);
+        const container = document.getElementById('env-distribution-chart');
+        
+        const html = `
+            <div class="env-bar-chart">
+                ${['prod', 'stg', 'dev'].map(env => {
+                    const stat = envStats[env] || { count: 0, partitions: 0 };
+                    const width = Math.max((stat.partitions / maxPartitions) * 100, 5); // 최소 5%
+                    const showText = width > 20; // 20% 이상일 때만 내부 텍스트
+                    return `
+                        <div class="env-bar-item">
+                            <div class="env-bar-label">${env.toUpperCase()}</div>
+                            <div class="env-bar-track">
+                                <div class="env-bar-fill ${env}" style="width: ${width}%">
+                                    ${showText ? `${stat.count}개 • ${stat.partitions}p` : ''}
+                                </div>
+                                ${!showText && stat.count > 0 ? `<span style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); font-size: 0.75rem; color: var(--text-muted);">${stat.count}개 • ${stat.partitions}p</span>` : ''}
+                            </div>
+                        </div>
+                    `;
+                }).join('')}
+            </div>
+        `;
+        
+        container.innerHTML = html;
+    }
+
+    /**
+     * Kafka 클러스터 상태 렌더링
+     */
+    renderClusterStatus(clusterStatus) {
+        const container = document.getElementById('cluster-status-info');
+        
+        if (!clusterStatus) {
+            container.innerHTML = '<p style="text-align: center; color: var(--text-muted);">클러스터 상태를 불러올 수 없습니다.</p>';
+            return;
+        }
+
+        const brokers = clusterStatus.brokers || [];
+        const controllerBroker = brokers.find(b => b.is_controller);
+        
+        const html = `
+            <div class="cluster-summary">
+                <div class="cluster-stat">
+                    <div class="stat-label">컨트롤러</div>
+                    <div class="stat-value">Broker ${clusterStatus.controller_id || 'N/A'}</div>
+                    <div class="stat-detail">${controllerBroker ? `${controllerBroker.host}:${controllerBroker.port}` : ''}</div>
+                </div>
+                <div class="cluster-stat">
+                    <div class="stat-label">브로커 수</div>
+                    <div class="stat-value">${brokers.length}개</div>
+                </div>
+                <div class="cluster-stat">
+                    <div class="stat-label">전체 토픽</div>
+                    <div class="stat-value">${clusterStatus.total_topics || 0}개</div>
+                </div>
+                <div class="cluster-stat">
+                    <div class="stat-label">전체 파티션</div>
+                    <div class="stat-value">${clusterStatus.total_partitions || 0}개</div>
+                </div>
+            </div>
+            
+            <div class="broker-grid">
+                ${brokers.map(broker => `
+                    <div class="broker-card ${broker.is_controller ? 'controller' : ''}" data-broker-id="${broker.broker_id}">
+                        <div class="broker-header">
+                            <strong>Broker ${broker.broker_id}</strong>
+                            ${broker.is_controller ? '<span class="badge badge-primary">CONTROLLER</span>' : ''}
+                        </div>
+                        <div class="broker-info">
+                            <div class="broker-host">${broker.host}:${broker.port}</div>
+                            <div class="broker-partitions">
+                                <i class="fas fa-layer-group"></i> ${broker.leader_partition_count || 0} 리더 파티션
+                            </div>
+                        </div>
+                    </div>
+                `).join('')}
+            </div>
+        `;
+
+        container.innerHTML = html;
+    }
+
+    renderRecentActivitiesList(activities) {
+        const container = document.getElementById('recent-activities-list');
+        
+        if (!activities || activities.length === 0) {
+            container.innerHTML = '<p style="text-align: center; color: var(--text-muted);">활동이 없습니다.</p>';
+            return;
+        }
+
+        const html = activities.map(activity => {
+            // 날짜 파싱 개선
+            let timeStr = '최근';
+            try {
+                const date = new Date(activity.occurred_at);
+                if (!isNaN(date.getTime())) {
+                    timeStr = date.toLocaleString('ko-KR', {
+                        month: 'short',
+                        day: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit'
+                    });
+                }
+            } catch (e) {
+                console.warn('날짜 파싱 실패:', activity.occurred_at);
+            }
+
+            const actionText = activity.action || 'ACTION';
+            const targetName = activity.target_name || 'unknown';
+            
+            return `
+                <div style="padding: 0.75rem 0; border-bottom: 1px solid var(--border-color);">
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 0.25rem;">
+                        <span style="font-weight: 500; font-size: 0.875rem;">${actionText} - ${targetName}</span>
+                        <span style="font-size: 0.75rem; color: var(--text-muted);">${timeStr}</span>
+                    </div>
+                    <div style="font-size: 0.75rem; color: var(--text-muted);">
+                        ${activity.actor || 'System'}
+                    </div>
+                </div>
+            `;
+        }).join('');
+
+        container.innerHTML = html;
     }
 
     /**
@@ -440,34 +732,78 @@ class KafkaGovApp {
             Loading.show();
             const envFilter = document.getElementById('topic-env-filter')?.value ?? '';
             const searchFilter = document.getElementById('topic-search')?.value ?? '';
+            const teamFilter = document.getElementById('topic-team-filter')?.value ?? '';
+            const tagFilter = document.getElementById('topic-tag-filter')?.value ?? '';
 
             // 실제 토픽 목록 조회
             const topicsData = await api.getTopics();
+            console.log('토픽 API 응답:', topicsData);
+            
             const topics = topicsData.topics || [];
+            console.log(`총 ${topics.length}개 토픽 로드됨`);
 
             // 토픽 데이터 매핑
-            const mapped = topics.map(topic => ({
-                topic_name: topic.name,
-                owner: topic.owner,
-                tags: topic.tags || [],
-                partition_count: topic.partition_count,
-                replication_factor: topic.replication_factor,
-                environment: topic.environment,
-            }));
+            const mapped = topics.map(topic => {
+                console.log('토픽 매핑:', topic.name, '태그:', topic.tags);
+                return {
+                    topic_name: topic.name,
+                    owner: topic.owner,
+                    doc: topic.doc,
+                    tags: topic.tags || [],
+                    partition_count: topic.partition_count,
+                    replication_factor: topic.replication_factor,
+                    environment: topic.environment,
+                };
+            });
+
+            // 팀 및 태그 필터 옵션 업데이트
+            this.updateFilterOptions(mapped);
 
             const filtered = mapped.filter((item) => {
                 const envMatches = !envFilter || item.environment === envFilter;
                 const sf = (searchFilter || '').toLowerCase();
                 const searchMatches = !sf || item.topic_name.toLowerCase().includes(sf);
-                return envMatches && searchMatches;
+                const teamMatches = !teamFilter || item.owner === teamFilter;
+                const tagMatches = !tagFilter || (item.tags && item.tags.includes(tagFilter));
+                return envMatches && searchMatches && teamMatches && tagMatches;
             });
 
+            console.log(`필터링 후 ${filtered.length}개 토픽 표시`);
             TableRenderer.renderTopicsTable(filtered);
         } catch (error) {
             console.error('토픽 로드 실패:', error);
             Toast.error(`토픽 목록 조회 실패: ${error.message}`);
         } finally {
             Loading.hide();
+        }
+    }
+
+    /**
+     * 팀 및 태그 필터 옵션 업데이트
+     */
+    updateFilterOptions(topics) {
+        // 고유한 팀 목록 추출
+        const teams = [...new Set(topics.map(t => t.owner).filter(o => o))];
+        const teamFilter = document.getElementById('topic-team-filter');
+        if (teamFilter) {
+            const currentValue = teamFilter.value;
+            teamFilter.innerHTML = '<option value="">전체 팀</option>';
+            teams.sort().forEach(team => {
+                teamFilter.innerHTML += `<option value="${team}">${team}</option>`;
+            });
+            teamFilter.value = currentValue; // 선택 상태 유지
+        }
+
+        // 고유한 태그 목록 추출
+        const tags = [...new Set(topics.flatMap(t => t.tags || []))];
+        const tagFilter = document.getElementById('topic-tag-filter');
+        if (tagFilter) {
+            const currentValue = tagFilter.value;
+            tagFilter.innerHTML = '<option value="">전체 태그</option>';
+            tags.sort().forEach(tag => {
+                tagFilter.innerHTML += `<option value="${tag}">${tag}</option>`;
+            });
+            tagFilter.value = currentValue; // 선택 상태 유지
         }
     }
 
@@ -496,6 +832,8 @@ class KafkaGovApp {
                         environments: new Set(),
                         latest_version: artifact.version,
                         schema_type: artifact.schema_type,
+                        compatibility_mode: artifact.compatibility_mode || null,
+                        owner: artifact.owner || null,
                     };
                 }
                 // 환경 추출 (subject에서)
@@ -510,6 +848,8 @@ class KafkaGovApp {
                 subject: group.subject,
                 environments: Array.from(group.environments),
                 schema_type: group.schema_type,
+                compatibility_mode: group.compatibility_mode,
+                owner: group.owner,
             }));
 
             const filtered = subjects.filter((subject) => {
@@ -535,25 +875,252 @@ class KafkaGovApp {
     }
 
     /**
+     * 팀별 분석 로드
+     */
+    async loadAnalytics() {
+        try {
+            Loading.show();
+
+            // 토픽 및 활동 데이터 가져오기
+            const [topicsData, activities] = await Promise.all([
+                api.getTopics(),
+                api.getActivityHistory({ limit: 100 }).catch(() => [])
+            ]);
+
+            const topics = topicsData.topics || [];
+            
+            // 팀 목록 추출
+            const teams = [...new Set(topics.map(t => t.owner).filter(o => o))].sort();
+            const teamFilter = document.getElementById('analytics-team-filter');
+            if (teamFilter) {
+                teamFilter.innerHTML = '<option value="">전체 팀</option>';
+                teams.forEach(team => {
+                    teamFilter.innerHTML += `<option value="${team}">${team}</option>`;
+                });
+            }
+
+            // 팀 필터 변경 이벤트
+            document.getElementById('analytics-team-filter')?.addEventListener('change', () => {
+                this.renderTeamAnalytics(topics, activities);
+            });
+
+            // 초기 렌더링
+            this.renderTeamAnalytics(topics, activities);
+
+        } catch (error) {
+            console.error('팀별 분석 로드 실패:', error);
+            Toast.error(`팀별 분석 조회 실패: ${error.message}`);
+        } finally {
+            Loading.hide();
+        }
+    }
+
+    /**
+     * 팀별 분석 렌더링
+     */
+    renderTeamAnalytics(topics, activities) {
+        const selectedTeam = document.getElementById('analytics-team-filter')?.value || '';
+        
+        // 필터링
+        const filteredTopics = selectedTeam 
+            ? topics.filter(t => t.owner === selectedTeam)
+            : topics;
+
+        // 메트릭 계산
+        const totalTopics = filteredTopics.length;
+        const envDistribution = filteredTopics.reduce((acc, t) => {
+            acc[t.environment] = (acc[t.environment] || 0) + 1;
+            return acc;
+        }, {});
+        
+        const avgPartitions = totalTopics > 0
+            ? Math.round(filteredTopics.reduce((sum, t) => sum + (t.partition_count || 0), 0) / totalTopics)
+            : 0;
+
+        // 최근 7일 활동 필터링 (팀도 필터링)
+        const sevenDaysAgo = new Date();
+        sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+        const recentActivities = activities.filter(a => {
+            const activityDate = new Date(a.timestamp);
+            const isRecent = activityDate >= sevenDaysAgo;
+            const isTeamMatch = !selectedTeam || a.team === selectedTeam;
+            return isRecent && isTeamMatch;
+        });
+
+        // 메트릭 업데이트
+        document.getElementById('team-total-topics').textContent = totalTopics;
+        document.getElementById('team-topics-change').textContent = selectedTeam || '전체';
+
+        const envText = Object.entries(envDistribution)
+            .map(([env, count]) => `${env.toUpperCase()}: ${count}`)
+            .join(' / ') || '-';
+        document.getElementById('team-env-distribution').textContent = Object.keys(envDistribution).length;
+        document.getElementById('team-env-info').textContent = envText;
+
+        document.getElementById('team-avg-partitions').textContent = avgPartitions;
+        document.getElementById('team-partitions-info').textContent = `${totalTopics}개 토픽 평균`;
+
+        document.getElementById('team-recent-activities').textContent = recentActivities.length;
+        document.getElementById('team-activities-info').textContent = '최근 7일';
+
+        // 환경별 분포 차트
+        this.renderTeamEnvChart(envDistribution);
+
+        // 활동 차트
+        this.renderTeamActivityChart(recentActivities);
+
+        // 토픽 테이블
+        this.renderTeamTopicsTable(filteredTopics);
+    }
+
+    /**
+     * 팀별 환경 분포 차트 렌더링
+     */
+    renderTeamEnvChart(envDistribution) {
+        const container = document.getElementById('team-env-chart');
+        const maxCount = Math.max(...Object.values(envDistribution), 1);
+        
+        const html = `
+            <div class="env-bar-chart">
+                ${['prod', 'stg', 'dev'].map(env => {
+                    const count = envDistribution[env] || 0;
+                    const width = Math.max((count / maxCount) * 100, 5);
+                    return `
+                        <div class="env-bar-item">
+                            <div class="env-bar-label">${env.toUpperCase()}</div>
+                            <div class="env-bar-track">
+                                <div class="env-bar-fill ${env}" style="width: ${width}%">
+                                    ${width > 20 ? `${count}개` : ''}
+                                </div>
+                                ${width <= 20 && count > 0 ? `<span style="margin-left: 10px;">${count}개</span>` : ''}
+                            </div>
+                        </div>
+                    `;
+                }).join('')}
+            </div>
+        `;
+        
+        container.innerHTML = html || '<p style="text-align: center; color: var(--text-muted);">데이터가 없습니다.</p>';
+    }
+
+    /**
+     * 팀별 활동 차트 렌더링
+     */
+    renderTeamActivityChart(activities) {
+        const container = document.getElementById('team-activity-chart');
+        
+        // 액션별 그룹화
+        const actionCounts = activities.reduce((acc, a) => {
+            const action = a.action || 'UNKNOWN';
+            acc[action] = (acc[action] || 0) + 1;
+            return acc;
+        }, {});
+
+        const maxCount = Math.max(...Object.values(actionCounts), 1);
+        
+        const html = `
+            <div class="env-bar-chart">
+                ${Object.entries(actionCounts).map(([action, count]) => {
+                    const width = Math.max((count / maxCount) * 100, 5);
+                    // 바가 충분히 클 때만 (30% 이상) 바 안에 텍스트 표시
+                    return `
+                        <div class="env-bar-item">
+                            <div class="env-bar-label">${action}</div>
+                            <div class="env-bar-track">
+                                <div class="env-bar-fill" style="width: ${width}%; background-color: var(--primary-color);">
+                                    ${width > 30 ? `${count}건` : ''}
+                                </div>
+                                ${width <= 30 ? `<span style="margin-left: 8px; font-size: 0.875rem;">${count}건</span>` : ''}
+                            </div>
+                        </div>
+                    `;
+                }).join('')}
+            </div>
+        `;
+        
+        container.innerHTML = html || '<p style="text-align: center; color: var(--text-muted);">활동이 없습니다.</p>';
+    }
+
+    /**
+     * 팀별 토픽 테이블 렌더링
+     */
+    renderTeamTopicsTable(topics) {
+        const tbody = document.getElementById('team-topics-table-body');
+        
+        if (!topics || topics.length === 0) {
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="6" style="text-align: center; padding: 2rem; color: var(--text-muted);">
+                        토픽이 없습니다.
+                    </td>
+                </tr>
+            `;
+            return;
+        }
+
+        tbody.innerHTML = topics.map(topic => {
+            const tags = topic.tags && topic.tags.length > 0 
+                ? topic.tags.map(tag => {
+                    const colorClass = TableRenderer.getTagColorClass(tag);
+                    return `<span class="tag-badge ${colorClass}">${TableRenderer.escapeHtml(tag)}</span>`;
+                  }).join(' ')
+                : '<span style="color: var(--text-muted);">-</span>';
+
+            const docHtml = topic.doc 
+                ? `<a href="${TableRenderer.escapeHtml(topic.doc)}" target="_blank" rel="noopener noreferrer" title="문서 보기" style="color: var(--primary);">
+                    <i class="fas fa-external-link-alt"></i>
+                   </a>`
+                : '<span style="color: var(--text-muted);">-</span>';
+
+            return `
+                <tr>
+                    <td><div style="font-weight: 500;">${TableRenderer.escapeHtml(topic.name)}</div></td>
+                    <td><span class="status-badge ${TableRenderer.getEnvClass(topic.environment)}">${TableRenderer.escapeHtml(topic.environment.toUpperCase())}</span></td>
+                    <td style="text-align: center;">${topic.partition_count || '-'}</td>
+                    <td style="text-align: center;">${topic.replication_factor || '-'}</td>
+                    <td>${tags}</td>
+                    <td style="text-align: center;">${docHtml}</td>
+                </tr>
+            `;
+        }).join('');
+    }
+
+    /**
      * 활동 히스토리 로드
      */
     async loadHistory() {
         try {
             Loading.show();
 
+            // 팀 필터 초기화 (첫 로드 시에만)
+            const teamFilter = document.getElementById('history-team-filter');
+            if (teamFilter && teamFilter.options.length === 1) {
+                const topicsData = await api.getTopics().catch(() => ({ topics: [] }));
+                const teams = [...new Set(topicsData.topics.map(t => t.owner).filter(o => o))].sort();
+                teams.forEach(team => {
+                    const option = document.createElement('option');
+                    option.value = team;
+                    option.textContent = team;
+                    teamFilter.appendChild(option);
+                });
+            }
+
             const fromDate = document.getElementById('history-from-date')?.value;
             const toDate = document.getElementById('history-to-date')?.value;
             const activityType = document.getElementById('history-type-filter')?.value;
             const action = document.getElementById('history-action-filter')?.value;
+            const team = document.getElementById('history-team-filter')?.value;
             const actor = document.getElementById('history-actor-filter')?.value;
 
-            const filters = {};
-            if (fromDate) filters.from_date = new Date(fromDate).toISOString();
-            if (toDate) filters.to_date = new Date(toDate).toISOString();
-            if (activityType) filters.activity_type = activityType;
-            if (action) filters.action = action;
-            if (actor) filters.actor = actor;
-            filters.limit = 100;
+            const filters = {
+                from_date: fromDate || undefined,
+                to_date: toDate || undefined,
+                activity_type: activityType || undefined,
+                action: action || undefined,
+                team: team || undefined,
+                actor: actor || undefined,
+                limit: 100
+            };
 
             const activities = await api.getActivityHistory(filters);
             
@@ -607,9 +1174,27 @@ class KafkaGovApp {
             // 목록 새로고침
             await this.loadSchemas();
             
+            // 대시보드 카운터 업데이트
+            try {
+                const schemaCount = await api.getSchemaCount();
+                const schemaCountEl = document.getElementById('schema-count');
+                if (schemaCountEl) {
+                    schemaCountEl.textContent = schemaCount.count;
+                }
+            } catch (err) {
+                console.error('스키마 카운트 업데이스트 실패:', err);
+            }
             Toast.success(
                 `스키마 동기화 완료! 총 ${result.total}개 (새로 추가: ${result.added}개, 업데이트: ${result.updated}개)`
             );
+            
+            // 대시보드 최근 활동 갱신
+            try {
+                const activities = await api.getRecentActivities(10);
+                ActivityRenderer.renderRecentActivities(activities);
+            } catch (error) {
+                console.error('최근 활동 갱신 실패:', error);
+            }
         } catch (error) {
             console.error('스키마 동기화 실패:', error);
             Toast.error(`스키마 동기화 실패: ${error.message}`);
@@ -669,13 +1254,31 @@ class KafkaGovApp {
             const form = document.getElementById('create-single-topic-form');
             const formData = FormUtils.formToObject(form);
 
+            // 환경 선택 검증
+            if (!formData['single-topic-env']) {
+                Toast.error('환경을 선택해주세요.');
+                return;
+            }
+
             // 토픽 이름 검증
             const topicName = formData['single-topic-name'];
+            if (!topicName) {
+                Toast.error('토픽명을 입력해주세요.');
+                return;
+            }
             const topicNamePattern = /^[a-z0-9._-]+$/;
             if (!topicNamePattern.test(topicName)) {
                 Toast.error('토픽 이름 형식이 올바르지 않습니다. 형식: 소문자, 숫자, ., _, - 만 사용 가능');
                 return;
             }
+
+            // Metadata 객체 구성
+            const metadata = {
+                owner: formData['single-topic-owner'],
+                doc: formData['single-topic-doc'] || 'https://wiki.example.com',
+                tags: formData['single-topic-tags'] ? 
+                    formData['single-topic-tags'].split(',').map(t => t.trim()).filter(t => t) : []
+            };
 
             const batch = {
                 kind: 'TopicBatch',
@@ -689,14 +1292,15 @@ class KafkaGovApp {
                         replication_factor: parseInt(formData['single-topic-replication']),
                         min_insync_replicas: parseInt(formData['single-topic-min-insync'])
                     },
-                    metadata: {
-                        owner: formData['single-topic-owner'],
-                        doc: formData['single-topic-doc'] || 'https://wiki.example.com',
-                        tags: formData['single-topic-tags'] ? 
-                            formData['single-topic-tags'].split(',').map(t => t.trim()).filter(t => t) : []
-                    }
+                    metadata: metadata
                 }]
             };
+
+            // 디버깅: 전송할 데이터 확인
+            console.log('=== 토픽 생성 요청 데이터 ===');
+            console.log('Full batch:', JSON.stringify(batch, null, 2));
+            console.log('Form data:', formData);
+            console.log('Metadata:', metadata);
 
             // 바로 Apply 실행
             const result = await api.topicBatchApply(batch);
@@ -708,6 +1312,15 @@ class KafkaGovApp {
             // 토픽 목록 새로고침
             if (this.currentTab === 'topics') {
                 await this.loadTopics();
+            }
+            
+            // 대시보드 최근 활동 갱신
+            try {
+                const activities = await api.getRecentActivities(10);
+                ActivityRenderer.renderRecentActivities(activities);
+                console.log('토픽 생성 후 최근 활동 갱신 완료');
+            } catch (error) {
+                console.error('최근 활동 갱신 실패:', error);
             }
 
         } catch (error) {
@@ -799,7 +1412,21 @@ class KafkaGovApp {
             document.getElementById('yaml-preview-content').innerHTML = summary;
             
             if (errorCount > 0) {
-                Toast.warning(`YAML 파싱 완료: ${errorCount}개 에러 발견. 적용은 진행할 수 없습니다.`);
+                // 에러 상세 내역을 포함한 메시지
+                const errorDetails = result.violations
+                    ?.filter(v => v.severity === 'error')
+                    .map(v => `• ${v.name}: ${v.message}`)
+                    .join('\n') || '';
+                
+                console.error('정책 위반 발견:', errorDetails);
+                
+                Toast.error(
+                    `정책 위반 발견! ${errorCount}개의 에러로 인해 적용할 수 없습니다.\n\n${errorDetails.substring(0, 200)}...`
+                );
+                
+                // Dry-Run 결과는 표시
+                document.getElementById('yaml-preview').style.display = 'block';
+                document.getElementById('yaml-preview-content').innerHTML = summary;
             } else {
                 // YAML 파일 내용을 읽어서 원본 요청 데이터 생성
                 const fileContent = await file.text();
@@ -1229,6 +1856,7 @@ class KafkaGovApp {
             const env = document.getElementById('schema-env')?.value;
             const changeId = document.getElementById('schema-change-id')?.value;
             const owner = document.getElementById('schema-owner')?.value;
+            const compatibilityMode = document.getElementById('schema-compatibility-mode')?.value;
 
             if (!env || !changeId) {
                 Toast.warning('환경과 변경 ID를 입력해주세요.');
@@ -1245,6 +1873,7 @@ class KafkaGovApp {
                 changeId,
                 owner,
                 files: this.selectedFiles,
+                compatibilityMode: compatibilityMode || null,
             });
             
             // 응답 구조: { upload_id, artifacts: [], summary: { total_files, ... } }
@@ -1259,6 +1888,17 @@ class KafkaGovApp {
                 // 스키마 목록 새로고침
                 if (this.currentTab === 'schemas') {
                     await this.loadSchemas();
+                }
+                
+                // 대시보드 카운터 업데이트 (모든 탭에서)
+                try {
+                    const schemaCount = await api.getSchemaCount();
+                    const schemaCountEl = document.getElementById('schema-count');
+                    if (schemaCountEl) {
+                        schemaCountEl.textContent = schemaCount.count;
+                    }
+                } catch (err) {
+                    console.error('스키마 카운트 업데이트 실패:', err);
                 }
             } else {
                 Toast.error('스키마 업로드에 실패했습니다.');
@@ -1369,6 +2009,15 @@ async function deleteTopic(topicName) {
         // 토픽 목록 새로고침
         if (window.kafkaGovApp && window.kafkaGovApp.currentTab === 'topics') {
             await window.kafkaGovApp.loadTopics();
+        }
+        
+        // 대시보드 최근 활동 갱신
+        try {
+            const activities = await api.getRecentActivities(10);
+            ActivityRenderer.renderRecentActivities(activities);
+            console.log('토픽 삭제 후 최근 활동 갱신 완료');
+        } catch (error) {
+            console.error('최근 활동 갱신 실패:', error);
         }
     } catch (error) {
         console.error('토픽 삭제 실패:', error);

@@ -4,8 +4,9 @@ from __future__ import annotations
 
 from datetime import datetime
 
+from app.cluster.domain.services import IConnectionManager
 from app.shared.domain.models import AuditActivity, ClusterStatus
-from app.shared.domain.repositories import IAuditActivityRepository, IClusterRepository
+from app.shared.domain.repositories import IAuditActivityRepository
 
 
 class GetRecentActivitiesUseCase:
@@ -87,14 +88,66 @@ class GetActivityHistoryUseCase:
 class GetClusterStatusUseCase:
     """Kafka 클러스터 상태 조회 Use Case"""
 
-    def __init__(self, cluster_repository: IClusterRepository) -> None:
-        self.cluster_repository = cluster_repository
+    def __init__(self, connection_manager: IConnectionManager) -> None:
+        self.connection_manager = connection_manager
 
-    async def execute(self) -> ClusterStatus:
+    async def execute(self, cluster_id: str) -> ClusterStatus:
         """
         Kafka 클러스터 상태 조회
 
+        Args:
+            cluster_id: 클러스터 ID
+
         Returns:
-            클러스터 상태 정보
+            클러스터 상태 정보 (브로커 목록, 토픽/파티션 수)
         """
-        return await self.cluster_repository.get_cluster_status()
+        # ConnectionManager를 통해 AdminClient 획득
+        admin_client = await self.connection_manager.get_kafka_admin_client(cluster_id)
+
+        # 클러스터 메타데이터 조회 (동기 방식이지만 빠름)
+        metadata = admin_client.list_topics(timeout=10)
+
+        # 컨트롤러 ID 조회
+        controller_id = metadata.controller_id
+
+        # 브로커 정보 수집
+        from app.shared.domain.models import BrokerInfo
+
+        brokers_dict = {}
+        for broker in metadata.brokers.values():
+            brokers_dict[broker.id] = BrokerInfo(
+                broker_id=broker.id,
+                host=broker.host,
+                port=broker.port,
+                is_controller=(broker.id == controller_id),
+                leader_partition_count=0,  # 기본값
+            )
+
+        # 파티션별 리더 카운트 계산
+        total_partitions = 0
+        for topic in metadata.topics.values():
+            if not topic.error:  # 에러가 없는 토픽만
+                for partition in topic.partitions.values():
+                    total_partitions += 1
+                    leader_id = partition.leader
+                    if leader_id in brokers_dict:
+                        # 리더 파티션 카운트 증가 (불변 객체이므로 새로 생성)
+                        old_broker = brokers_dict[leader_id]
+                        brokers_dict[leader_id] = BrokerInfo(
+                            broker_id=old_broker.broker_id,
+                            host=old_broker.host,
+                            port=old_broker.port,
+                            is_controller=old_broker.is_controller,
+                            leader_partition_count=old_broker.leader_partition_count + 1,
+                        )
+
+        # ClusterStatus 생성
+        from app.shared.domain.models import ClusterStatus
+
+        return ClusterStatus(
+            cluster_id=cluster_id,
+            controller_id=controller_id,
+            brokers=tuple(brokers_dict.values()),
+            total_topics=len([t for t in metadata.topics.values() if not t.error]),
+            total_partitions=total_partitions,
+        )

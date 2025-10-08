@@ -45,6 +45,10 @@ class ISchemaRegistryRepository(ABC):
     async def list_all_subjects(self) -> list[SubjectName]:
         """Schema Registry의 모든 Subject 목록 조회"""
 
+    @abstractmethod
+    async def set_compatibility_mode(self, subject: SubjectName, mode: str) -> None:
+        """Subject의 호환성 모드 설정"""
+
 
 class ISchemaMetadataRepository(ABC):
     """스키마 메타데이터/Audit Repository 인터페이스"""

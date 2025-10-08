@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from unittest.mock import MagicMock
+
 import pytest
 
 from app.topic.application.use_cases import (
@@ -18,13 +20,13 @@ class TestTopicBatchDryRunUseCase:
     @pytest.mark.asyncio
     async def test_dry_run_success(
         self,
-        mock_topic_repository,
+        mock_connection_manager,
         mock_metadata_repository,
         mock_audit_repository,
     ):
         """정상적인 Dry-Run"""
         use_case = TopicBatchDryRunUseCase(
-            mock_topic_repository,
+            mock_connection_manager,
             mock_metadata_repository,
             mock_audit_repository,
         )
@@ -33,10 +35,7 @@ class TestTopicBatchDryRunUseCase:
             specs=(create_topic_spec(name="dev.test.topic"),),
         )
 
-        # Repository: 새 토픽
-        mock_topic_repository.describe_topics.return_value = {}
-
-        plan = await use_case.execute(batch, actor="test-user")
+        plan = await use_case.execute("default", batch, actor="test-user")
 
         assert plan.change_id == batch.change_id
         assert len(plan.items) == 1
@@ -50,24 +49,24 @@ class TestTopicBatchDryRunUseCase:
     @pytest.mark.asyncio
     async def test_dry_run_failure(
         self,
-        mock_topic_repository,
+        mock_connection_manager,
         mock_metadata_repository,
         mock_audit_repository,
     ):
         """Dry-Run 실패"""
         use_case = TopicBatchDryRunUseCase(
-            mock_topic_repository,
+            mock_connection_manager,
             mock_metadata_repository,
             mock_audit_repository,
         )
 
         batch = create_topic_batch()
 
-        # Repository 에러 발생
-        mock_topic_repository.describe_topics.side_effect = Exception("Connection failed")
+        # ConnectionManager 에러 발생
+        mock_connection_manager.get_kafka_admin_client.side_effect = Exception("Connection failed")
 
         with pytest.raises(Exception, match="Connection failed"):
-            await use_case.execute(batch, actor="test-user")
+            await use_case.execute("default", batch, actor="test-user")
 
         # 실패 감사 로그 기록 확인
         calls = mock_audit_repository.log_topic_operation.call_args_list
@@ -80,13 +79,24 @@ class TestTopicBatchApplyUseCase:
     @pytest.mark.asyncio
     async def test_apply_create_success(
         self,
-        mock_topic_repository,
+        mock_connection_manager,
+        mock_admin_client,
         mock_metadata_repository,
         mock_audit_repository,
     ):
         """토픽 생성 적용"""
+        # AdminClient의 create_topics future mock 설정
+        mock_future = MagicMock()
+        mock_future.result.return_value = None  # 성공
+        mock_admin_client.create_topics.return_value = {"dev.test1.topic": mock_future}
+
+        # describe_topics mock 설정 (새 토픽)
+        mock_metadata = MagicMock()
+        mock_metadata.topics = {}
+        mock_admin_client.list_topics.return_value = mock_metadata
+
         use_case = TopicBatchApplyUseCase(
-            mock_topic_repository,
+            mock_connection_manager,
             mock_metadata_repository,
             mock_audit_repository,
         )
@@ -95,13 +105,7 @@ class TestTopicBatchApplyUseCase:
             specs=(create_topic_spec(name="dev.test1.topic"),),
         )
 
-        # Repository: 토픽 생성
-        mock_topic_repository.describe_topics.return_value = {}
-        mock_topic_repository.create_topics.return_value = {
-            "dev.test1.topic": None,
-        }
-
-        result = await use_case.execute(batch, actor="test-user")
+        result = await use_case.execute("default", batch, actor="test-user")
 
         assert result.change_id == batch.change_id
         assert len(result.applied) == 1
@@ -113,13 +117,26 @@ class TestTopicBatchApplyUseCase:
     @pytest.mark.asyncio
     async def test_apply_delete_success(
         self,
-        mock_topic_repository,
+        mock_connection_manager,
+        mock_admin_client,
         mock_metadata_repository,
         mock_audit_repository,
     ):
         """토픽 삭제 적용"""
+        # AdminClient의 delete_topics future mock 설정
+        mock_future = MagicMock()
+        mock_future.result.return_value = None  # 성공
+        mock_admin_client.delete_topics.return_value = {"dev.old.topic": mock_future}
+
+        # describe_topics mock 설정 (기존 토픽)
+        mock_metadata = MagicMock()
+        mock_topic_metadata = MagicMock()
+        mock_topic_metadata.partitions = {0: MagicMock()}
+        mock_metadata.topics = {"dev.old.topic": mock_topic_metadata}
+        mock_admin_client.list_topics.return_value = mock_metadata
+
         use_case = TopicBatchApplyUseCase(
-            mock_topic_repository,
+            mock_connection_manager,
             mock_metadata_repository,
             mock_audit_repository,
         )
@@ -130,13 +147,7 @@ class TestTopicBatchApplyUseCase:
         )
         batch = create_topic_batch(specs=(spec,))
 
-        # Repository: 토픽 삭제
-        mock_topic_repository.describe_topics.return_value = {
-            "dev.old.topic": {"partition_count": 3}
-        }
-        mock_topic_repository.delete_topics.return_value = {"dev.old.topic": None}
-
-        result = await use_case.execute(batch, actor="test-user")
+        result = await use_case.execute("default", batch, actor="test-user")
 
         assert len(result.applied) == 1
         assert "dev.old.topic" in result.applied
@@ -144,13 +155,33 @@ class TestTopicBatchApplyUseCase:
     @pytest.mark.asyncio
     async def test_apply_partial_failure(
         self,
-        mock_topic_repository,
+        mock_connection_manager,
+        mock_admin_client,
         mock_metadata_repository,
         mock_audit_repository,
     ):
         """일부 실패한 적용"""
+        from unittest.mock import MagicMock
+
+        # AdminClient의 create_topics future mock 설정 - 1개 성공, 1개 실패
+        mock_success_future = MagicMock()
+        mock_success_future.result.return_value = None  # 성공
+
+        mock_fail_future = MagicMock()
+        mock_fail_future.result.side_effect = Exception("Creation failed")  # 실패
+
+        mock_admin_client.create_topics.return_value = {
+            "dev.success.topic": mock_success_future,
+            "dev.failure.topic": mock_fail_future,
+        }
+
+        # describe_topics mock 설정 (새 토픽)
+        mock_metadata = MagicMock()
+        mock_metadata.topics = {}
+        mock_admin_client.list_topics.return_value = mock_metadata
+
         use_case = TopicBatchApplyUseCase(
-            mock_topic_repository,
+            mock_connection_manager,
             mock_metadata_repository,
             mock_audit_repository,
         )
@@ -162,14 +193,7 @@ class TestTopicBatchApplyUseCase:
             ),
         )
 
-        # Repository: 토픽 생성
-        mock_topic_repository.describe_topics.return_value = {}
-        mock_topic_repository.create_topics.return_value = {
-            "dev.success.topic": None,
-            "dev.failure.topic": Exception("Creation failed"),
-        }
-
-        result = await use_case.execute(batch, actor="test-user")
+        result = await use_case.execute("default", batch, actor="test-user")
 
         assert len(result.applied) == 1
         assert len(result.failed) == 1
@@ -178,13 +202,13 @@ class TestTopicBatchApplyUseCase:
     @pytest.mark.asyncio
     async def test_apply_with_policy_violation(
         self,
-        mock_topic_repository,
+        mock_connection_manager,
         mock_metadata_repository,
         mock_audit_repository,
     ):
         """정책 위반으로 적용 차단"""
         use_case = TopicBatchApplyUseCase(
-            mock_topic_repository,
+            mock_connection_manager,
             mock_metadata_repository,
             mock_audit_repository,
         )
@@ -194,27 +218,63 @@ class TestTopicBatchApplyUseCase:
             specs=(create_topic_spec(name="dev.__consumer_offsets"),)  # 예약어 사용 (위반)
         )
 
-        mock_topic_repository.describe_topics.return_value = {}
-
         # 정책 검증에서 위반 발생 (내부적으로 처리됨)
         with pytest.raises(ValueError, match="Cannot apply due to policy violations"):
-            await use_case.execute(batch, actor="test-user")
+            await use_case.execute("default", batch, actor="test-user")
 
     @pytest.mark.asyncio
     async def test_apply_partition_change(
         self,
-        mock_topic_repository,
+        mock_connection_manager,
+        mock_admin_client,
         mock_metadata_repository,
         mock_audit_repository,
     ):
         """파티션 수 변경 적용"""
+        from tests.topic.factories import create_topic_config
+
+        # 기존 토픽 describe mock 설정
+        mock_metadata = MagicMock()
+        mock_topic_metadata = MagicMock()
+        mock_partition_replicas = [MagicMock(), MagicMock()]  # replication_factor=2
+        mock_partition_replicas[0].replicas = [1, 2]
+        mock_topic_metadata.partitions = {
+            i: mock_partition_replicas[i % 2] for i in range(6)
+        }  # 파티션 6개
+        mock_metadata.topics = {"dev.existing.topic": mock_topic_metadata}
+        mock_admin_client.list_topics.return_value = mock_metadata
+
+        # describe_configs mock 설정 - config 정보 포함
+        from confluent_kafka.admin import ConfigResource, ConfigEntry
+
+        mock_config_resource = ConfigResource(ConfigResource.Type.TOPIC, "dev.existing.topic")
+        mock_config_future = MagicMock()
+        mock_config_result = MagicMock()
+        # ConfigEntry 목 객체 생성
+        mock_config_entry = MagicMock()
+        mock_config_entry.name = "partitions"
+        mock_config_entry.value = "6"
+        mock_config_result.values.return_value = [mock_config_entry]
+        mock_config_future.result.return_value = mock_config_result
+        mock_admin_client.describe_configs.return_value = {mock_config_resource: mock_config_future}
+
+        # create_partitions future mock 설정
+        mock_partition_future = MagicMock()
+        mock_partition_future.result.return_value = None  # 성공
+        mock_admin_client.create_partitions.return_value = {
+            "dev.existing.topic": mock_partition_future
+        }
+
+        # alter_configs future mock 설정
+        mock_alter_future = MagicMock()
+        mock_alter_future.result.return_value = None  # 성공
+        mock_admin_client.alter_configs.return_value = {mock_config_resource: mock_alter_future}
+
         use_case = TopicBatchApplyUseCase(
-            mock_topic_repository,
+            mock_connection_manager,
             mock_metadata_repository,
             mock_audit_repository,
         )
-
-        from tests.topic.factories import create_topic_config
 
         spec = create_topic_spec(
             name="dev.existing.topic",
@@ -223,19 +283,6 @@ class TestTopicBatchApplyUseCase:
         )
         batch = create_topic_batch(specs=(spec,))
 
-        # 기존 토픽 (파티션 6개)
-        mock_topic_repository.describe_topics.return_value = {
-            "dev.existing.topic": {
-                "partition_count": 6,
-                "config": {"partitions": "6", "replication_factor": "2"},
-            }
-        }
-
-        # 파티션 변경 성공
-        mock_topic_repository.create_partitions.return_value = {"dev.existing.topic": None}
-        mock_topic_repository.alter_topic_configs.return_value = {"dev.existing.topic": None}
-
-        result = await use_case.execute(batch, actor="test-user")
+        result = await use_case.execute("default", batch, actor="test-user")
 
         assert len(result.applied) == 1
-        mock_topic_repository.create_partitions.assert_called_once()

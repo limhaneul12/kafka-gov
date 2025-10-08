@@ -5,7 +5,7 @@ from __future__ import annotations
 import pytest
 from pydantic import ValidationError
 
-from app.topic.interface.schema import (
+from app.topic.interface.schemas import (
     TopicBatchRequest,
     TopicConfig,
     TopicItem,

@@ -16,13 +16,13 @@ from app.topic.interface.adapters import (
     safe_convert_plan_to_response,
     safe_convert_request_to_batch,
 )
-from app.topic.interface.schema import (
-    TopicAction,
+from app.topic.interface.schemas import (
     TopicBatchRequest,
     TopicConfig,
     TopicItem,
     TopicMetadata,
 )
+from app.topic.interface.types import TopicAction
 
 from .factories import create_topic_plan
 

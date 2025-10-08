@@ -110,6 +110,7 @@ class AuditLogModel(Base):
     change_id: Mapped[str] = mapped_column(String(100), comment="변경 ID")
     action: Mapped[str] = mapped_column(String(50), comment="액션")
     target: Mapped[str] = mapped_column(String(255), comment="대상 (토픽명)")
+    team: Mapped[str | None] = mapped_column(String(100), nullable=True, comment="팀 (토픽 소유자)")
     actor: Mapped[str] = mapped_column(String(100), comment="수행자")
     status: Mapped[str] = mapped_column(String(20), comment="상태")
     message: Mapped[str | None] = mapped_column(Text, comment="메시지")

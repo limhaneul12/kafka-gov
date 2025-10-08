@@ -2,6 +2,8 @@ from dependency_injector import containers, providers
 
 from app.analysis.application.event_handlers import SchemaRegisteredHandler, TopicCreatedHandler
 from app.analysis.container import AnalysisContainer
+from app.cluster.container import ClusterContainer
+from app.connect.container import ConnectContainer
 from app.schema.container import SchemaContainer
 from app.shared.container import InfrastructureContainer
 from app.shared.infrastructure.event_bus import get_event_bus
@@ -17,18 +19,51 @@ class AppContainer(containers.DeclarativeContainer):
             "app.schema.interface",
             "app.analysis.interface",
             "app.shared.interface",
+            "app.cluster.interface",
+            "app.connect.interface",  # Connect API 추가
         ]
     )
 
-    infrastructure_container = providers.Container(InfrastructureContainer)
+    # ClusterContainer (ConnectionManager 제공) - 최우선 생성
+    cluster_container = providers.Container(ClusterContainer)
+
+    infrastructure_container = providers.Container(
+        InfrastructureContainer,
+        cluster=cluster_container,
+    )
+
+    # ClusterContainer에 infrastructure 주입 (순환 참조 해결)
+    cluster_container.override(
+        providers.Container(
+            ClusterContainer,
+            infrastructure=infrastructure_container,
+        )
+    )
+
     analysis_container = providers.Container(
         AnalysisContainer, infrastructure=infrastructure_container
     )
-    topic_container = providers.Container(TopicContainer, infrastructure=infrastructure_container)
+
+    # TopicContainer - ConnectionManager 주입
+    topic_container = providers.Container(
+        TopicContainer,
+        infrastructure=infrastructure_container,
+        cluster=cluster_container,  # ConnectionManager 전달
+    )
+
+    # SchemaContainer - ConnectionManager 주입
     schema_container = providers.Container(
         SchemaContainer,
         infrastructure=infrastructure_container,
         analysis=analysis_container,
+        cluster=cluster_container,  # ConnectionManager 전달
+    )
+
+    # ConnectContainer - Kafka Connect 관리
+    connect_container = providers.Container(
+        ConnectContainer,
+        connect_repository=cluster_container.kafka_connect_repository,
+        database_manager=infrastructure_container.database_manager,
     )
 
 

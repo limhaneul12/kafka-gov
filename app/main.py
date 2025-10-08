@@ -7,11 +7,14 @@ from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import ORJSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
 from .analysis.interface.router import router as analysis_router
+from .cluster.interface.router import router as cluster_router
+from .connect.interface.router import router as connect_router
 from .container import AppContainer, register_event_handlers
 from .schema.interface.router import router as schema_router
 from .shared.interface.router import router as shared_router
@@ -77,15 +80,19 @@ def create_app() -> FastAPI:
 
     # (선택) 하위 컨테이너 인스턴스를 접근 용도로 보관하고 싶다면 호출해서 저장
     app.state.infrastructure_container = container.infrastructure_container()
+    app.state.cluster_container = container.cluster_container()
     app.state.topic_container = container.topic_container()
     app.state.schema_container = container.schema_container()
     app.state.analysis_container = container.analysis_container()
+    app.state.connect_container = container.connect_container()
 
     # ✅ (중요) 와이어링 - wiring_config가 있으면 생략 가능하지만,
     # 명시적으로 호출하면 import 타이밍 이슈를 줄일 수 있음
     container.wire(
         packages=[
             # 라우터/핸들러 패키지들
+            "app.cluster.interface",  # Cluster API (ConnectionManager 제공)
+            "app.connect.interface",  # Connect API
             "app.topic.interface",
             "app.schema.interface",
             "app.analysis.interface",
@@ -96,6 +103,8 @@ def create_app() -> FastAPI:
 
     # 라우터 등록
     app.include_router(shared_router, prefix="/api")
+    app.include_router(cluster_router, prefix="/api")  # Cluster API
+    app.include_router(connect_router, prefix="/api")  # Connect API
     app.include_router(topic_router, prefix="/api")
     app.include_router(schema_router, prefix="/api")
     app.include_router(analysis_router, prefix="/api")
@@ -111,6 +120,21 @@ def create_app() -> FastAPI:
     @app.get("/health")
     async def health_check() -> dict[str, str]:
         return {"status": "healthy"}
+
+    @app.exception_handler(RequestValidationError)
+    async def validation_exception_handler(request: Request, exc: RequestValidationError):
+        """Pydantic validation 에러를 상세히 로깅"""
+        logger.error(f"Validation error on {request.method} {request.url.path}")
+        logger.error(f"Request body: {await request.body()}")
+        logger.error(f"Validation errors: {exc.errors()}")
+
+        return ORJSONResponse(
+            status_code=422,
+            content={
+                "detail": exc.errors(),
+                "body": exc.body if hasattr(exc, "body") else None,
+            },
+        )
 
     @app.exception_handler(404)
     async def not_found_exception_handler(request: Request, exc: Exception):

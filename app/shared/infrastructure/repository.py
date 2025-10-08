@@ -39,6 +39,7 @@ def _subquery_log_model[AuditLogT: (AuditLogModel, SchemaAuditLogModel)](
         model.action,
         model.target,
         model.actor,
+        model.team if hasattr(model, "team") else literal(None).label("team"),
         model.timestamp,
         model.message,
         model.snapshot,
@@ -108,6 +109,7 @@ class MySQLAuditActivityRepository(IAuditActivityRepository):
             target=row.target,
             message=str(message),  # 명시적 문자열 변환
             actor=row.actor,
+            team=row.team if hasattr(row, "team") else None,
             timestamp=row.timestamp,
             metadata=row.snapshot or {},
         )
@@ -172,6 +174,7 @@ class MySQLAuditActivityRepository(IAuditActivityRepository):
             model.action,
             model.target,
             model.actor,
+            model.team if hasattr(model, "team") else literal(None).label("team"),
             model.timestamp,
             model.message,
             model.snapshot,

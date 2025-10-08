@@ -1,0 +1,52 @@
+"""Plugin Management API Router"""
+
+from dependency_injector.wiring import Provide, inject
+from fastapi import APIRouter, Body, Depends, Path
+
+from app.connect.domain.types import PluginConfig, PluginListResponse, ValidationResponse
+from app.container import AppContainer
+
+router = APIRouter()
+
+# Use Case Dependencies
+PluginOperations = Depends(Provide[AppContainer.connect_container.plugin_operations])
+
+
+@router.get(
+    "/{connect_id}/connector-plugins",
+    summary="플러그인 목록 조회",
+    description="Kafka Connect에 설치된 커넥터 플러그인 목록을 조회합니다.",
+)
+@inject
+async def list_connector_plugins(
+    connect_id: str = Path(..., description="Connect ID"),
+    use_case=PluginOperations,
+) -> PluginListResponse:
+    """플러그인 목록 조회"""
+    return await use_case.list_plugins(connect_id)
+
+
+@router.put(
+    "/{connect_id}/connector-plugins/{plugin_class}/config/validate",
+    summary="커넥터 설정 검증",
+    description="커넥터 설정이 유효한지 검증합니다.",
+)
+@inject
+async def validate_connector_config(
+    connect_id: str = Path(..., description="Connect ID"),
+    plugin_class: str = Path(..., description="플러그인 클래스 이름"),
+    config: PluginConfig = Body(..., description="검증할 설정"),
+    use_case=PluginOperations,
+) -> ValidationResponse:
+    """커넥터 설정 검증
+
+    Example:
+    ```json
+    {
+        "connector.class": "org.apache.kafka.connect.file.FileStreamSinkConnector",
+        "tasks.max": "1",
+        "topics": "test-topic"
+    }
+    ```
+    """
+    return await use_case.validate_config(connect_id, plugin_class, config)

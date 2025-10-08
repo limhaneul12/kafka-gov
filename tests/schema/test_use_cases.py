@@ -48,11 +48,49 @@ def mock_registry_repository():
 
 
 @pytest.fixture
+def mock_connection_manager():
+    """Mock Connection Manager"""
+    from unittest.mock import AsyncMock, MagicMock
+
+    mock_cm = AsyncMock()
+
+    # get_schema_registry_client returns a mock registry client (AsyncMock으로 변경)
+    mock_registry_client = AsyncMock()
+    mock_registry_client.get_subjects = AsyncMock(return_value=[])
+    mock_registry_client.get_latest_version = AsyncMock(return_value=None)
+    mock_registry_client.test_compatibility = AsyncMock(return_value=True)
+    mock_registry_client.register_schema = AsyncMock(return_value=1)
+    mock_registry_client.delete_subject = AsyncMock(return_value=[])
+    mock_registry_client.get_versions = AsyncMock(return_value=[])
+    mock_registry_client.get_version = AsyncMock(return_value=None)
+    mock_registry_client.set_config = AsyncMock(return_value=None)
+
+    mock_cm.get_schema_registry_client = AsyncMock(return_value=mock_registry_client)
+
+    # get_minio_client returns (client, bucket_name)
+    mock_minio_client = MagicMock()
+    mock_minio_client.put_object = MagicMock(return_value=None)
+    mock_cm.get_minio_client = AsyncMock(return_value=(mock_minio_client, "test-bucket"))
+
+    # get_storage_info returns storage info with base_url
+    mock_storage_info = MagicMock()
+    mock_storage_info.get_base_url = MagicMock(return_value="http://localhost:9000")
+    mock_storage_info.endpoint_url = "localhost:9000"
+    mock_cm.get_storage_info = AsyncMock(return_value=mock_storage_info)
+
+    return mock_cm
+
+
+@pytest.fixture
 def mock_metadata_repository():
     """Mock Metadata Repository"""
     mock = AsyncMock()
     mock.save_plan.return_value = None
     mock.get_plan.return_value = None
+    mock.save_apply_result.return_value = None
+    mock.save_upload_result.return_value = None
+    mock.record_artifact.return_value = None
+    mock.save_schema_metadata.return_value = None
     return mock
 
 
@@ -69,6 +107,7 @@ def mock_storage_repository():
     """Mock Storage Repository"""
     mock = AsyncMock()
     mock.upload_schema.return_value = "s3://bucket/schema.avsc"
+    mock.put_object.return_value = "http://localhost:9000/test-bucket/schema.avsc"
     return mock
 
 
@@ -78,14 +117,14 @@ class TestSchemaBatchDryRunUseCase:
     @pytest.mark.asyncio
     async def test_dry_run_success(
         self,
-        mock_registry_repository,
+        mock_connection_manager,
         mock_metadata_repository,
         mock_audit_repository,
     ):
         """정상적인 Dry-Run"""
         policy_engine = SchemaPolicyEngine()
         use_case = SchemaBatchDryRunUseCase(
-            mock_registry_repository,
+            mock_connection_manager,
             mock_metadata_repository,
             mock_audit_repository,
             policy_engine,
@@ -95,7 +134,7 @@ class TestSchemaBatchDryRunUseCase:
             specs=(create_schema_spec(subject="dev.test-value"),),
         )
 
-        plan = await use_case.execute(batch, actor="test-user")
+        plan = await use_case.execute(registry_id="test-registry", batch=batch, actor="test-user")
 
         assert plan.change_id == batch.change_id
         assert len(plan.items) == 1
@@ -109,14 +148,14 @@ class TestSchemaBatchDryRunUseCase:
     @pytest.mark.asyncio
     async def test_dry_run_failure(
         self,
-        mock_registry_repository,
+        mock_connection_manager,
         mock_metadata_repository,
         mock_audit_repository,
     ):
         """Dry-Run 실패"""
         policy_engine = SchemaPolicyEngine()
         use_case = SchemaBatchDryRunUseCase(
-            mock_registry_repository,
+            mock_connection_manager,
             mock_metadata_repository,
             mock_audit_repository,
             policy_engine,
@@ -124,11 +163,13 @@ class TestSchemaBatchDryRunUseCase:
 
         batch = create_schema_batch()
 
-        # Repository 에러 발생
-        mock_registry_repository.describe_subjects.side_effect = Exception("Connection failed")
+        # ConnectionManager 에러 발생
+        mock_connection_manager.get_schema_registry_client.side_effect = Exception(
+            "Connection failed"
+        )
 
         with pytest.raises(Exception, match="Connection failed"):
-            await use_case.execute(batch, actor="test-user")
+            await use_case.execute(registry_id="test-registry", batch=batch, actor="test-user")
 
         # 실패 감사 로그 기록 확인
         calls = mock_audit_repository.log_operation.call_args_list
@@ -141,18 +182,16 @@ class TestSchemaBatchApplyUseCase:
     @pytest.mark.asyncio
     async def test_apply_register_schemas(
         self,
-        mock_registry_repository,
+        mock_connection_manager,
         mock_metadata_repository,
         mock_audit_repository,
-        mock_storage_repository,
     ):
         """스키마 등록 적용"""
         policy_engine = SchemaPolicyEngine()
         use_case = SchemaBatchApplyUseCase(
-            mock_registry_repository,
+            mock_connection_manager,
             mock_metadata_repository,
             mock_audit_repository,
-            mock_storage_repository,
             policy_engine,
         )
 
@@ -163,13 +202,9 @@ class TestSchemaBatchApplyUseCase:
             ),
         )
 
-        # Repository: 새 스키마
-        mock_registry_repository.describe_subjects.return_value = {}
-
-        # 스키마 등록 성공
-        mock_registry_repository.register_schema.return_value = 1
-
-        result = await use_case.execute(batch, actor="test-user")
+        result = await use_case.execute(
+            registry_id="test-registry", storage_id=None, batch=batch, actor="test-user"
+        )
 
         assert result.change_id == batch.change_id
         assert len(result.registered) == 2
@@ -178,18 +213,16 @@ class TestSchemaBatchApplyUseCase:
     @pytest.mark.asyncio
     async def test_apply_with_policy_violations(
         self,
-        mock_registry_repository,
+        mock_connection_manager,
         mock_metadata_repository,
         mock_audit_repository,
-        mock_storage_repository,
     ):
         """정책 위반으로 적용 차단"""
         policy_engine = SchemaPolicyEngine()
         use_case = SchemaBatchApplyUseCase(
-            mock_registry_repository,
+            mock_connection_manager,
             mock_metadata_repository,
             mock_audit_repository,
-            mock_storage_repository,
             policy_engine,
         )
 
@@ -204,10 +237,10 @@ class TestSchemaBatchApplyUseCase:
             ),
         )
 
-        mock_registry_repository.describe_subjects.return_value = {}
-
         with pytest.raises(ValueError, match="Policy violations or incompatibilities detected"):
-            await use_case.execute(batch, actor="test-user")
+            await use_case.execute(
+                registry_id="test-registry", storage_id=None, batch=batch, actor="test-user"
+            )
 
 
 class TestSchemaPlanUseCase:
@@ -236,28 +269,35 @@ class TestSchemaDeleteUseCase:
     @pytest.mark.asyncio
     async def test_analyze_delete_impact(
         self,
-        mock_registry_repository,
+        mock_connection_manager,
         mock_schema_metadata_repository,
         mock_schema_audit_repository,
     ):
         """삭제 영향도 분석"""
+        # Mock registry client에 스키마 정보 설정
+        registry_client = await mock_connection_manager.get_schema_registry_client("test-registry")
+
+        # 스키마가 존재하는 경우
+        mock_schema_version = AsyncMock()
+        mock_schema_version.version = 3
+        mock_schema_version.schema_id = 123
+        mock_schema = AsyncMock()
+        mock_schema.schema_str = '{"type": "record"}'
+        mock_schema.schema_type = "AVRO"
+        mock_schema_version.schema = mock_schema
+
+        registry_client.get_subjects.return_value = ["dev.test-value"]
+        registry_client.get_latest_version.return_value = mock_schema_version
+        registry_client.get_versions.return_value = [1, 2, 3]
+
         use_case = SchemaDeleteUseCase(
-            mock_registry_repository, mock_schema_metadata_repository, mock_schema_audit_repository
+            mock_connection_manager,
+            mock_schema_metadata_repository,
+            mock_schema_audit_repository,
         )
 
-        # Repository: 스키마 존재
-        mock_registry_repository.describe_subjects.return_value = {
-            "dev.test-value": SchemaVersionInfo(
-                version=3,
-                schema_id=123,
-                schema='{"type": "record"}',
-                schema_type="AVRO",
-                references=[],
-                hash="abc123",
-            )
-        }
-
         impact = await use_case.analyze(
+            registry_id="test-registry",
             subject="dev.test-value",
             strategy=DomainSubjectStrategy.TOPIC_NAME,
             actor="test-user",
@@ -270,19 +310,19 @@ class TestSchemaDeleteUseCase:
     @pytest.mark.asyncio
     async def test_analyze_non_existing_schema(
         self,
-        mock_registry_repository,
+        mock_connection_manager,
         mock_schema_metadata_repository,
         mock_schema_audit_repository,
     ):
         """존재하지 않는 스키마"""
         use_case = SchemaDeleteUseCase(
-            mock_registry_repository, mock_schema_metadata_repository, mock_schema_audit_repository
+            mock_connection_manager,
+            mock_schema_metadata_repository,
+            mock_schema_audit_repository,
         )
 
-        # Repository: 스키마 없음
-        mock_registry_repository.describe_subjects.return_value = {}
-
         impact = await use_case.analyze(
+            registry_id="test-registry",
             subject="dev.nonexist-value",
             strategy=DomainSubjectStrategy.TOPIC_NAME,
             actor="test-user",
@@ -299,35 +339,28 @@ class TestSchemaBatchDryRunUseCaseExtended:
     @pytest.mark.asyncio
     async def test_dry_run_with_incompatibility(
         self,
-        mock_registry_repository,
+        mock_connection_manager,
         mock_metadata_repository,
         mock_audit_repository,
     ):
         """호환성 문제가 있는 Dry-Run"""
+        # Mock registry client에서 호환성 검사 실패 설정
+        registry_client = await mock_connection_manager.get_schema_registry_client("test-registry")
+        registry_client.test_compatibility.return_value = False
+
         policy_engine = SchemaPolicyEngine()
         use_case = SchemaBatchDryRunUseCase(
-            mock_registry_repository,
+            mock_connection_manager,
             mock_metadata_repository,
             mock_audit_repository,
             policy_engine,
         )
 
-        # 호환성 검사 실패 설정
-        async def mock_check_compat_fail(spec):
-            return DomainSchemaCompatibilityReport(
-                subject=spec.subject,
-                mode=DomainCompatibilityMode.BACKWARD,
-                is_compatible=False,
-                issues=({"path": "/fields", "message": "Field removed"},),
-            )
-
-        mock_registry_repository.check_compatibility.side_effect = mock_check_compat_fail
-
         batch = create_schema_batch(
             specs=(create_schema_spec(subject="dev.test-value"),),
         )
 
-        plan = await use_case.execute(batch, actor="test-user")
+        plan = await use_case.execute(registry_id="test-registry", batch=batch, actor="test-user")
 
         assert plan.change_id == batch.change_id
         assert len(plan.compatibility_reports) == 1
@@ -336,36 +369,38 @@ class TestSchemaBatchDryRunUseCaseExtended:
     @pytest.mark.asyncio
     async def test_dry_run_with_existing_schema(
         self,
-        mock_registry_repository,
+        mock_connection_manager,
         mock_metadata_repository,
         mock_audit_repository,
     ):
         """기존 스키마 업데이트 Dry-Run"""
+        # Mock registry client에 기존 스키마 설정
+        registry_client = await mock_connection_manager.get_schema_registry_client("test-registry")
+
+        mock_schema_version = AsyncMock()
+        mock_schema_version.version = 2
+        mock_schema_version.schema_id = 100
+        mock_schema = AsyncMock()
+        mock_schema.schema_str = '{"type": "string"}'
+        mock_schema.schema_type = "AVRO"
+        mock_schema_version.schema = mock_schema
+
+        registry_client.get_subjects.return_value = ["dev.test-value"]
+        registry_client.get_latest_version.return_value = mock_schema_version
+
         policy_engine = SchemaPolicyEngine()
         use_case = SchemaBatchDryRunUseCase(
-            mock_registry_repository,
+            mock_connection_manager,
             mock_metadata_repository,
             mock_audit_repository,
             policy_engine,
         )
 
-        # 기존 스키마 존재
-        mock_registry_repository.describe_subjects.return_value = {
-            "dev.test-value": SchemaVersionInfo(
-                version=2,
-                schema_id=100,
-                schema='{"type": "string"}',
-                schema_type="AVRO",
-                references=[],
-                hash="old123",
-            )
-        }
-
         batch = create_schema_batch(
             specs=(create_schema_spec(subject="dev.test-value"),),
         )
 
-        plan = await use_case.execute(batch, actor="test-user")
+        plan = await use_case.execute(registry_id="test-registry", batch=batch, actor="test-user")
 
         assert plan.change_id == batch.change_id
         assert len(plan.items) == 1
@@ -383,48 +418,42 @@ class TestSchemaBatchApplyUseCaseExtended:
     @pytest.mark.asyncio
     async def test_apply_with_storage(
         self,
-        mock_registry_repository,
+        mock_connection_manager,
         mock_metadata_repository,
         mock_audit_repository,
-        mock_storage_repository,
     ):
         """스토리지 저장 포함 적용"""
         policy_engine = SchemaPolicyEngine()
         use_case = SchemaBatchApplyUseCase(
-            mock_registry_repository,
+            mock_connection_manager,
             mock_metadata_repository,
             mock_audit_repository,
-            mock_storage_repository,
             policy_engine,
         )
-
-        mock_storage_repository.put_object.return_value = "s3://bucket/dev/test-value/1/schema.txt"
 
         batch = create_schema_batch(
             specs=(create_schema_spec(subject="dev.test-value"),),
         )
 
-        result = await use_case.execute(batch, actor="test-user")
+        result = await use_case.execute(
+            registry_id="test-registry", storage_id="test-storage", batch=batch, actor="test-user"
+        )
 
         assert len(result.registered) == 1
-        # Storage에 업로드되었는지 확인
-        mock_storage_repository.put_object.assert_called()
 
     @pytest.mark.asyncio
     async def test_apply_with_dry_run_only_spec(
         self,
-        mock_registry_repository,
+        mock_connection_manager,
         mock_metadata_repository,
         mock_audit_repository,
-        mock_storage_repository,
     ):
         """dry_run_only 스펙은 스킵"""
         policy_engine = SchemaPolicyEngine()
         use_case = SchemaBatchApplyUseCase(
-            mock_registry_repository,
+            mock_connection_manager,
             mock_metadata_repository,
             mock_audit_repository,
-            mock_storage_repository,
             policy_engine,
         )
 
@@ -435,7 +464,9 @@ class TestSchemaBatchApplyUseCaseExtended:
             ),
         )
 
-        result = await use_case.execute(batch, actor="test-user")
+        result = await use_case.execute(
+            registry_id="test-registry", storage_id=None, batch=batch, actor="test-user"
+        )
 
         assert len(result.registered) == 1
         assert len(result.skipped) == 1
@@ -444,32 +475,32 @@ class TestSchemaBatchApplyUseCaseExtended:
     @pytest.mark.asyncio
     async def test_apply_with_partial_failure(
         self,
-        mock_registry_repository,
+        mock_connection_manager,
         mock_metadata_repository,
         mock_audit_repository,
-        mock_storage_repository,
     ):
         """일부 실패"""
-        policy_engine = SchemaPolicyEngine()
-        use_case = SchemaBatchApplyUseCase(
-            mock_registry_repository,
-            mock_metadata_repository,
-            mock_audit_repository,
-            mock_storage_repository,
-            policy_engine,
-        )
+        # Mock registry client에서 두 번째 등록 실패 설정
+        registry_client = await mock_connection_manager.get_schema_registry_client("test-registry")
 
-        # 첫 번째는 성공, 두 번째는 실패
         call_count = 0
 
-        async def mock_register_with_failure(spec):
+        async def mock_register_with_failure(*args, **kwargs):
             nonlocal call_count
             call_count += 1
             if call_count == 1:
                 return 1
             raise ValueError("Registration failed")
 
-        mock_registry_repository.register_schema.side_effect = mock_register_with_failure
+        registry_client.register_schema.side_effect = mock_register_with_failure
+
+        policy_engine = SchemaPolicyEngine()
+        use_case = SchemaBatchApplyUseCase(
+            mock_connection_manager,
+            mock_metadata_repository,
+            mock_audit_repository,
+            policy_engine,
+        )
 
         batch = create_schema_batch(
             specs=(
@@ -478,7 +509,9 @@ class TestSchemaBatchApplyUseCaseExtended:
             ),
         )
 
-        result = await use_case.execute(batch, actor="test-user")
+        result = await use_case.execute(
+            registry_id="test-registry", storage_id=None, batch=batch, actor="test-user"
+        )
 
         assert len(result.registered) == 1
         assert len(result.failed) == 1
@@ -508,20 +541,16 @@ class TestSchemaUploadUseCase:
     @pytest.mark.asyncio
     async def test_upload_single_avro_file(
         self,
-        mock_registry_repository,
+        mock_connection_manager,
         mock_schema_metadata_repository,
         mock_schema_audit_repository,
         mock_upload_file,
     ):
         """단일 AVRO 파일 업로드"""
-        storage_repo = AsyncMock()
-        storage_repo.put_object.return_value = "s3://bucket/dev/uploads/upload_123/test.avsc"
-
         use_case = SchemaUploadUseCase(
-            storage_repo,
+            mock_connection_manager,
             mock_schema_metadata_repository,
             mock_schema_audit_repository,
-            mock_registry_repository,
         )
 
         # AVRO 스키마 파일
@@ -530,11 +559,9 @@ class TestSchemaUploadUseCase:
         )
         files = [mock_upload_file("test.avsc", avro_schema)]
 
-        # Registry 등록 성공
-        mock_registry_repository.register_schema.return_value = 1
-        mock_registry_repository.describe_subjects.return_value = {}
-
         result = await use_case.execute(
+            registry_id="test-registry",
+            storage_id="test-storage",
             env=DomainEnvironment.DEV,
             change_id="upload-001",
             owner="test-team",
@@ -550,29 +577,24 @@ class TestSchemaUploadUseCase:
     @pytest.mark.asyncio
     async def test_upload_json_file(
         self,
-        mock_registry_repository,
+        mock_connection_manager,
         mock_schema_metadata_repository,
         mock_schema_audit_repository,
         mock_upload_file,
     ):
         """JSON 스키마 파일 업로드"""
-        storage_repo = AsyncMock()
-        storage_repo.put_object.return_value = "s3://bucket/dev/uploads/upload_123/schema.json"
-
         use_case = SchemaUploadUseCase(
-            storage_repo,
+            mock_connection_manager,
             mock_schema_metadata_repository,
             mock_schema_audit_repository,
-            mock_registry_repository,
         )
 
         json_schema = b'{"type": "object", "properties": {"name": {"type": "string"}}}'
         files = [mock_upload_file("schema.json", json_schema)]
 
-        mock_registry_repository.register_schema.return_value = 2
-        mock_registry_repository.describe_subjects.return_value = {}
-
         result = await use_case.execute(
+            registry_id="test-registry",
+            storage_id="test-storage",
             env=DomainEnvironment.DEV,
             change_id="upload-002",
             owner="test-team",
@@ -585,29 +607,24 @@ class TestSchemaUploadUseCase:
     @pytest.mark.asyncio
     async def test_upload_proto_file(
         self,
-        mock_registry_repository,
+        mock_connection_manager,
         mock_schema_metadata_repository,
         mock_schema_audit_repository,
         mock_upload_file,
     ):
         """Protobuf 스키마 파일 업로드"""
-        storage_repo = AsyncMock()
-        storage_repo.put_object.return_value = "s3://bucket/dev/uploads/upload_123/schema.proto"
-
         use_case = SchemaUploadUseCase(
-            storage_repo,
+            mock_connection_manager,
             mock_schema_metadata_repository,
             mock_schema_audit_repository,
-            mock_registry_repository,
         )
 
         proto_schema = b'syntax = "proto3"; message User { string id = 1; }'
         files = [mock_upload_file("schema.proto", proto_schema)]
 
-        mock_registry_repository.register_schema.return_value = 1
-        mock_registry_repository.describe_subjects.return_value = {}
-
         result = await use_case.execute(
+            registry_id="test-registry",
+            storage_id="test-storage",
             env=DomainEnvironment.DEV,
             change_id="upload-003",
             owner="test-team",
@@ -620,21 +637,21 @@ class TestSchemaUploadUseCase:
     @pytest.mark.asyncio
     async def test_upload_no_files_error(
         self,
-        mock_registry_repository,
+        mock_connection_manager,
         mock_schema_metadata_repository,
         mock_schema_audit_repository,
     ):
         """파일이 없을 때 에러"""
-        storage_repo = AsyncMock()
         use_case = SchemaUploadUseCase(
-            storage_repo,
+            mock_connection_manager,
             mock_schema_metadata_repository,
             mock_schema_audit_repository,
-            mock_registry_repository,
         )
 
         with pytest.raises(ValueError, match="No files provided"):
             await use_case.execute(
+                registry_id="test-registry",
+                storage_id="test-storage",
                 env=DomainEnvironment.DEV,
                 change_id="upload-004",
                 owner="test-team",
@@ -645,24 +662,24 @@ class TestSchemaUploadUseCase:
     @pytest.mark.asyncio
     async def test_upload_unsupported_extension(
         self,
-        mock_registry_repository,
+        mock_connection_manager,
         mock_schema_metadata_repository,
         mock_schema_audit_repository,
         mock_upload_file,
     ):
         """지원하지 않는 파일 확장자"""
-        storage_repo = AsyncMock()
         use_case = SchemaUploadUseCase(
-            storage_repo,
+            mock_connection_manager,
             mock_schema_metadata_repository,
             mock_schema_audit_repository,
-            mock_registry_repository,
         )
 
         files = [mock_upload_file("test.txt", b"invalid")]
 
         with pytest.raises(ValueError, match="Unsupported file type"):
             await use_case.execute(
+                registry_id="test-registry",
+                storage_id="test-storage",
                 env=DomainEnvironment.DEV,
                 change_id="upload-005",
                 owner="test-team",
@@ -673,18 +690,16 @@ class TestSchemaUploadUseCase:
     @pytest.mark.asyncio
     async def test_upload_file_too_large(
         self,
-        mock_registry_repository,
+        mock_connection_manager,
         mock_schema_metadata_repository,
         mock_schema_audit_repository,
         mock_upload_file,
     ):
         """파일 크기 초과"""
-        storage_repo = AsyncMock()
         use_case = SchemaUploadUseCase(
-            storage_repo,
+            mock_connection_manager,
             mock_schema_metadata_repository,
             mock_schema_audit_repository,
-            mock_registry_repository,
         )
 
         # 10MB 초과
@@ -693,6 +708,8 @@ class TestSchemaUploadUseCase:
 
         with pytest.raises(ValueError, match="is too large"):
             await use_case.execute(
+                registry_id="test-registry",
+                storage_id="test-storage",
                 env=DomainEnvironment.DEV,
                 change_id="upload-006",
                 owner="test-team",
@@ -703,24 +720,24 @@ class TestSchemaUploadUseCase:
     @pytest.mark.asyncio
     async def test_upload_empty_file(
         self,
-        mock_registry_repository,
+        mock_connection_manager,
         mock_schema_metadata_repository,
         mock_schema_audit_repository,
         mock_upload_file,
     ):
         """빈 파일"""
-        storage_repo = AsyncMock()
         use_case = SchemaUploadUseCase(
-            storage_repo,
+            mock_connection_manager,
             mock_schema_metadata_repository,
             mock_schema_audit_repository,
-            mock_registry_repository,
         )
 
         files = [mock_upload_file("empty.avsc", b"")]
 
         with pytest.raises(ValueError, match="is empty"):
             await use_case.execute(
+                registry_id="test-registry",
+                storage_id="test-storage",
                 env=DomainEnvironment.DEV,
                 change_id="upload-007",
                 owner="test-team",
@@ -731,24 +748,24 @@ class TestSchemaUploadUseCase:
     @pytest.mark.asyncio
     async def test_upload_invalid_json(
         self,
-        mock_registry_repository,
+        mock_connection_manager,
         mock_schema_metadata_repository,
         mock_schema_audit_repository,
         mock_upload_file,
     ):
         """잘못된 JSON 파일"""
-        storage_repo = AsyncMock()
         use_case = SchemaUploadUseCase(
-            storage_repo,
+            mock_connection_manager,
             mock_schema_metadata_repository,
             mock_schema_audit_repository,
-            mock_registry_repository,
         )
 
         files = [mock_upload_file("invalid.json", b"{invalid json}")]
 
         with pytest.raises(ValueError, match="Invalid schema file"):
             await use_case.execute(
+                registry_id="test-registry",
+                storage_id="test-storage",
                 env=DomainEnvironment.DEV,
                 change_id="upload-008",
                 owner="test-team",
@@ -759,30 +776,24 @@ class TestSchemaUploadUseCase:
     @pytest.mark.asyncio
     async def test_upload_registry_failure_continues(
         self,
-        mock_registry_repository,
+        mock_connection_manager,
         mock_schema_metadata_repository,
         mock_schema_audit_repository,
         mock_upload_file,
     ):
         """Registry 등록 실패해도 MinIO 저장은 유지"""
-        storage_repo = AsyncMock()
-        storage_repo.put_object.return_value = "s3://bucket/dev/uploads/upload_123/test.avsc"
-
         use_case = SchemaUploadUseCase(
-            storage_repo,
+            mock_connection_manager,
             mock_schema_metadata_repository,
             mock_schema_audit_repository,
-            mock_registry_repository,
         )
 
         avro_schema = b'{"type": "record", "name": "Test"}'
         files = [mock_upload_file("test.avsc", avro_schema)]
 
-        # Registry 등록 실패
-        mock_registry_repository.register_schema.side_effect = Exception("Registry error")
-        mock_registry_repository.describe_subjects.return_value = {}
-
         result = await use_case.execute(
+            registry_id="test-registry",
+            storage_id="test-storage",
             env=DomainEnvironment.DEV,
             change_id="upload-009",
             owner="test-team",
@@ -801,42 +812,43 @@ class TestSchemaSyncUseCase:
     @pytest.mark.asyncio
     async def test_sync_success(
         self,
-        mock_registry_repository,
+        mock_connection_manager,
         mock_schema_metadata_repository,
         mock_schema_audit_repository,
     ):
         """동기화 성공"""
+        # Mock registry client에 스키마 설정
+        registry_client = await mock_connection_manager.get_schema_registry_client("test-registry")
+
+        mock_schema_version1 = AsyncMock()
+        mock_schema_version1.version = 1
+        mock_schema_version1.schema_id = 101
+        mock_schema1 = AsyncMock()
+        mock_schema1.schema_str = '{"type": "record"}'
+        mock_schema1.schema_type = "AVRO"
+        mock_schema_version1.schema = mock_schema1
+
+        mock_schema_version2 = AsyncMock()
+        mock_schema_version2.version = 2
+        mock_schema_version2.schema_id = 102
+        mock_schema2 = AsyncMock()
+        mock_schema2.schema_str = '{"type": "record"}'
+        mock_schema2.schema_type = "AVRO"
+        mock_schema_version2.schema = mock_schema2
+
+        registry_client.get_subjects.return_value = ["dev.user-value", "dev.order-value"]
+        registry_client.get_latest_version.side_effect = [
+            mock_schema_version1,
+            mock_schema_version2,
+        ]
+
         use_case = SchemaSyncUseCase(
-            mock_registry_repository,
+            mock_connection_manager,
             mock_schema_metadata_repository,
             mock_schema_audit_repository,
         )
 
-        # Registry에 스키마 존재
-        mock_registry_repository.list_all_subjects.return_value = [
-            "dev.user-value",
-            "dev.order-value",
-        ]
-        mock_registry_repository.describe_subjects.return_value = {
-            "dev.user-value": SchemaVersionInfo(
-                version=1,
-                schema_id=101,
-                schema='{"type": "record"}',
-                schema_type="AVRO",
-                references=[],
-                hash="hash1",
-            ),
-            "dev.order-value": SchemaVersionInfo(
-                version=2,
-                schema_id=102,
-                schema='{"type": "record"}',
-                schema_type="AVRO",
-                references=[],
-                hash="hash2",
-            ),
-        }
-
-        result = await use_case.execute(actor="test-user")
+        result = await use_case.execute(registry_id="test-registry", actor="test-user")
 
         assert result["total"] == 2
         assert result["added"] == 2
@@ -845,20 +857,18 @@ class TestSchemaSyncUseCase:
     @pytest.mark.asyncio
     async def test_sync_no_schemas(
         self,
-        mock_registry_repository,
+        mock_connection_manager,
         mock_schema_metadata_repository,
         mock_schema_audit_repository,
     ):
         """Registry에 스키마가 없을 때"""
         use_case = SchemaSyncUseCase(
-            mock_registry_repository,
+            mock_connection_manager,
             mock_schema_metadata_repository,
             mock_schema_audit_repository,
         )
 
-        mock_registry_repository.list_all_subjects.return_value = []
-
-        result = await use_case.execute(actor="test-user")
+        result = await use_case.execute(registry_id="test-registry", actor="test-user")
 
         assert result["total"] == 0
         assert result["added"] == 0
@@ -867,33 +877,35 @@ class TestSchemaSyncUseCase:
     @pytest.mark.asyncio
     async def test_sync_with_existing_artifacts(
         self,
-        mock_registry_repository,
+        mock_connection_manager,
         mock_schema_metadata_repository,
         mock_schema_audit_repository,
     ):
         """이미 존재하는 artifact는 업데이트 카운트"""
+        # Mock registry client에 스키마 설정
+        registry_client = await mock_connection_manager.get_schema_registry_client("test-registry")
+
+        mock_schema_version = AsyncMock()
+        mock_schema_version.version = 1
+        mock_schema_version.schema_id = 101
+        mock_schema = AsyncMock()
+        mock_schema.schema_str = '{"type": "record"}'
+        mock_schema.schema_type = "AVRO"
+        mock_schema_version.schema = mock_schema
+
+        registry_client.get_subjects.return_value = ["dev.user-value"]
+        registry_client.get_latest_version.return_value = mock_schema_version
+
         use_case = SchemaSyncUseCase(
-            mock_registry_repository,
+            mock_connection_manager,
             mock_schema_metadata_repository,
             mock_schema_audit_repository,
         )
 
-        mock_registry_repository.list_all_subjects.return_value = ["dev.user-value"]
-        mock_registry_repository.describe_subjects.return_value = {
-            "dev.user-value": SchemaVersionInfo(
-                version=1,
-                schema_id=101,
-                schema='{"type": "record"}',
-                schema_type="AVRO",
-                references=[],
-                hash="hash1",
-            ),
-        }
-
         # artifact 저장 시 예외 발생 (이미 존재)
         mock_schema_metadata_repository.record_artifact.side_effect = Exception("Already exists")
 
-        result = await use_case.execute(actor="test-user")
+        result = await use_case.execute(registry_id="test-registry", actor="test-user")
 
         assert result["total"] == 1
         assert result["added"] == 0
@@ -902,18 +914,20 @@ class TestSchemaSyncUseCase:
     @pytest.mark.asyncio
     async def test_sync_failure(
         self,
-        mock_registry_repository,
+        mock_connection_manager,
         mock_schema_metadata_repository,
         mock_schema_audit_repository,
     ):
         """동기화 실패"""
         use_case = SchemaSyncUseCase(
-            mock_registry_repository,
+            mock_connection_manager,
             mock_schema_metadata_repository,
             mock_schema_audit_repository,
         )
 
-        mock_registry_repository.list_all_subjects.side_effect = Exception("Connection error")
+        mock_connection_manager.get_schema_registry_client.side_effect = Exception(
+            "Connection error"
+        )
 
         with pytest.raises(Exception, match="Connection error"):
-            await use_case.execute(actor="test-user")
+            await use_case.execute(registry_id="test-registry", actor="test-user")

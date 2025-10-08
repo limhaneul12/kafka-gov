@@ -37,6 +37,7 @@ class MySQLAuditRepository(IAuditRepository):
         status: str,
         message: str | None = None,
         snapshot: dict[str, Any] | None = None,
+        team: str | None = None,
     ) -> str:
         """토픽 작업 감사 로그 기록"""
         async with self.session_factory() as session:
@@ -45,6 +46,7 @@ class MySQLAuditRepository(IAuditRepository):
                     change_id=change_id,
                     action=action,
                     target=target,
+                    team=team,
                     actor=actor,
                     status=status,
                     message=message,
@@ -55,7 +57,9 @@ class MySQLAuditRepository(IAuditRepository):
                 await session.flush()
 
                 log_id = str(audit_log.id)
-                logger.info(f"Audit log created: {log_id} - {action} on {target} by {actor}")
+                logger.info(
+                    f"Audit log created: {log_id} - {action} on {target} by {team or actor}"
+                )
 
                 return log_id
 

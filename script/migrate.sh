@@ -93,4 +93,3 @@ fi
 
 echo "[migrate] 데이터베이스를 최신 상태로 업그레이드합니다."
 uv run alembic -c "${ALEMBIC_CFG}" upgrade head
-
