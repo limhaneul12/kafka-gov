@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="./image/logo.png" alt="Kafka Gov Logo" width="400"/>
+  <img src="./image/kafka_gov_logo.png" alt="Kafka Gov Logo" width="400"/>
   
   **🛡️ Kafka Governance Platform**
   
