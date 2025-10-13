@@ -7,6 +7,7 @@ from dependency_injector.wiring import Provide, inject
 from fastapi import APIRouter, Depends, Query
 
 from app.container import AppContainer
+from app.shared.error_handlers import endpoint_error_handler
 from app.shared.interface.schema import BrokerResponse, ClusterStatusResponse
 
 router = APIRouter(prefix="/v1", tags=["shared"])
@@ -22,6 +23,7 @@ ClusterStatus = Depends(Provide[AppContainer.infrastructure_container.get_cluste
 
 @router.get("/audit/recent")
 @inject
+@endpoint_error_handler(default_message="Failed to retrieve recent activities")
 async def get_recent_activities(
     use_case=RecentActivitiesResponse,
     limit: int = Query(default=20, ge=1, le=100, description="조회할 활동 수"),
@@ -57,6 +59,7 @@ async def get_recent_activities(
 
 @router.get("/audit/history")
 @inject
+@endpoint_error_handler(default_message="Failed to retrieve activity history")
 async def get_activity_history(
     use_case=ActivityHistoryResponse,
     from_date: datetime | None = Query(default=None, description="시작 날짜/시간 (ISO 8601)"),
@@ -109,6 +112,7 @@ async def get_activity_history(
 
 @router.get("/cluster/status", response_model=ClusterStatusResponse)
 @inject
+@endpoint_error_handler(default_message="Failed to retrieve cluster status")
 async def get_cluster_status(
     use_case=ClusterStatus,
     cluster_id: str = Query(..., description="클러스터 ID"),

@@ -11,6 +11,7 @@ from app.connect.domain.types import (
     ConnectorStatusResponse,
 )
 from app.container import AppContainer
+from app.shared.error_handlers import endpoint_error_handler
 
 router = APIRouter()
 
@@ -25,6 +26,7 @@ ConnectorOperations = Depends(Provide[AppContainer.connect_container.connector_o
     description="Kafka Connect의 등록된 커넥터 목록을 조회합니다.",
 )
 @inject
+@endpoint_error_handler(default_message="Failed to list connectors")
 async def list_connectors(
     connect_id: str = Path(..., description="Connect ID"),
     expand: list[str] | None = Query(None, description="확장 정보 (status, info)"),
@@ -48,6 +50,7 @@ async def list_connectors(
     description="특정 커넥터의 상세 정보를 조회합니다.",
 )
 @inject
+@endpoint_error_handler(default_message="Failed to get connector")
 async def get_connector(
     connect_id: str = Path(..., description="Connect ID"),
     connector_name: str = Path(..., description="커넥터 이름"),
@@ -63,6 +66,7 @@ async def get_connector(
     description="커넥터의 현재 설정을 조회합니다.",
 )
 @inject
+@endpoint_error_handler(default_message="Failed to get connector config")
 async def get_connector_config(
     connect_id: str = Path(..., description="Connect ID"),
     connector_name: str = Path(..., description="커넥터 이름"),
@@ -78,6 +82,7 @@ async def get_connector_config(
     description="커넥터와 태스크의 현재 상태를 조회합니다.",
 )
 @inject
+@endpoint_error_handler(default_message="Failed to get connector status")
 async def get_connector_status(
     connect_id: str = Path(..., description="Connect ID"),
     connector_name: str = Path(..., description="커넥터 이름"),
@@ -94,6 +99,10 @@ async def get_connector_status(
     description="새로운 커넥터를 생성합니다.",
 )
 @inject
+@endpoint_error_handler(
+    error_mappings={ValueError: (status.HTTP_422_UNPROCESSABLE_ENTITY, "Validation error")},
+    default_message="Failed to create connector",
+)
 async def create_connector(
     connect_id: str = Path(..., description="Connect ID"),
     config: ConnectorConfig = Body(..., description="커넥터 설정 (name, config 포함)"),
@@ -123,6 +132,10 @@ async def create_connector(
     description="커넥터의 설정을 수정합니다.",
 )
 @inject
+@endpoint_error_handler(
+    error_mappings={ValueError: (status.HTTP_422_UNPROCESSABLE_ENTITY, "Validation error")},
+    default_message="Failed to update connector config",
+)
 async def update_connector_config(
     connect_id: str = Path(..., description="Connect ID"),
     connector_name: str = Path(..., description="커넥터 이름"),
@@ -140,6 +153,7 @@ async def update_connector_config(
     description="커넥터를 삭제합니다.",
 )
 @inject
+@endpoint_error_handler(default_message="Failed to delete connector")
 async def delete_connector(
     connect_id: str = Path(..., description="Connect ID"),
     connector_name: str = Path(..., description="커넥터 이름"),

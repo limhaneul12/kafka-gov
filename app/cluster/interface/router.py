@@ -4,6 +4,7 @@ from dependency_injector.wiring import Provide, inject
 from fastapi import APIRouter, Depends, Path, Query, status
 
 from app.container import AppContainer
+from app.shared.error_handlers import endpoint_error_handler
 
 from .schemas import (
     ConnectionTestResponse,
@@ -87,6 +88,10 @@ TestConnectConnectionUseCase = Depends(
 
 @router.post("/kafka", response_model=KafkaClusterResponse, status_code=status.HTTP_201_CREATED)
 @inject
+@endpoint_error_handler(
+    error_mappings={ValueError: (status.HTTP_422_UNPROCESSABLE_ENTITY, "Validation error")},
+    default_message="Failed to create Kafka cluster",
+)
 async def create_kafka_cluster(
     request: KafkaClusterCreateRequest,
     use_case=CreateClusterUseCase,
@@ -138,6 +143,7 @@ async def create_kafka_cluster(
 
 @router.get("/kafka", response_model=list[KafkaClusterResponse])
 @inject
+@endpoint_error_handler(default_message="Failed to list Kafka clusters")
 async def list_kafka_clusters(
     active_only: bool = Query(default=True, description="활성화된 클러스터만 조회"),
     use_case=ListClustersUseCase,
@@ -174,6 +180,7 @@ async def list_kafka_clusters(
 
 @router.get("/kafka/{cluster_id}", response_model=KafkaClusterResponse)
 @inject
+@endpoint_error_handler(default_message="Failed to get Kafka cluster")
 async def get_kafka_cluster(
     cluster_id: str = Path(..., description="클러스터 ID"),
     use_case=GetClusterUseCase,
@@ -207,6 +214,10 @@ async def get_kafka_cluster(
 
 @router.put("/kafka/{cluster_id}", response_model=KafkaClusterResponse)
 @inject
+@endpoint_error_handler(
+    error_mappings={ValueError: (status.HTTP_422_UNPROCESSABLE_ENTITY, "Validation error")},
+    default_message="Failed to update Kafka cluster",
+)
 async def update_kafka_cluster(
     request: KafkaClusterUpdateRequest,
     cluster_id: str = Path(..., description="클러스터 ID"),
@@ -259,6 +270,7 @@ async def update_kafka_cluster(
 
 @router.delete("/kafka/{cluster_id}", status_code=status.HTTP_204_NO_CONTENT)
 @inject
+@endpoint_error_handler(default_message="Failed to delete Kafka cluster")
 async def delete_kafka_cluster(
     cluster_id: str = Path(..., description="클러스터 ID"),
     use_case=DeleteClusterUseCase,
@@ -274,6 +286,7 @@ async def delete_kafka_cluster(
 
 @router.post("/kafka/{cluster_id}/test", response_model=ConnectionTestResponse)
 @inject
+@endpoint_error_handler(default_message="Kafka connection test failed")
 async def test_kafka_connection(
     cluster_id: str = Path(..., description="클러스터 ID"),
     use_case=TestClusterConnectionUseCase,
@@ -306,6 +319,10 @@ async def test_kafka_connection(
     "/schema-registries", response_model=SchemaRegistryResponse, status_code=status.HTTP_201_CREATED
 )
 @inject
+@endpoint_error_handler(
+    error_mappings={ValueError: (status.HTTP_422_UNPROCESSABLE_ENTITY, "Validation error")},
+    default_message="Failed to create Schema Registry",
+)
 async def create_schema_registry(
     request: SchemaRegistryCreateRequest,
     use_case=CreateRegistryUseCase,
@@ -342,6 +359,7 @@ async def create_schema_registry(
 
 @router.get("/schema-registries", response_model=list[SchemaRegistryResponse])
 @inject
+@endpoint_error_handler(default_message="Failed to list Schema Registries")
 async def list_schema_registries(
     active_only: bool = Query(default=True, description="활성화된 레지스트리만 조회"),
     use_case=ListRegistriesUseCase,
@@ -370,6 +388,7 @@ async def list_schema_registries(
 
 @router.delete("/schema-registries/{registry_id}", status_code=status.HTTP_204_NO_CONTENT)
 @inject
+@endpoint_error_handler(default_message="Failed to delete Schema Registry")
 async def delete_schema_registry(
     registry_id: str = Path(..., description="레지스트리 ID"),
     use_case=DeleteRegistryUseCase,
@@ -380,6 +399,7 @@ async def delete_schema_registry(
 
 @router.post("/schema-registries/{registry_id}/test", response_model=ConnectionTestResponse)
 @inject
+@endpoint_error_handler(default_message="Schema Registry connection test failed")
 async def test_schema_registry_connection(
     registry_id: str = Path(..., description="레지스트리 ID"),
     use_case=TestRegistryConnectionUseCase,
@@ -402,6 +422,10 @@ async def test_schema_registry_connection(
 
 @router.post("/storages", response_model=ObjectStorageResponse, status_code=status.HTTP_201_CREATED)
 @inject
+@endpoint_error_handler(
+    error_mappings={ValueError: (status.HTTP_422_UNPROCESSABLE_ENTITY, "Validation error")},
+    default_message="Failed to create Object Storage",
+)
 async def create_object_storage(
     request: ObjectStorageCreateRequest,
     use_case=CreateStorageUseCase,
@@ -436,6 +460,7 @@ async def create_object_storage(
 
 @router.get("/storages", response_model=list[ObjectStorageResponse])
 @inject
+@endpoint_error_handler(default_message="Failed to list Object Storages")
 async def list_object_storages(
     active_only: bool = Query(default=True, description="활성화된 스토리지만 조회"),
     use_case=ListStoragesUseCase,
@@ -463,6 +488,7 @@ async def list_object_storages(
 
 @router.delete("/storages/{storage_id}", status_code=status.HTTP_204_NO_CONTENT)
 @inject
+@endpoint_error_handler(default_message="Failed to delete Object Storage")
 async def delete_object_storage(
     storage_id: str = Path(..., description="스토리지 ID"),
     use_case=DeleteStorageUseCase,
@@ -473,6 +499,7 @@ async def delete_object_storage(
 
 @router.post("/storages/{storage_id}/test", response_model=ConnectionTestResponse)
 @inject
+@endpoint_error_handler(default_message="Object Storage connection test failed")
 async def test_object_storage_connection(
     storage_id: str = Path(..., description="스토리지 ID"),
     use_case=TestStorageConnectionUseCase,
@@ -502,6 +529,10 @@ async def test_object_storage_connection(
     response_description="생성된 Kafka Connect 정보",
 )
 @inject
+@endpoint_error_handler(
+    error_mappings={ValueError: (status.HTTP_422_UNPROCESSABLE_ENTITY, "Validation error")},
+    default_message="Failed to create Kafka Connect",
+)
 async def create_kafka_connect(
     request: KafkaConnectCreateRequest,
     use_case=CreateConnectUseCase,
@@ -549,6 +580,7 @@ async def create_kafka_connect(
     response_description="Kafka Connect 목록",
 )
 @inject
+@endpoint_error_handler(default_message="Failed to list Kafka Connects")
 async def list_kafka_connects(
     cluster_id: str | None = Query(default=None, description="필터: 클러스터 ID"),
     use_case=ListConnectsUseCase,
@@ -588,6 +620,7 @@ async def list_kafka_connects(
     response_description="Kafka Connect 상세 정보",
 )
 @inject
+@endpoint_error_handler(default_message="Failed to get Kafka Connect")
 async def get_kafka_connect(
     connect_id: str = Path(..., description="Connect ID"),
     use_case=GetConnectUseCase,
@@ -623,6 +656,7 @@ async def get_kafka_connect(
     description="등록된 Kafka Connect를 삭제합니다 (소프트 삭제).",
 )
 @inject
+@endpoint_error_handler(default_message="Failed to delete Kafka Connect")
 async def delete_kafka_connect(
     connect_id: str = Path(..., description="Connect ID"),
     use_case=DeleteConnectUseCase,
@@ -644,6 +678,7 @@ async def delete_kafka_connect(
     response_description="연결 테스트 결과 (성공 여부, 지연시간, 커넥터 개수)",
 )
 @inject
+@endpoint_error_handler(default_message="Kafka Connect connection test failed")
 async def test_kafka_connect_connection(
     connect_id: str = Path(..., description="Connect ID"),
     use_case=TestConnectConnectionUseCase,

@@ -4,6 +4,7 @@ from dependency_injector.wiring import Provide, inject
 from fastapi import APIRouter, Depends, Path, status
 
 from app.container import AppContainer
+from app.shared.error_handlers import endpoint_error_handler
 
 router = APIRouter()
 
@@ -18,6 +19,7 @@ ConnectorStateControl = Depends(Provide[AppContainer.connect_container.connector
     description="커넥터를 재시작합니다.",
 )
 @inject
+@endpoint_error_handler(default_message="Failed to restart connector")
 async def restart_connector(
     connect_id: str = Path(..., description="Connect ID"),
     connector_name: str = Path(..., description="커넥터 이름"),
@@ -35,6 +37,7 @@ async def restart_connector(
     description="커넥터를 일시정지합니다.",
 )
 @inject
+@endpoint_error_handler(default_message="Failed to pause connector")
 async def pause_connector(
     connect_id: str = Path(..., description="Connect ID"),
     connector_name: str = Path(..., description="커넥터 이름"),
@@ -52,6 +55,7 @@ async def pause_connector(
     description="일시정지된 커넥터를 재개합니다.",
 )
 @inject
+@endpoint_error_handler(default_message="Failed to resume connector")
 async def resume_connector(
     connect_id: str = Path(..., description="Connect ID"),
     connector_name: str = Path(..., description="커넥터 이름"),

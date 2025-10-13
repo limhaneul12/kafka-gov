@@ -5,6 +5,7 @@ from fastapi import APIRouter, Body, Depends, HTTPException, Path, status
 from typing_extensions import TypedDict
 
 from app.container import AppContainer
+from app.shared.error_handlers import endpoint_error_handler
 
 router = APIRouter()
 
@@ -42,6 +43,7 @@ class MetadataResponse(TypedDict, total=False):
     description="커넥터의 거버넌스 메타데이터(팀, 태그, 설명 등)를 조회합니다.",
 )
 @inject
+@endpoint_error_handler(default_message="Failed to get connector metadata")
 async def get_connector_metadata(
     connect_id: str = Path(..., description="Connect ID"),
     connector_name: str = Path(..., description="커넥터 이름"),
@@ -70,6 +72,7 @@ async def get_connector_metadata(
     description="커넥터의 거버넌스 메타데이터를 업데이트합니다.",
 )
 @inject
+@endpoint_error_handler(default_message="Failed to update connector metadata")
 async def update_connector_metadata(
     connect_id: str = Path(..., description="Connect ID"),
     connector_name: str = Path(..., description="커넥터 이름"),
@@ -119,6 +122,7 @@ async def update_connector_metadata(
     description="커넥터의 메타데이터를 삭제합니다.",
 )
 @inject
+@endpoint_error_handler(default_message="Failed to delete connector metadata")
 async def delete_connector_metadata(
     connect_id: str = Path(..., description="Connect ID"),
     connector_name: str = Path(..., description="커넥터 이름"),
@@ -136,6 +140,7 @@ async def delete_connector_metadata(
     description="특정 팀이 소유한 커넥터 메타데이터 목록을 조회합니다.",
 )
 @inject
+@endpoint_error_handler(default_message="Failed to list connectors by team")
 async def list_connectors_by_team(
     connect_id: str = Path(..., description="Connect ID"),
     team: str = Path(..., description="팀 이름"),

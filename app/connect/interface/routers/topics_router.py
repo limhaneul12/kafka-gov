@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, Path, status
 
 from app.connect.domain.types import TopicsResponse
 from app.container import AppContainer
+from app.shared.error_handlers import endpoint_error_handler
 
 router = APIRouter()
 
@@ -18,6 +19,7 @@ TopicOperations = Depends(Provide[AppContainer.connect_container.topic_operation
     description="커넥터가 사용하는 토픽을 조회합니다.",
 )
 @inject
+@endpoint_error_handler(default_message="Failed to get connector topics")
 async def get_connector_topics(
     connect_id: str = Path(..., description="Connect ID"),
     connector_name: str = Path(..., description="커넥터 이름"),
@@ -34,6 +36,7 @@ async def get_connector_topics(
     description="커넥터의 토픽을 리셋합니다.",
 )
 @inject
+@endpoint_error_handler(default_message="Failed to reset connector topics")
 async def reset_connector_topics(
     connect_id: str = Path(..., description="Connect ID"),
     connector_name: str = Path(..., description="커넥터 이름"),

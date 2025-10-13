@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, Path, status
 
 from app.connect.domain.types import TaskListResponse, TaskStatusResponse
 from app.container import AppContainer
+from app.shared.error_handlers import endpoint_error_handler
 
 router = APIRouter()
 
@@ -18,6 +19,7 @@ TaskOperations = Depends(Provide[AppContainer.connect_container.task_operations]
     description="커넥터의 태스크 목록을 조회합니다.",
 )
 @inject
+@endpoint_error_handler(default_message="Failed to get connector tasks")
 async def get_connector_tasks(
     connect_id: str = Path(..., description="Connect ID"),
     connector_name: str = Path(..., description="커넥터 이름"),
@@ -33,6 +35,7 @@ async def get_connector_tasks(
     description="특정 태스크의 상태를 조회합니다.",
 )
 @inject
+@endpoint_error_handler(default_message="Failed to get task status")
 async def get_task_status(
     connect_id: str = Path(..., description="Connect ID"),
     connector_name: str = Path(..., description="커넥터 이름"),
@@ -50,6 +53,7 @@ async def get_task_status(
     description="특정 태스크를 재시작합니다 (Connector RUNNING + Task FAILED 시 사용).",
 )
 @inject
+@endpoint_error_handler(default_message="Failed to restart task")
 async def restart_task(
     connect_id: str = Path(..., description="Connect ID"),
     connector_name: str = Path(..., description="커넥터 이름"),

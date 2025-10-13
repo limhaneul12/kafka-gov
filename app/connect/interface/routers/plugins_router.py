@@ -5,6 +5,7 @@ from fastapi import APIRouter, Body, Depends, Path
 
 from app.connect.domain.types import PluginConfig, PluginListResponse, ValidationResponse
 from app.container import AppContainer
+from app.shared.error_handlers import endpoint_error_handler
 
 router = APIRouter()
 
@@ -18,6 +19,7 @@ PluginOperations = Depends(Provide[AppContainer.connect_container.plugin_operati
     description="Kafka Connect에 설치된 커넥터 플러그인 목록을 조회합니다.",
 )
 @inject
+@endpoint_error_handler(default_message="Failed to list connector plugins")
 async def list_connector_plugins(
     connect_id: str = Path(..., description="Connect ID"),
     use_case=PluginOperations,
@@ -32,6 +34,7 @@ async def list_connector_plugins(
     description="커넥터 설정이 유효한지 검증합니다.",
 )
 @inject
+@endpoint_error_handler(default_message="Failed to validate connector config")
 async def validate_connector_config(
     connect_id: str = Path(..., description="Connect ID"),
     plugin_class: str = Path(..., description="플러그인 클래스 이름"),
