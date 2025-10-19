@@ -1,7 +1,5 @@
 """Topic Interface 레이어 헬퍼 함수"""
 
-from __future__ import annotations
-
 import yaml
 from fastapi import HTTPException, UploadFile, status
 

@@ -68,6 +68,34 @@ Kafka-Gov transforms Kafka into a **governed enterprise platform**:
 - **At-a-glance**: View partitions, replication, retention instantly
 - **Single Topic Creation**: Quick form-based creation for individual topics
 
+### 📏 Flexible Naming Policy
+
+**3 Built-in Strategies + Custom Support:**
+
+| Strategy | Structure | Use Case |
+|----------|-----------|----------|
+| **Permissive** | 자유 형식 | Startup, 빠른 개발 |
+| **Balanced** | `{env}.{domain}.{resource}` | 중견 기업, 팀 네임스페이스 |
+| **Strict** | `{env}.{classification}.{domain}.{resource}.{version}` | 대기업, 컴플라이언스 |
+| **Custom** | YAML로 정의 | 특수 요구사항 |
+
+**특징:**
+- ✅ 런타임 전략 전환 (재배포 불필요)
+- ✅ Pydantic 기반 엄격한 검증 (StrictStr, StringConstraints)
+- ✅ PII 데이터 분류 및 추가 제약
+- ✅ YAML로 Custom 규칙 업로드
+
+```bash
+# UI에서 클릭 한 번으로 전환
+Permissive → Balanced → Strict
+
+# 또는 YAML 업로드
+curl -X POST /api/v1/naming-policy/custom \
+  -F "file=@my-company-policy.yml"
+```
+
+📖 **상세 가이드**: [Topic Naming Conventions](./docs/topic-naming-conventions.md)
+
 ### 🚀 YAML-Based Batch Operations
 
 **Create/update/delete dozens of topics at once:**

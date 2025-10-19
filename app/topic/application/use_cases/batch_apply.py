@@ -5,8 +5,7 @@ from __future__ import annotations
 import logging
 import uuid
 from collections import defaultdict
-
-import msgspec
+from dataclasses import asdict
 
 from app.cluster.domain.services import IConnectionManager
 from app.shared.constants import AuditAction, AuditStatus, AuditTarget, MethodType
@@ -439,8 +438,8 @@ class TopicBatchApplyUseCase:
     async def _save_topic_metadata(self, spec: DomainTopicSpec, actor: str) -> None:
         """토픽 메타데이터 저장 (Critical - 예외 발생)"""
         # 메타데이터 딕셔너리 생성
-        # msgspec.structs.asdict()를 사용하여 딕셔너리로 변환
-        config_dict = msgspec.structs.asdict(spec.config) if spec.config else None
+        # dataclasses.asdict()를 사용하여 딕셔너리로 변환
+        config_dict = asdict(spec.config) if spec.config else None
 
         metadata_dict = {
             "topic_name": spec.name,

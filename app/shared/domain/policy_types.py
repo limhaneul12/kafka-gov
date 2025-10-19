@@ -2,9 +2,8 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from enum import Enum
-
-import msgspec
 
 
 class DomainPolicySeverity(str, Enum):
@@ -30,8 +29,9 @@ class DomainEnvironment(str, Enum):
     PROD = "prod"
 
 
-class DomainPolicyViolation(msgspec.Struct, frozen=True):
-    """정책 위반 정보 (공통)"""
+@dataclass(frozen=True, slots=True)
+class DomainPolicyViolation:
+    """정책 위반 정보 (공통) - Value Object"""
 
     resource_type: DomainResourceType
     resource_name: str

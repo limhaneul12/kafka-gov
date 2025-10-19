@@ -1,10 +1,6 @@
 """Topic Interface TypeAdapter 기반 변환 어댑터"""
 
-from __future__ import annotations
-
 import logging
-
-import msgspec
 
 from ..domain.models import (
     DomainCleanupPolicy,
@@ -28,20 +24,27 @@ from .schemas import (
 
 
 class TopicTypeAdapters:
-    """Topic 모듈 TypeAdapter 컬렉션"""
+    """Topic 모듈 변환기 - Pydantic DTO ↔ dataclass Domain Model
+
+    Note:
+        Pydantic과 dataclass는 자연스럽게 호환됨
+        불필요한 model_validate 단계 제거
+    """
 
     @classmethod
     def convert_item_to_spec(cls, item: TopicItem) -> DomainTopicSpec:
-        """TopicItem을 DomainTopicSpec으로 안전하게 변환
+        """Pydantic DTO를 Domain Model로 변환
+
+        Pydantic Request → dataclass Domain Model
 
         Args:
-            item: 변환할 TopicItem
+            item: Pydantic 토픽 아이템
 
         Returns:
-            변환된 DomainTopicSpec
+            Domain Model (DomainTopicSpec)
 
         Raises:
-            ValidationError: 변환 중 검증 실패 시
+            ValueError: 도메인 검증 실패 시
         """
         try:
             # 설정 변환 (직접 생성 - 불필요한 중간 dict 제거)
@@ -77,21 +80,23 @@ class TopicTypeAdapters:
                 metadata=domain_metadata,
             )
 
-        except (msgspec.ValidationError, ValueError) as e:
+        except ValueError as e:
             raise ValueError(f"Failed to convert TopicItem to TopicSpec: {e}") from e
 
     @classmethod
     def convert_request_to_batch(cls, request: TopicBatchRequest) -> DomainTopicBatch:
-        """TopicBatchRequest를 TopicBatch로 안전하게 변환
+        """Pydantic 요청을 Domain Aggregate로 변환
+
+        Pydantic Request → Domain Aggregate Root
 
         Args:
-            request: 변환할 TopicBatchRequest
+            request: Pydantic 배치 요청
 
         Returns:
-            변환된 TopicBatch
+            Domain Aggregate (DomainTopicBatch)
 
         Raises:
-            ValidationError: 변환 중 검증 실패 시
+            ValueError: 도메인 검증 실패 시
         """
         try:
             # 각 아이템을 TopicSpec으로 변환
@@ -107,7 +112,7 @@ class TopicTypeAdapters:
                 specs=specs,
             )
 
-        except (msgspec.ValidationError, ValueError) as e:
+        except ValueError as e:
             raise ValueError(f"Failed to convert TopicBatchRequest to TopicBatch: {e}") from e
 
     @classmethod
@@ -263,13 +268,12 @@ def kafka_metadata_to_core_metadata(
     created_at_s = str(created_at) if created_at is not None else None
 
     try:
-        return msgspec.convert(
+        return InterfaceKafkaCoreMetadata.model_validate(
             {
                 "partition_count": partitions,
                 "leader_replicas": replicas,
                 "created_at": created_at_s,
-            },
-            InterfaceKafkaCoreMetadata,
+            }
         )
     except Exception:
         return None

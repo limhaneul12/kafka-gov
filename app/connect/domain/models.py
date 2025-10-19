@@ -1,8 +1,7 @@
 """Kafka Connect Domain Models"""
 
+from dataclasses import dataclass
 from enum import Enum
-
-import msgspec
 
 
 class ConnectorType(str, Enum):
@@ -33,8 +32,9 @@ class TaskState(str, Enum):
     UNKNOWN = "UNKNOWN"
 
 
-class TaskInfo(msgspec.Struct, frozen=True):
-    """태스크 정보"""
+@dataclass(frozen=True, slots=True)
+class TaskInfo:
+    """태스크 정보 - Value Object"""
 
     id: int
     state: TaskState
@@ -42,8 +42,9 @@ class TaskInfo(msgspec.Struct, frozen=True):
     trace: str | None = None
 
 
-class ConnectorInfo(msgspec.Struct, frozen=True):
-    """커넥터 상세 정보
+@dataclass(frozen=True, slots=True)
+class ConnectorInfo:
+    """커넥터 상세 정보 - Value Object
 
     Kafka Connect REST API의 응답 모델
     """
@@ -53,24 +54,34 @@ class ConnectorInfo(msgspec.Struct, frozen=True):
     state: ConnectorState
     worker_id: str
     config: dict[str, str]
-    tasks: list[TaskInfo] = []
-    topics: list[str] = []
+    tasks: list[TaskInfo] = None  # type: ignore
+    topics: list[str] = None  # type: ignore
 
-    # 메타데이터 (거버넌스용)
+    # 메타데이터 (거버너스용)
     team: str | None = None
-    tags: list[str] = []
+    tags: list[str] = None  # type: ignore
+
+    def __post_init__(self) -> None:
+        if self.tasks is None:
+            object.__setattr__(self, "tasks", [])
+        if self.topics is None:
+            object.__setattr__(self, "topics", [])
+        if self.tags is None:
+            object.__setattr__(self, "tags", [])
 
 
-class ConnectorPlugin(msgspec.Struct, frozen=True):
-    """커넥터 플러그인 정보"""
+@dataclass(frozen=True, slots=True)
+class ConnectorPlugin:
+    """커넥터 플러그인 정보 - Value Object"""
 
     class_name: str
     type: ConnectorType
     version: str
 
 
-class ConnectorStatus(msgspec.Struct, frozen=True):
-    """커넥터 전체 상태 (connector + tasks)"""
+@dataclass(frozen=True, slots=True)
+class ConnectorStatus:
+    """커녅터 전체 상태 (connector + tasks) - Value Object"""
 
     name: str
     connector: dict[str, str]  # state, worker_id
@@ -78,15 +89,17 @@ class ConnectorStatus(msgspec.Struct, frozen=True):
     type: ConnectorType
 
 
-class ConnectorConfig(msgspec.Struct, frozen=True):
-    """커넥터 설정"""
+@dataclass(frozen=True, slots=True)
+class ConnectorConfig:
+    """커녅터 설정 - Value Object"""
 
     name: str
     config: dict[str, str]
 
 
-class ConnectorValidationResult(msgspec.Struct, frozen=True):
-    """커넥터 설정 검증 결과"""
+@dataclass(frozen=True, slots=True)
+class ConnectorValidationResult:
+    """커녅터 설정 검증 결과 - Value Object"""
 
     name: str
     error_count: int

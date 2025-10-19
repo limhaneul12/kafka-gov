@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
+from dataclasses import asdict
 from datetime import datetime, timezone
 
-import msgspec
 import pytest
 
 from app.shared.domain.models import AuditActivity
@@ -32,8 +32,8 @@ class TestAuditActivity:
         assert activity.actor == "test-user"
         assert activity.timestamp == now
 
-    def test_msgspec_serialization(self):
-        """msgspec 직렬화 테스트"""
+    def test_dataclass_serialization(self):
+        """dataclass 직렬화 테스트"""
         now = datetime.now(timezone.utc)
         activity = AuditActivity(
             activity_type="schema",
@@ -45,8 +45,8 @@ class TestAuditActivity:
             metadata={"key": "value"},
         )
 
-        # msgspec.structs.asdict()로 변환
-        result = msgspec.structs.asdict(activity)
+        # dataclasses.asdict()로 변환
+        result = asdict(activity)
 
         assert result["activity_type"] == "schema"
         assert result["action"] == "REGISTER"
@@ -57,7 +57,7 @@ class TestAuditActivity:
         assert result["metadata"] == {"key": "value"}
 
     def test_immutable(self):
-        """불변성 검증 (msgspec frozen=True)"""
+        """불변성 검증 (dataclass frozen=True)"""
         activity = AuditActivity(
             activity_type="topic",
             action="UPDATE",
@@ -67,5 +67,5 @@ class TestAuditActivity:
             timestamp=datetime.now(timezone.utc),
         )
 
-        with pytest.raises(AttributeError):  # msgspec frozen=True
+        with pytest.raises(AttributeError):  # dataclass frozen=True
             activity.action = "DELETE"  # type: ignore[misc]

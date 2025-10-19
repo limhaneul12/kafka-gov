@@ -2,10 +2,9 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
-
-import msgspec
 
 
 class SecurityProtocol(str, Enum):
@@ -27,8 +26,9 @@ class SaslMechanism(str, Enum):
     OAUTHBEARER = "OAUTHBEARER"
 
 
-class KafkaCluster(msgspec.Struct, frozen=True, kw_only=True):
-    """Kafka 클러스터 연결 정보 (불변)
+@dataclass(frozen=True, slots=True, kw_only=True)
+class KafkaCluster:
+    """Kafka 클러스터 연결 정보 - Entity
 
     Note:
         ConnectionManager가 이 정보를 사용하여 AdminClient를 동적 생성
@@ -91,8 +91,9 @@ class KafkaCluster(msgspec.Struct, frozen=True, kw_only=True):
         return config
 
 
-class SchemaRegistry(msgspec.Struct, frozen=True, kw_only=True):
-    """Schema Registry 연결 정보 (불변)
+@dataclass(frozen=True, slots=True, kw_only=True)
+class SchemaRegistry:
+    """Schema Registry 연결 정보 - Entity
 
     Note:
         ConnectionManager가 이 정보를 사용하여 AsyncSchemaRegistryClient를 동적 생성
@@ -146,8 +147,9 @@ class SchemaRegistry(msgspec.Struct, frozen=True, kw_only=True):
         return config
 
 
-class ObjectStorage(msgspec.Struct, frozen=True, kw_only=True):
-    """Object Storage (MinIO/S3) 연결 정보 (불변)
+@dataclass(frozen=True, slots=True, kw_only=True)
+class ObjectStorage:
+    """Object Storage (MinIO/S3) 연결 정보 - Entity
 
     Note:
         ConnectionManager가 이 정보를 사용하여 Minio Client를 동적 생성
@@ -198,8 +200,9 @@ class ObjectStorage(msgspec.Struct, frozen=True, kw_only=True):
         return f"{protocol}://{self.endpoint_url}"
 
 
-class KafkaConnect(msgspec.Struct, frozen=True, kw_only=True):
-    """Kafka Connect 연결 정보 (불변)
+@dataclass(frozen=True, slots=True, kw_only=True)
+class KafkaConnect:
+    """Kafka Connect 연결 정보 - Entity
 
     Note:
         향후 Kafka Connect REST API 연동 시 사용
@@ -221,8 +224,9 @@ class KafkaConnect(msgspec.Struct, frozen=True, kw_only=True):
     updated_at: datetime
 
 
-class ConnectionTestResult(msgspec.Struct, frozen=True, kw_only=True):
-    """연결 테스트 결과 (불변)"""
+@dataclass(frozen=True, slots=True, kw_only=True)
+class ConnectionTestResult:
+    """연결 테스트 결과 - Value Object"""
 
     success: bool
     message: str

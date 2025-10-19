@@ -48,6 +48,12 @@ services:
       dockerfile: Dockerfile
     environment:
       - DATABASE_URL=mysql+asyncmy://user:password@mysql:3306/kafka_gov?charset=utf8mb4
+      # migrate.sh 스크립트용 환경 변수
+      - DB_HOST=mysql
+      - DB_PORT=3306
+      - DB_USER=user
+      - DB_PASSWORD=password
+      - DB_NAME=kafka_gov
       - KAFKA_BOOTSTRAP_SERVERS=kafka1:19092,kafka2:29092,kafka3:39092
       - KAFKA_SCHEMA_REGISTRY_URL=http://schema-registry:8081
       - JWT_SECRET_KEY=your-super-secret-jwt-key-change-in-production

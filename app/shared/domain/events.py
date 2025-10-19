@@ -2,10 +2,9 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from datetime import datetime
 from typing import TypeAlias
-
-import msgspec
 
 from ..roles import UserRole
 
@@ -15,7 +14,8 @@ AggregateId: TypeAlias = str
 Actor: TypeAlias = str
 
 
-class DomainEvent(msgspec.Struct, frozen=True):
+@dataclass(frozen=True, slots=True)
+class DomainEvent:
     """도메인 이벤트 베이스"""
 
     event_id: EventId
@@ -24,7 +24,8 @@ class DomainEvent(msgspec.Struct, frozen=True):
     event_type: str
 
 
-class SchemaRegisteredEvent(msgspec.Struct, frozen=True):
+@dataclass(frozen=True, slots=True)
+class SchemaRegisteredEvent:
     """스키마 등록 이벤트 - Schema Context → Topic/Analysis Context"""
 
     event_id: EventId
@@ -50,7 +51,8 @@ class SchemaRegisteredEvent(msgspec.Struct, frozen=True):
     actor_role: str = UserRole.ADMIN.value
 
 
-class TopicCreatedEvent(msgspec.Struct, frozen=True):
+@dataclass(frozen=True, slots=True)
+class TopicCreatedEvent:
     """토픽 생성 이벤트 - Topic Context → Analysis Context"""
 
     event_id: EventId
@@ -71,7 +73,8 @@ class TopicCreatedEvent(msgspec.Struct, frozen=True):
     actor_role: str = UserRole.ADMIN.value
 
 
-class TopicSchemaLinkedEvent(msgspec.Struct, frozen=True):
+@dataclass(frozen=True, slots=True)
+class TopicSchemaLinkedEvent:
     """토픽-스키마 연결 이벤트 - Analysis Context 발행"""
 
     event_id: EventId

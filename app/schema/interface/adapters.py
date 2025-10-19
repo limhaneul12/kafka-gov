@@ -32,22 +32,30 @@ from .types.enums import Environment
 
 
 class SchemaConverter:
-    """Schema 모듈 고성능 변환기 - msgspec 직접 생성"""
+    """Schema 모듈 변환기 - Pydantic DTO to dataclass Domain Model
+
+    Note:
+        Pydantic(IO 경계) → dataclass(도메인)로 변환
+        dataclass는 Pydantic과 자연스럽게 호환되므로 복잡한 변환 불필요
+        Enum 값 변환과 타입 체크만 수행
+    """
 
     __slots__ = ()  # 메모리 최적화
 
     @staticmethod
     def convert_item_to_spec(item: SchemaBatchItem) -> DomainSchemaSpec:
-        """SchemaBatchItem을 DomainSchemaSpec으로 직접 변환 (고성능)
+        """Pydantic DTO를 Domain Model로 변환
+
+        Pydantic 요청 모델(SchemaBatchItem) → Domain Model(DomainSchemaSpec)
 
         Args:
-            item: 변환할 스키마 아이템
+            item: Pydantic 스키마 아이템
 
         Returns:
-            변환된 DomainSchemaSpec
+            변환된 Domain Model
 
         Raises:
-            ValueError: 변환 중 검증 실패 시
+            ValueError: 도메인 검증 실패 시
         """
         # 메타데이터 변환 - 직접 생성
         domain_metadata = None
@@ -90,7 +98,7 @@ class SchemaConverter:
             else DomainCompatibilityMode.NONE
         )
 
-        # SchemaSpec 직접 생성 - msgspec.Struct는 __init__으로 빠르게 생성
+        # SchemaSpec 직접 생성 - dataclass는 __init__으로 빠르게 생성
         return DomainSchemaSpec(
             subject=item.subject,
             schema_type=DomainSchemaType(item.type.value),
@@ -106,13 +114,15 @@ class SchemaConverter:
 
     @classmethod
     def convert_request_to_batch(cls, request: SchemaBatchRequest) -> DomainSchemaBatch:
-        """SchemaBatchRequest를 DomainSchemaBatch로 직접 변환 (고성능)
+        """Pydantic 요청을 Domain Aggregate로 변환
+
+        Pydantic Request → Domain Aggregate Root
 
         Args:
-            request: 변환할 SchemaBatchRequest
+            request: Pydantic 배치 요청
 
         Returns:
-            변환된 DomainSchemaBatch
+            Domain Aggregate (DomainSchemaBatch)
         """
         # 각 아이템을 SchemaSpec으로 변환 (제너레이터로 메모리 효율화)
         specs = tuple(cls.convert_item_to_spec(item) for item in request.items)
@@ -127,13 +137,16 @@ class SchemaConverter:
 
     @classmethod
     def convert_plan_to_response(cls, plan: DomainSchemaPlan) -> SchemaBatchDryRunResponse:
-        """DomainSchemaPlan을 SchemaBatchDryRunResponse로 변환
+        """Domain Model을 Pydantic 응답으로 변환
+
+        Domain Model → Pydantic Response
+        dataclass와 Pydantic은 호환되므로 필드 매핑만 수행
 
         Args:
-            plan: 변환할 DomainSchemaPlan
+            plan: Domain Plan Model
 
         Returns:
-            변환된 SchemaBatchDryRunResponse
+            Pydantic 응답 DTO
         """
         # 계획 아이템 변환
         plan_items: list[SchemaPlanItem] = [

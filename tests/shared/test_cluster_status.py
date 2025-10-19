@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
+from dataclasses import asdict
 from unittest.mock import AsyncMock, MagicMock
 
-import msgspec
 import pytest
 
 from app.shared.domain.models import BrokerInfo, ClusterStatus
@@ -99,8 +99,8 @@ class TestClusterStatus:
         assert cluster.total_topics == 25
         assert cluster.total_partitions == 120
 
-    def test_msgspec_serialization(self):
-        """msgspec 직렬화 테스트"""
+    def test_dataclass_serialization(self):
+        """dataclass 직렬화 테스트 (asdict 사용)"""
         broker = BrokerInfo(
             broker_id=1,
             host="kafka-1",
@@ -117,15 +117,14 @@ class TestClusterStatus:
             total_partitions=30,
         )
 
-        # msgspec.json.encode/decode를 통한 완전 직렬화 테스트
-        encoded = msgspec.json.encode(cluster)
-        decoded = msgspec.json.decode(encoded)
+        # dataclasses.asdict()를 통한 직렬화 테스트
+        cluster_dict = asdict(cluster)
 
-        assert decoded["cluster_id"] == "test-cluster"
-        assert decoded["controller_id"] == 1
-        assert len(decoded["brokers"]) == 1
-        # JSON으로 인코딩되면 dict로 변환됨
-        first_broker = decoded["brokers"][0]
+        assert cluster_dict["cluster_id"] == "test-cluster"
+        assert cluster_dict["controller_id"] == 1
+        assert len(cluster_dict["brokers"]) == 1
+        # asdict는 중첩된 dataclass도 dict로 변환
+        first_broker = cluster_dict["brokers"][0]
         assert first_broker["broker_id"] == 1
         assert first_broker["host"] == "kafka-1"
 

@@ -2,14 +2,14 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
 
-import msgspec
 
-
-class AuditActivity(msgspec.Struct, frozen=True, kw_only=True):
-    """감사 활동 도메인 모델 (불변)"""
+@dataclass(frozen=True, slots=True, kw_only=True)
+class AuditActivity:
+    """감사 활동 도메인 모델 - Value Object"""
 
     activity_type: str  # "topic" | "schema"
     action: str  # CREATE, UPDATE, DELETE,ADD, etc.
@@ -21,8 +21,9 @@ class AuditActivity(msgspec.Struct, frozen=True, kw_only=True):
     metadata: dict[str, Any] | None = None  # 추가 메타데이터
 
 
-class BrokerInfo(msgspec.Struct, frozen=True, kw_only=True):
-    """Kafka 브로커 정보 도메인 모델 (불변)"""
+@dataclass(frozen=True, slots=True, kw_only=True)
+class BrokerInfo:
+    """Kafka 브로커 정보 도메인 모델 - Value Object"""
 
     broker_id: int  # 브로커 ID
     host: str  # 호스트
@@ -32,8 +33,9 @@ class BrokerInfo(msgspec.Struct, frozen=True, kw_only=True):
     disk_usage_bytes: int | None = None  # 디스크 사용량 (bytes)
 
 
-class ClusterStatus(msgspec.Struct, frozen=True, kw_only=True):
-    """Kafka 클러스터 상태 도메인 모델 (불변)"""
+@dataclass(frozen=True, slots=True, kw_only=True)
+class ClusterStatus:
+    """Kafka 클러스터 상태 도메인 모델 - Value Object"""
 
     cluster_id: str  # 클러스터 ID
     controller_id: int  # 컨트롤러 브로커 ID

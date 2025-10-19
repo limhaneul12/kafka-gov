@@ -10,12 +10,26 @@ from app.topic.application.use_cases import (
     TopicBulkDeleteUseCase,
     TopicListUseCase,
 )
+from app.topic.application.use_cases.policy_crud import (
+    ActivatePolicyUseCase,
+    ArchivePolicyUseCase,
+    CreatePolicyUseCase,
+    DeletePolicyUseCase,
+    GetActivePolicyUseCase,
+    GetPolicyUseCase,
+    ListPoliciesUseCase,
+    ListPolicyVersionsUseCase,
+    RollbackPolicyUseCase,
+    UpdatePolicyUseCase,
+)
 from app.topic.domain.repositories.interfaces import (
     IAuditRepository,
+    IPolicyRepository,
     ITopicMetadataRepository,
 )
 from app.topic.infrastructure.repository.audit_repository import MySQLAuditRepository
 from app.topic.infrastructure.repository.mysql_repository import MySQLTopicMetadataRepository
+from app.topic.infrastructure.repository.policy_repository import PolicyRepository
 
 
 class TopicContainer(containers.DeclarativeContainer):
@@ -40,6 +54,11 @@ class TopicContainer(containers.DeclarativeContainer):
 
     audit_repository: providers.Provider[IAuditRepository] = providers.Factory(
         MySQLAuditRepository,
+        session_factory=infrastructure.database_manager.provided.get_db_session,
+    )
+
+    policy_repository: providers.Provider[IPolicyRepository] = providers.Factory(
+        PolicyRepository,
         session_factory=infrastructure.database_manager.provided.get_db_session,
     )
 
@@ -69,6 +88,59 @@ class TopicContainer(containers.DeclarativeContainer):
         apply_use_case=apply_use_case,
         audit_repository=audit_repository,
         metadata_repository=metadata_repository,
+    )
+
+    # Policy Use Cases
+    create_policy_use_case: providers.Provider[CreatePolicyUseCase] = providers.Factory(
+        CreatePolicyUseCase,
+        policy_repository=policy_repository,
+    )
+
+    get_policy_use_case: providers.Provider[GetPolicyUseCase] = providers.Factory(
+        GetPolicyUseCase,
+        policy_repository=policy_repository,
+    )
+
+    get_active_policy_use_case: providers.Provider[GetActivePolicyUseCase] = providers.Factory(
+        GetActivePolicyUseCase,
+        policy_repository=policy_repository,
+    )
+
+    list_policies_use_case: providers.Provider[ListPoliciesUseCase] = providers.Factory(
+        ListPoliciesUseCase,
+        policy_repository=policy_repository,
+    )
+
+    list_policy_versions_use_case: providers.Provider[ListPolicyVersionsUseCase] = (
+        providers.Factory(
+            ListPolicyVersionsUseCase,
+            policy_repository=policy_repository,
+        )
+    )
+
+    update_policy_use_case: providers.Provider[UpdatePolicyUseCase] = providers.Factory(
+        UpdatePolicyUseCase,
+        policy_repository=policy_repository,
+    )
+
+    activate_policy_use_case: providers.Provider[ActivatePolicyUseCase] = providers.Factory(
+        ActivatePolicyUseCase,
+        policy_repository=policy_repository,
+    )
+
+    archive_policy_use_case: providers.Provider[ArchivePolicyUseCase] = providers.Factory(
+        ArchivePolicyUseCase,
+        policy_repository=policy_repository,
+    )
+
+    delete_policy_use_case: providers.Provider[DeletePolicyUseCase] = providers.Factory(
+        DeletePolicyUseCase,
+        policy_repository=policy_repository,
+    )
+
+    rollback_policy_use_case: providers.Provider[RollbackPolicyUseCase] = providers.Factory(
+        RollbackPolicyUseCase,
+        policy_repository=policy_repository,
     )
 
 

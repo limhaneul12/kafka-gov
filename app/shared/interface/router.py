@@ -39,7 +39,7 @@ async def get_recent_activities(
     """
     activities = await use_case.execute(limit=limit)
 
-    # msgspec.Struct를 dict로 변환 (FastAPI가 자동으로 JSON 직렬화)
+    # dataclass를 dict로 변환 (FastAPI 직렬화)
     result: list[dict[str, Any]] = [
         {
             "activity_type": activity.activity_type,
@@ -92,7 +92,7 @@ async def get_activity_history(
         limit=limit,
     )
 
-    # msgspec.Struct를 dict로 변환
+    # dataclass를 dict로 변환
     result: list[dict[str, Any]] = [
         {
             "activity_type": activity.activity_type,
@@ -128,7 +128,7 @@ async def get_cluster_status(
     """
     cluster_status = await use_case.execute(cluster_id=cluster_id)
 
-    # msgspec.Struct를 Pydantic 모델로 변환
+    # dataclass를 Pydantic 모델로 변환
     return ClusterStatusResponse(
         cluster_id=cluster_status.cluster_id,
         controller_id=cluster_status.controller_id,

@@ -19,7 +19,7 @@ RUN --mount=type=cache,target=/tmp/uv-cache uv sync --frozen --no-dev
 
 # 앱 코드 및 설정 복사
 COPY app/ ./app/
-COPY static/ ./static/
+# COPY static/ ./static/
 COPY script/ ./script/
 COPY alembic.ini ./
 # ★ 여기가 포인트: 레포의 migrations 폴더를 그대로 이미지에 포함

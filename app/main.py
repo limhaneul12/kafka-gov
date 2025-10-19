@@ -9,8 +9,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import ORJSONResponse, RedirectResponse
-from fastapi.staticfiles import StaticFiles
+from fastapi.responses import ORJSONResponse
 
 from .analysis.interface.router import router as analysis_router
 from .cluster.interface.router import router as cluster_router
@@ -18,6 +17,7 @@ from .connect.interface.router import router as connect_router
 from .container import AppContainer, register_event_handlers
 from .schema.interface.router import router as schema_router
 from .shared.interface.router import router as shared_router
+from .topic.interface.policy_router import router as policy_router
 from .topic.interface.router import router as topic_router
 
 logger = logging.getLogger(__name__)
@@ -71,9 +71,6 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
 
-    # 정적 파일
-    app.mount("/static", StaticFiles(directory="static"), name="static")
-
     # ✅ 컨테이너 인스턴스 생성 & 보관
     container = AppContainer()
     app.state.container = container
@@ -106,12 +103,9 @@ def create_app() -> FastAPI:
     app.include_router(cluster_router, prefix="/api")  # Cluster API
     app.include_router(connect_router, prefix="/api")  # Connect API
     app.include_router(topic_router, prefix="/api")
+    app.include_router(policy_router, prefix="/api")  # Policy API
     app.include_router(schema_router, prefix="/api")
     app.include_router(analysis_router, prefix="/api")
-
-    @app.get("/")
-    async def root() -> RedirectResponse:
-        return RedirectResponse(url="/static/index.html")
 
     @app.get("/api")
     async def api_info() -> dict[str, str]:

@@ -12,12 +12,15 @@ from sqlalchemy import select
 from sqlalchemy.dialects.mysql import insert as mysql_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.shared.domain.policy_types import DomainPolicySeverity, DomainResourceType
+from app.shared.domain.policy_types import (
+    DomainPolicySeverity,
+    DomainPolicyViolation,
+    DomainResourceType,
+)
 from app.topic.domain.models import (
     ChangeId,
     DomainEnvironment,
     DomainPlanAction,
-    DomainPolicyViolation,
     DomainTopicPlan,
     DomainTopicPlanItem,
 )

@@ -1,10 +1,9 @@
-"""Analysis Domain Models - msgspec 기반"""
+"""Analysis Domain Models - dataclass 기반"""
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import TypeAlias
-
-import msgspec
 
 # Type Aliases
 TopicName: TypeAlias = str
@@ -12,8 +11,9 @@ SubjectName: TypeAlias = str
 CorrelationId: TypeAlias = str
 
 
-class TopicSchemaCorrelation(msgspec.Struct, frozen=True):
-    """토픽-스키마 상관관계 (Aggregate Root)"""
+@dataclass(frozen=True, slots=True)
+class TopicSchemaCorrelation:
+    """토픽-스키마 상관관계 (Aggregate Root) - Value Object"""
 
     correlation_id: CorrelationId
     topic_name: TopicName
@@ -30,8 +30,9 @@ class TopicSchemaCorrelation(msgspec.Struct, frozen=True):
         return self.key_schema_subject is not None or self.value_schema_subject is not None
 
 
-class SchemaImpactAnalysis(msgspec.Struct, frozen=True):
-    """스키마 영향도 분석 결과"""
+@dataclass(frozen=True, slots=True)
+class SchemaImpactAnalysis:
+    """스키마 영향도 분석 결과 - Value Object"""
 
     subject: SubjectName
     affected_topics: tuple[TopicName, ...]
@@ -40,8 +41,9 @@ class SchemaImpactAnalysis(msgspec.Struct, frozen=True):
     warnings: tuple[str, ...]
 
 
-class TopicSchemaUsage(msgspec.Struct, frozen=True):
-    """토픽의 스키마 사용 현황"""
+@dataclass(frozen=True, slots=True)
+class TopicSchemaUsage:
+    """토픽의 스키마 사용 현황 - Value Object"""
 
     topic_name: TopicName
     key_schema: SubjectName | None

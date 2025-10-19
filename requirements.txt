@@ -44,6 +44,5 @@ minio
 argon2-cffi
 orjson
 dependency-injector
-msgspec
 
 pre-commit

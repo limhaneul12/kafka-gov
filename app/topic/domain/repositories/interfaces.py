@@ -3,9 +3,12 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import Any, TypedDict
+from typing import TYPE_CHECKING, Any, TypedDict
 
 from ..models import ChangeId, DomainTopicApplyResult, DomainTopicPlan, DomainTopicSpec, TopicName
+
+if TYPE_CHECKING:
+    from ..policies.management.models import PolicyStatus, PolicyType, StoredPolicy
 
 
 class ITopicRepository(ABC):
@@ -125,4 +128,169 @@ class IAuditRepository(ABC):
         team: str | None = None,
     ) -> str:
         """토픽 작업 감사 로그 기록"""
+        ...
+
+
+class IPolicyRepository(ABC):
+    """Policy repository interface for custom policies"""
+
+    @abstractmethod
+    async def create_policy(
+        self,
+        policy_type: PolicyType,
+        name: str,
+        description: str,
+        content: dict,
+        created_by: str,
+    ) -> StoredPolicy:
+        """Create new custom policy
+
+        Args:
+            policy_type: Type of policy (naming or guardrail)
+            name: Policy name
+            description: Policy description
+            content: Policy configuration (dict)
+            created_by: User who created the policy
+
+        Returns:
+            Created policy with version=1, status=DRAFT
+        """
+        ...
+
+    @abstractmethod
+    async def get_policy(self, policy_id: str, version: int | None = None) -> StoredPolicy | None:
+        """Get policy by ID
+
+        Args:
+            policy_id: Policy UUID
+            version: Version number (None = latest version)
+
+        Returns:
+            Policy if found, None otherwise
+        """
+        ...
+
+    @abstractmethod
+    async def get_active_policy(self, policy_id: str) -> StoredPolicy | None:
+        """Get active policy by ID
+
+        Args:
+            policy_id: Policy UUID
+
+        Returns:
+            Policy if found and active, None otherwise
+        """
+        ...
+
+    @abstractmethod
+    async def list_policies(
+        self,
+        policy_type: PolicyType | None = None,
+        status: PolicyStatus | None = None,
+    ) -> list[StoredPolicy]:
+        """List policies with optional filters
+
+        Args:
+            policy_type: Filter by type (None = all types)
+            status: Filter by status (None = all statuses)
+
+        Returns:
+            List of policies matching filters (latest versions only)
+        """
+        ...
+
+    @abstractmethod
+    async def list_policy_versions(self, policy_id: str) -> list[StoredPolicy]:
+        """List all versions of a policy
+
+        Args:
+            policy_id: Policy UUID
+
+        Returns:
+            List of all policy versions (newest first)
+        """
+        ...
+
+    @abstractmethod
+    async def update_policy(
+        self,
+        policy_id: str,
+        name: str | None = None,
+        description: str | None = None,
+        content: dict | None = None,
+    ) -> StoredPolicy:
+        """Update policy (creates new version)
+
+        Args:
+            policy_id: Policy UUID
+            name: New name (None = keep current)
+            description: New description (None = keep current)
+            content: New content (None = keep current)
+
+        Returns:
+            Updated policy with incremented version
+
+        Raises:
+            ValueError: If policy not found or not in DRAFT status
+        """
+        ...
+
+    @abstractmethod
+    async def activate_policy(self, policy_id: str, version: int | None = None) -> StoredPolicy:
+        """Activate policy (DRAFT → ACTIVE)
+
+        Args:
+            policy_id: Policy UUID
+            version: Version to activate (None = latest DRAFT)
+
+        Returns:
+            Activated policy
+
+        Raises:
+            ValueError: If policy not found or no DRAFT version
+        """
+        ...
+
+    @abstractmethod
+    async def archive_policy(self, policy_id: str) -> StoredPolicy:
+        """Archive policy (ACTIVE → ARCHIVED)
+
+        Args:
+            policy_id: Policy UUID
+
+        Returns:
+            Archived policy
+
+        Raises:
+            ValueError: If policy not found
+        """
+        ...
+
+    @abstractmethod
+    async def delete_policy(self, policy_id: str, version: int | None = None) -> None:
+        """Delete policy (only if DRAFT)
+
+        Args:
+            policy_id: Policy UUID
+            version: Version to delete (None = delete all DRAFT versions)
+
+        Raises:
+            ValueError: If policy not found or not in DRAFT status
+        """
+        ...
+
+    @abstractmethod
+    async def rollback_to_version(self, policy_id: str, target_version: int) -> StoredPolicy:
+        """Rollback policy to previous version (creates new DRAFT)
+
+        Args:
+            policy_id: Policy UUID
+            target_version: Version to rollback to
+
+        Returns:
+            New DRAFT policy with content from target version
+
+        Raises:
+            ValueError: If target version not found
+        """
         ...

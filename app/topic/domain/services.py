@@ -12,7 +12,6 @@ from .models import (
     DomainTopicPlanItem,
     DomainTopicSpec,
 )
-from .policies import TopicPolicyEngine
 from .repositories.interfaces import ITopicRepository
 from .utils import (
     calculate_dict_diff,
@@ -23,21 +22,32 @@ from .utils import (
 
 
 class TopicPlannerService:
-    """토픽 계획 수립 서비스"""
+    """토픽 계획 수립 서비스
 
-    def __init__(
-        self,
-        topic_repository: ITopicRepository,
-        policy_engine: TopicPolicyEngine | None = None,
-    ) -> None:
+    Note:
+        정책 검증은 이 서비스의 책임이 아닙니다.
+        정책 검증이 필요한 경우 Application Layer에서
+        PolicyValidator를 사용하여 검증 후 이 서비스를 호출하세요.
+    """
+
+    def __init__(self, topic_repository: ITopicRepository) -> None:
         self.topic_repository = topic_repository
-        self.policy_engine = policy_engine or TopicPolicyEngine()
 
     async def create_plan(self, batch: DomainTopicBatch, actor: str = "system") -> DomainTopicPlan:
-        """배치에 대한 실행 계획 생성"""
+        """배치에 대한 실행 계획 생성
 
-        # 직접 정책 검증
-        violations = self.policy_engine.validate_batch(list(batch.specs))
+        Args:
+            batch: 토픽 배치 (specs 포함)
+            actor: 실행 주체
+
+        Returns:
+            실행 계획 (violations는 빈 tuple)
+
+        Note:
+            정책 검증은 이 메서드 호출 전에 수행되어야 합니다.
+        """
+        # 정책 검증은 Application Layer에서 수행
+        violations: list = []
 
         # 현재 토픽 상태 조회
         topic_names: list[str] = [spec.name for spec in batch.specs]
@@ -70,7 +80,11 @@ class TopicPlannerService:
                 name=spec.name,
                 action=DomainPlanAction.DELETE,
                 diff={"status": "exists→deleted"},
-                current_config=current_topic.get("config", {}),
+                current_config={
+                    "partitions": str(current_topic.get("partition_count", 0)),
+                    "replication_factor": str(current_topic.get("replication_factor", 0)),
+                    **current_topic.get("config", {}),
+                },
                 target_config=None,
             )
 
@@ -85,7 +99,12 @@ class TopicPlannerService:
             )
 
         # 기존 토픽 수정
-        current_config = current_topic.get("config", {})
+        # current_config에 partitions와 replication_factor를 포함 (검증 로직에서 필요)
+        current_config = {
+            "partitions": str(current_topic.get("partition_count", 0)),
+            "replication_factor": str(current_topic.get("replication_factor", 0)),
+            **current_topic.get("config", {}),
+        }
         target_config: dict[str, str] = self._spec_to_config_dict(spec)
         diff: dict = self._calculate_config_diff(current_config, target_config)
 
