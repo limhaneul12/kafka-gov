@@ -4,8 +4,10 @@ import Button from "../components/ui/Button";
 import Badge from "../components/ui/Badge";
 import Loading from "../components/ui/Loading";
 import { topicsAPI, clustersAPI } from "../services/api";
-import { Plus, RefreshCw, Trash2, Search } from "lucide-react";
+import { Plus, RefreshCw, Trash2, Search, Edit } from "lucide-react";
 import type { Topic, KafkaCluster } from "../types";
+import EditTopicMetadataModal from "../components/topic/EditTopicMetadataModal";
+import CreateTopicModal from "../components/topic/CreateTopicModal";
 
 export default function Topics() {
   const [topics, setTopics] = useState<Topic[]>([]);
@@ -14,6 +16,14 @@ export default function Topics() {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [envFilter, setEnvFilter] = useState("");
+  const [ownerFilter, setOwnerFilter] = useState("");
+  const [tagFilter, setTagFilter] = useState("");
+  const [editingTopic, setEditingTopic] = useState<Topic | null>(null);
+  const [showCreateModal, setShowCreateModal] = useState(false);
+
+  // 필터 옵션
+  const owners = Array.from(new Set(topics.map(t => t.owner).filter(Boolean))) as string[];
+  const allTags = Array.from(new Set(topics.flatMap(t => t.tags)));
 
   useEffect(() => {
     loadClusters();
@@ -51,7 +61,37 @@ export default function Topics() {
     }
   };
 
+  const handleEditMetadata = async (data: {
+    owner: string | null;
+    doc: string | null;
+    tags: string[];
+    environment: string;
+  }) => {
+    if (!editingTopic || !selectedCluster) return;
+
+    try {
+      await topicsAPI.updateMetadata(selectedCluster, editingTopic.name, data);
+      await loadTopics();
+    } catch (error) {
+      console.error("Failed to update topic metadata:", error);
+      throw error;
+    }
+  };
+
+  const handleCreateTopic = async (clusterId: string, yamlContent: string) => {
+    try {
+      // YAML을 파싱하여 batch request로 변환
+      const batchRequest = { yaml_content: yamlContent };
+      await topicsAPI.create(clusterId, batchRequest);
+      await loadTopics();
+    } catch (error) {
+      console.error("Failed to create topic:", error);
+      throw error;
+    }
+  };
+
   const handleDelete = async (topicName: string) => {
+    if (!selectedCluster) return;
     if (!confirm(`Are you sure you want to delete topic "${topicName}"?`)) {
       return;
     }
@@ -70,7 +110,9 @@ export default function Topics() {
       .toLowerCase()
       .includes(searchQuery.toLowerCase());
     const matchesEnv = !envFilter || topic.environment === envFilter;
-    return matchesSearch && matchesEnv;
+    const matchesOwner = !ownerFilter || topic.owner === ownerFilter;
+    const matchesTag = !tagFilter || topic.tags.includes(tagFilter);
+    return matchesSearch && matchesEnv && matchesOwner && matchesTag;
   });
 
   const getEnvBadgeVariant = (env: string) => {
@@ -106,7 +148,7 @@ export default function Topics() {
             <RefreshCw className="h-4 w-4" />
             Refresh
           </Button>
-          <Button>
+          <Button onClick={() => setShowCreateModal(true)}>
             <Plus className="h-4 w-4" />
             Create Topic
           </Button>
@@ -116,7 +158,7 @@ export default function Topics() {
       {/* Filters */}
       <Card>
         <CardContent className="pt-6">
-          <div className="grid gap-4 md:grid-cols-3">
+          <div className="grid gap-4 md:grid-cols-5">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Cluster
@@ -165,9 +207,55 @@ export default function Topics() {
                 <option value="prod">Production</option>
               </select>
             </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Team/Owner
+              </label>
+              <select
+                value={ownerFilter}
+                onChange={(e) => setOwnerFilter(e.target.value)}
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              >
+                <option value="">All Teams</option>
+                {owners.map((owner) => (
+                  <option key={owner} value={owner}>
+                    {owner}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Tag
+              </label>
+              <select
+                value={tagFilter}
+                onChange={(e) => setTagFilter(e.target.value)}
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              >
+                <option value="">All Tags</option>
+                {allTags.map((tag) => (
+                  <option key={tag} value={tag}>
+                    {tag}
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
         </CardContent>
       </Card>
+
+      {/* Edit Metadata Modal */}
+      {editingTopic && (
+        <EditTopicMetadataModal
+          isOpen={!!editingTopic}
+          onClose={() => setEditingTopic(null)}
+          onSubmit={handleEditMetadata}
+          initialData={editingTopic}
+        />
+      )}
 
       {/* Topics Table */}
       <Card>
@@ -186,6 +274,12 @@ export default function Topics() {
                     Owner
                   </th>
                   <th className="px-4 py-3 text-left text-sm font-medium text-gray-600">
+                    Doc
+                  </th>
+                  <th className="px-4 py-3 text-left text-sm font-medium text-gray-600">
+                    Tags
+                  </th>
+                  <th className="px-4 py-3 text-left text-sm font-medium text-gray-600">
                     Partitions
                   </th>
                   <th className="px-4 py-3 text-left text-sm font-medium text-gray-600">
@@ -202,7 +296,7 @@ export default function Topics() {
               <tbody className="divide-y divide-gray-200">
                 {filteredTopics.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="px-4 py-8 text-center text-gray-500">
+                    <td colSpan={8} className="px-4 py-8 text-center text-gray-500">
                       No topics found
                     </td>
                   </tr>
@@ -214,6 +308,22 @@ export default function Topics() {
                       </td>
                       <td className="px-4 py-3 text-sm text-gray-600">
                         {topic.owner || "-"}
+                      </td>
+                      <td className="px-4 py-3 text-sm text-gray-600 max-w-xs truncate" title={topic.doc || ""}>
+                        {topic.doc || "-"}
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex flex-wrap gap-1">
+                          {topic.tags.length > 0 ? (
+                            topic.tags.map((tag) => (
+                              <Badge key={tag} className="text-xs bg-gray-100 text-gray-700">
+                                {tag}
+                              </Badge>
+                            ))
+                          ) : (
+                            <span className="text-sm text-gray-400">-</span>
+                          )}
+                        </div>
                       </td>
                       <td className="px-4 py-3 text-sm text-gray-600">
                         {topic.partition_count || "-"}
@@ -227,13 +337,24 @@ export default function Topics() {
                         </Badge>
                       </td>
                       <td className="px-4 py-3">
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => handleDelete(topic.name)}
-                        >
-                          <Trash2 className="h-4 w-4 text-red-600" />
-                        </Button>
+                        <div className="flex gap-1">
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => setEditingTopic(topic)}
+                            title="Edit metadata"
+                          >
+                            <Edit className="h-4 w-4 text-blue-600" />
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => handleDelete(topic.name)}
+                            title="Delete topic"
+                          >
+                            <Trash2 className="h-4 w-4 text-red-600" />
+                          </Button>
+                        </div>
                       </td>
                     </tr>
                   ))
@@ -243,6 +364,23 @@ export default function Topics() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Modals */}
+      <CreateTopicModal
+        isOpen={showCreateModal}
+        onClose={() => setShowCreateModal(false)}
+        onSubmit={handleCreateTopic}
+        clusterId={selectedCluster}
+      />
+
+      {editingTopic && (
+        <EditTopicMetadataModal
+          isOpen={!!editingTopic}
+          onClose={() => setEditingTopic(null)}
+          onSubmit={handleEditMetadata}
+          initialData={editingTopic}
+        />
+      )}
     </div>
   );
 }

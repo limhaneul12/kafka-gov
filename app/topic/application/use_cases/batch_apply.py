@@ -19,6 +19,8 @@ from ...domain.models import (
     DomainTopicSpec,
     TopicName,
 )
+from ...domain.policies.management import IPolicyRepository, PolicyReference
+from ...domain.policies.validation import PolicyResolver
 from ...domain.repositories.interfaces import IAuditRepository, ITopicMetadataRepository
 from ...domain.services import TopicPlannerService
 
@@ -31,10 +33,12 @@ class TopicBatchApplyUseCase:
         connection_manager: IConnectionManager,
         metadata_repository: ITopicMetadataRepository,
         audit_repository: IAuditRepository,
+        policy_repository: IPolicyRepository,
     ) -> None:
         self.connection_manager = connection_manager
         self.metadata_repository = metadata_repository
         self.audit_repository = audit_repository
+        self.policy_repository = policy_repository
 
     async def execute(
         self, cluster_id: str, batch: DomainTopicBatch, actor: str
@@ -59,7 +63,14 @@ class TopicBatchApplyUseCase:
             # 2. Adapter 생성
             topic_repository = KafkaTopicAdapter(admin_client)
 
-            # 3. Planner Service 생성 및 계획 재생성
+            # 3. 정책 검증 (Naming + Guardrail)
+            violations = await self._validate_policies(batch.specs)
+            if violations:
+                error_messages = [v.message for v in violations if v.level == "error"]
+                if error_messages:
+                    raise ValueError(f"Policy violations: {error_messages}")
+
+            # 4. Planner Service 생성 및 계획 재생성
             planner_service = TopicPlannerService(topic_repository)  # type: ignore[arg-type]
             plan = await planner_service.create_plan(batch, actor)
 
@@ -475,3 +486,85 @@ class TopicBatchApplyUseCase:
         except Exception as e:
             logger = logging.getLogger(__name__)
             logger.error(f"Failed to delete topic metadata for {topic_name}: {e}", exc_info=True)
+
+    async def _validate_policies(self, specs: tuple[DomainTopicSpec, ...]) -> list:
+        """정책 검증 (Naming + Guardrail)
+
+        로직:
+        1. ACTIVE naming 정책이 있으면 naming 검증
+        2. ACTIVE guardrail 정책이 있으면 guardrail 검증
+        3. 둘 다 없으면 스킵
+
+        Returns:
+            violations 리스트 (빈 리스트면 정책 없음 또는 모두 통과)
+        """
+        logger = logging.getLogger(__name__)
+
+        try:
+            # 1. ACTIVE 정책 조회 (type별로)
+            from ...domain.policies.management import PolicyType
+
+            naming_policies, _ = await self.policy_repository.list_policies(
+                policy_type=PolicyType.NAMING,
+                status=None,  # ACTIVE만 필터링하려면 get_active_policy 사용
+            )
+            guardrail_policies, _ = await self.policy_repository.list_policies(
+                policy_type=PolicyType.GUARDRAIL, status=None
+            )
+
+            # ACTIVE 상태만 필터링
+            from ...domain.policies.management import PolicyStatus
+
+            active_naming = [p for p in naming_policies if p.status == PolicyStatus.ACTIVE]  # type: ignore
+            active_guardrail = [p for p in guardrail_policies if p.status == PolicyStatus.ACTIVE]  # type: ignore
+
+            # 2. 정책이 하나도 없으면 스킵
+            if not active_naming and not active_guardrail:
+                logger.info("No active policies found. Skipping policy validation.")
+                return []
+
+            # 3. PolicyResolver로 Validator 생성
+            resolver = PolicyResolver(
+                naming_policy_repo=self.policy_repository,
+                guardrail_policy_repo=self.policy_repository,
+            )
+
+            # PolicyReference 생성
+            naming_ref = (
+                PolicyReference(policy_id=active_naming[0].policy_id) if active_naming else None
+            )
+            guardrail_ref = (
+                PolicyReference(policy_id=active_guardrail[0].policy_id)
+                if active_guardrail
+                else None
+            )
+
+            validator = await resolver.resolve(naming_ref, guardrail_ref)
+
+            if not validator:
+                logger.info("No validator created. Skipping policy validation.")
+                return []
+
+            # 4. 각 spec에 대해 검증
+            all_violations = []
+            for spec in specs:
+                violations = validator.validate(spec)
+                if violations:
+                    all_violations.extend(violations)
+                    logger.warning(
+                        f"Policy violations for {spec.name}: {[v.message for v in violations]}"
+                    )
+
+            if all_violations:
+                logger.error(f"Total {len(all_violations)} policy violations found")
+            else:
+                logger.info("All specs passed policy validation")
+
+            return all_violations
+
+        except Exception as e:
+            logger.error(f"Policy validation error: {e}", exc_info=True)
+            # 정책 검증 에러는 fail-open (통과) 처리
+            # 정책 시스템 장애 시 토픽 생성이 막히지 않도록
+            logger.warning("Policy validation failed, allowing operation (fail-open)")
+            return []

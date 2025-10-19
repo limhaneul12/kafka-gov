@@ -115,7 +115,7 @@ export interface Policy {
   status: "DRAFT" | "ACTIVE" | "ARCHIVED";
   created_by: string;
   created_at: string;
-  updated_at: string;
+  updated_at: string | null;
 }
 
 // Audit Types

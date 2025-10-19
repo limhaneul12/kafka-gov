@@ -108,6 +108,7 @@ def create_app() -> FastAPI:
     app.include_router(analysis_router, prefix="/api")
 
     @app.get("/api")
+    @app.get("/api/")
     async def api_info() -> dict[str, str]:
         return {"message": "Kafka Governance API", "version": "1.0.0"}
 

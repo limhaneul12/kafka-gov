@@ -23,6 +23,7 @@ class TopicMetadataModel(Base):
     owner: Mapped[str | None] = mapped_column(String(100), comment="소유자")
     doc: Mapped[str | None] = mapped_column(Text, comment="문서/설명")
     tags: Mapped[dict[str, Any] | None] = mapped_column(JSON, comment="태그 (JSON)")
+    environment: Mapped[str | None] = mapped_column(String(20), comment="환경 (dev/stg/prod)")
 
     # 설정 정보 (JSON으로 저장)
     config: Mapped[dict[str, Any] | None] = mapped_column(JSON, comment="토픽 설정")

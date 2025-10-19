@@ -49,10 +49,14 @@ class TopicListUseCase:
             owner = metadata.get("owner") if metadata else None
             doc = metadata.get("doc") if metadata else None
             tags = metadata.get("tags", []) if metadata else []
+            # metadata에서 environment 가져오기, 없으면 토픽명에서 추론
+            environment = metadata.get("environment") if metadata else None
+            if not environment:
+                environment = self._infer_environment(topic_name)
 
             logger = logging.getLogger(__name__)
             logger.debug(
-                f"[{cluster_id}] Topic {topic_name}: owner={owner}, doc={doc}, tags={tags}"
+                f"[{cluster_id}] Topic {topic_name}: owner={owner}, doc={doc}, tags={tags}, env={environment}"
             )
 
             topics_with_metadata.append(
@@ -63,7 +67,7 @@ class TopicListUseCase:
                     "tags": tags,
                     "partition_count": kafka_info.get("partition_count"),
                     "replication_factor": kafka_info.get("replication_factor"),
-                    "environment": self._infer_environment(topic_name),
+                    "environment": environment,
                 }
             )
 

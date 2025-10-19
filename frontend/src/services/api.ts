@@ -46,9 +46,9 @@ api.interceptors.response.use(
 );
 
 // API 연결 테스트 함수
-export const testConnection = async () => {
+export const testAPIConnection = async () => {
   try {
-    const response = await api.get("/");
+    const response = await api.get("");
     console.log("✅ API Connection OK:", response.data);
     return { success: true, data: response.data };
   } catch (error: any) {
@@ -71,8 +71,28 @@ export default api;
 // API 엔드포인트 함수들
 export const topicsAPI = {
   list: (clusterId: string) => api.get(`/v1/topics?cluster_id=${clusterId}`),
-  create: (clusterId: string, data: any) =>
-    api.post(`/v1/topics/batch/apply?cluster_id=${clusterId}`, data),
+  uploadAndDryRun: (clusterId: string, file: File) => {
+    const formData = new FormData();
+    formData.append("file", file);
+    return api.post(`/v1/topics/batch/upload?cluster_id=${clusterId}`, formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
+  },
+  dryRun: (clusterId: string, batchRequest: Record<string, unknown>) =>
+    api.post(`/v1/topics/batch/dry-run?cluster_id=${clusterId}`, batchRequest),
+  create: (clusterId: string, batchRequest: Record<string, unknown>) =>
+    api.post(`/v1/topics/batch/apply?cluster_id=${clusterId}`, batchRequest),
+  updateMetadata: (
+    clusterId: string,
+    topicName: string,
+    metadata: {
+      owner: string | null;
+      doc: string | null;
+      tags: string[];
+      environment: string;
+    }
+  ) =>
+    api.patch(`/v1/topics/${topicName}/metadata?cluster_id=${clusterId}`, metadata),
   delete: (clusterId: string, name: string) =>
     api.delete(`/v1/topics/${name}?cluster_id=${clusterId}`),
   bulkDelete: (clusterId: string, names: string[]) =>
@@ -95,12 +115,18 @@ export const schemasAPI = {
 
 export const clustersAPI = {
   listKafka: () => api.get("/v1/clusters/kafka"),
-  createKafka: (data: any) => api.post("/v1/clusters/kafka", data),
+  createKafka: (data: Record<string, string>) => api.post("/v1/clusters/kafka", data),
   testKafka: (clusterId: string) =>
     api.post(`/v1/clusters/kafka/${clusterId}/test`),
   listRegistries: () => api.get("/v1/clusters/schema-registries"),
+  createRegistry: (data: Record<string, string>) => 
+    api.post("/v1/clusters/schema-registries", data),
   listStorages: () => api.get("/v1/clusters/storages"),
+  createStorage: (data: Record<string, string>) => 
+    api.post("/v1/clusters/storages", data),
   listConnects: () => api.get("/v1/clusters/connects"),
+  createConnect: (data: Record<string, string>) => 
+    api.post("/v1/clusters/connects", data),
 };
 
 export const connectAPI = {
@@ -127,8 +153,8 @@ export const policiesAPI = {
   update: (policyId: string, data: any) =>
     api.put(`/v1/policies/${policyId}`, data),
   delete: (policyId: string) => api.delete(`/v1/policies/${policyId}`),
-  activate: (policyId: string, version: number) =>
-    api.post(`/v1/policies/${policyId}/activate`, { version }),
+  activate: (policyId: string, version?: number) =>
+    api.post(`/v1/policies/${policyId}/activate`, version !== undefined ? { version } : {}),
 };
 
 export const auditAPI = {

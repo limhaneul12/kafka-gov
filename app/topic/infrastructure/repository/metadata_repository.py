@@ -46,6 +46,7 @@ class MetadataRepository:
                     "owner": metadata_model.owner,
                     "doc": metadata_model.doc,
                     "tags": metadata_model.tags or [],
+                    "environment": metadata_model.environment,
                     "config": metadata_model.config or {},
                     "created_by": metadata_model.created_by,
                     "updated_by": metadata_model.updated_by,
@@ -53,7 +54,7 @@ class MetadataRepository:
 
                 logger.debug(
                     f"Retrieved metadata for {name}: owner={metadata_dict['owner']}, "
-                    f"doc={metadata_dict['doc']}"
+                    f"doc={metadata_dict['doc']}, env={metadata_dict['environment']}"
                 )
 
                 return metadata_dict
@@ -73,7 +74,7 @@ class MetadataRepository:
 
                 logger.info(
                     f"Saving metadata for {name}: owner={metadata.get('owner')}, "
-                    f"doc={metadata.get('doc')}, tags={metadata.get('tags')}"
+                    f"doc={metadata.get('doc')}, tags={metadata.get('tags')}, env={metadata.get('environment')}"
                 )
 
                 if existing:
@@ -81,6 +82,7 @@ class MetadataRepository:
                     existing.owner = metadata.get("owner")
                     existing.doc = metadata.get("doc")
                     existing.tags = metadata.get("tags", [])
+                    existing.environment = metadata.get("environment")
                     existing.config = metadata.get("config", {})
                     existing.updated_by = metadata.get("updated_by", "system")
                     session.add(existing)
@@ -92,6 +94,7 @@ class MetadataRepository:
                         owner=metadata.get("owner"),
                         doc=metadata.get("doc"),
                         tags=metadata.get("tags", []),
+                        environment=metadata.get("environment"),
                         config=metadata.get("config", {}),
                         created_by=metadata.get("created_by", "system"),
                         updated_by=metadata.get("updated_by", "system"),

@@ -3,18 +3,28 @@ import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/Card"
 import Button from "../components/ui/Button";
 import Badge from "../components/ui/Badge";
 import Loading from "../components/ui/Loading";
-import { schemasAPI } from "../services/api";
+import UploadSchemaModal from "../components/schema/UploadSchemaModal";
+import { schemasAPI, clustersAPI } from "../services/api";
 import { Upload, RefreshCw, Trash2, Search } from "lucide-react";
 import type { SchemaArtifact } from "../types";
 
 export default function Schemas() {
   const [schemas, setSchemas] = useState<SchemaArtifact[]>([]);
+  const [selectedRegistry, setSelectedRegistry] = useState<string>("");
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
+  const [showUploadModal, setShowUploadModal] = useState(false);
 
-  useEffect(() => {
-    loadSchemas();
-  }, []);
+  const loadRegistries = async () => {
+    try {
+      const response = await clustersAPI.listRegistries();
+      if (response.data.length > 0) {
+        setSelectedRegistry(response.data[0].registry_id);
+      }
+    } catch (error) {
+      console.error("Failed to load registries:", error);
+    }
+  };
 
   const loadSchemas = async () => {
     try {
@@ -25,6 +35,26 @@ export default function Schemas() {
       console.error("Failed to load schemas:", error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadRegistries();
+  }, []);
+
+  useEffect(() => {
+    if (selectedRegistry) {
+      loadSchemas();
+    }
+  }, [selectedRegistry]);
+
+  const handleUploadSchema = async (registryId: string, formData: FormData) => {
+    try {
+      await schemasAPI.upload(registryId, formData);
+      await loadSchemas();
+    } catch (error) {
+      console.error("Failed to upload schema:", error);
+      throw error;
     }
   };
 
@@ -52,12 +82,20 @@ export default function Schemas() {
             <RefreshCw className="h-4 w-4" />
             Refresh
           </Button>
-          <Button>
+          <Button onClick={() => setShowUploadModal(true)}>
             <Upload className="h-4 w-4" />
             Upload Schema
           </Button>
         </div>
       </div>
+
+      {/* Upload Schema Modal */}
+      <UploadSchemaModal
+        isOpen={showUploadModal}
+        onClose={() => setShowUploadModal(false)}
+        onSubmit={handleUploadSchema}
+        registryId={selectedRegistry}
+      />
 
       {/* Search */}
       <Card>

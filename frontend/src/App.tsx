@@ -8,6 +8,7 @@ import Connections from "./pages/Connections";
 import Policies from "./pages/Policies";
 import Analysis from "./pages/Analysis";
 import Settings from "./pages/Settings";
+import History from "./pages/History";
 
 function App() {
   return (
@@ -26,6 +27,7 @@ function App() {
           <Route path="connections" element={<Connections />} />
           <Route path="policies" element={<Policies />} />
           <Route path="analysis" element={<Analysis />} />
+          <Route path="history" element={<History />} />
           <Route path="settings" element={<Settings />} />
         </Route>
       </Routes>

@@ -3,15 +3,18 @@ import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/Card"
 import Button from "../components/ui/Button";
 import Badge from "../components/ui/Badge";
 import Loading from "../components/ui/Loading";
+import AddConnectionModal from "../components/connection/AddConnectionModal";
 import { clustersAPI } from "../services/api";
-import { Plus, Server, Database, HardDrive } from "lucide-react";
-import type { KafkaCluster, SchemaRegistry, ObjectStorage } from "../types";
+import { Plus, Server, Database, HardDrive, Link } from "lucide-react";
+import type { KafkaCluster, SchemaRegistry, ObjectStorage, KafkaConnect } from "../types";
 
 export default function Connections() {
   const [clusters, setClusters] = useState<KafkaCluster[]>([]);
   const [registries, setRegistries] = useState<SchemaRegistry[]>([]);
   const [storages, setStorages] = useState<ObjectStorage[]>([]);
+  const [connects, setConnects] = useState<KafkaConnect[]>([]);
   const [loading, setLoading] = useState(true);
+  const [showAddModal, setShowAddModal] = useState(false);
 
   useEffect(() => {
     loadConnections();
@@ -20,18 +23,43 @@ export default function Connections() {
   const loadConnections = async () => {
     try {
       setLoading(true);
-      const [clustersRes, registriesRes, storagesRes] = await Promise.all([
+      const [clustersRes, registriesRes, storagesRes, connectsRes] = await Promise.all([
         clustersAPI.listKafka(),
         clustersAPI.listRegistries(),
         clustersAPI.listStorages(),
+        clustersAPI.listConnects(),
       ]);
       setClusters(clustersRes.data);
       setRegistries(registriesRes.data);
       setStorages(storagesRes.data);
+      setConnects(connectsRes.data);
     } catch (error) {
       console.error("Failed to load connections:", error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleAddConnection = async (type: string, data: Record<string, string>) => {
+    try {
+      switch (type) {
+        case "kafka":
+          await clustersAPI.createKafka(data);
+          break;
+        case "registry":
+          await clustersAPI.createRegistry(data);
+          break;
+        case "storage":
+          await clustersAPI.createStorage(data);
+          break;
+        case "connect":
+          await clustersAPI.createConnect(data);
+          break;
+      }
+      await loadConnections();
+    } catch (error) {
+      console.error("Failed to add connection:", error);
+      throw error;
     }
   };
 
@@ -52,11 +80,18 @@ export default function Connections() {
             Kafka 클러스터 및 관련 리소스 연결을 관리합니다
           </p>
         </div>
-        <Button>
+        <Button onClick={() => setShowAddModal(true)}>
           <Plus className="h-4 w-4" />
           Add Connection
         </Button>
       </div>
+
+      {/* Add Connection Modal */}
+      <AddConnectionModal
+        isOpen={showAddModal}
+        onClose={() => setShowAddModal(false)}
+        onSubmit={handleAddConnection}
+      />
 
       {/* Kafka Clusters */}
       <Card>
@@ -114,6 +149,47 @@ export default function Connections() {
                 </Badge>
               </div>
             ))}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Kafka Connect */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Link className="h-5 w-5" />
+            Kafka Connect ({connects.length})
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-3">
+            {connects.length === 0 ? (
+              <p className="text-center text-sm text-gray-500 py-4">
+                No Kafka Connect instances found
+              </p>
+            ) : (
+              connects.map((connect) => (
+                <div
+                  key={connect.connect_id}
+                  className="flex items-center justify-between rounded-lg border border-gray-200 p-4"
+                >
+                  <div>
+                    <h4 className="font-medium text-gray-900">{connect.name}</h4>
+                    <p className="text-sm text-gray-600">
+                      {connect.url}
+                    </p>
+                    {connect.description && (
+                      <p className="text-xs text-gray-500 mt-1">
+                        {connect.description}
+                      </p>
+                    )}
+                  </div>
+                  <Badge variant={connect.is_active ? "success" : "default"}>
+                    {connect.is_active ? "Active" : "Inactive"}
+                  </Badge>
+                </div>
+              ))
+            )}
           </div>
         </CardContent>
       </Card>

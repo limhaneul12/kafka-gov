@@ -30,6 +30,7 @@ DryTopicDep = Depends(Provide[AppContainer.topic_container.dry_run_use_case])
 ApplyTopicDep = Depends(Provide[AppContainer.topic_container.apply_use_case])
 ListTopicDep = Depends(Provide[AppContainer.topic_container.list_use_case])
 BulkDeleteDep = Depends(Provide[AppContainer.topic_container.bulk_delete_use_case])
+MetadataRepoDep = Depends(Provide[AppContainer.topic_container.metadata_repository])
 
 
 @router.get(
@@ -170,6 +171,26 @@ async def bulk_delete_topics(
         failed=result["failed"],
         message=result["message"],
     )
+
+
+@router.patch(
+    "/{name}/metadata",
+    status_code=status.HTTP_200_OK,
+    summary="토픽 메타데이터 업데이트",
+    description="토픽의 메타데이터(owner, doc, tags, environment)를 업데이트합니다.",
+)
+@inject
+@handle_server_errors(error_message="Failed to update topic metadata")
+async def update_topic_metadata(
+    name: str,
+    metadata: dict[str, str | list[str] | None],
+    cluster_id: str = Query(..., description="Kafka Cluster ID"),
+    metadata_repo=MetadataRepoDep,
+) -> dict[str, str]:
+    """토픽 메타데이터 업데이트"""
+    # metadata_repo는 save_topic_metadata를 사용하여 저장
+    await metadata_repo.save_topic_metadata(name, metadata)
+    return {"message": f"Topic metadata for '{name}' updated successfully"}
 
 
 @router.delete(

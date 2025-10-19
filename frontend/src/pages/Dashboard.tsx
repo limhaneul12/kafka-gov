@@ -2,13 +2,14 @@ import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/Card";
 import Button from "../components/ui/Button";
 import Loading from "../components/ui/Loading";
-import { analysisAPI, testConnection } from "../services/api";
-import { Activity, Database, FileCode, List, Wifi } from "lucide-react";
+import { analysisAPI, testAPIConnection } from "../services/api";
+import { Activity, Database, FileCode, List, Wifi, RefreshCw } from "lucide-react";
 import type { Statistics } from "../types";
 
 export default function Dashboard() {
   const [stats, setStats] = useState<Statistics | null>(null);
   const [loading, setLoading] = useState(true);
+  const [syncing, setSyncing] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState<string>("");
 
   useEffect(() => {
@@ -17,7 +18,7 @@ export default function Dashboard() {
   }, []);
 
   const checkConnection = async () => {
-    const result = await testConnection();
+    const result = await testAPIConnection();
     if (result.success) {
       setConnectionStatus("✅ 백엔드 연결 성공");
     } else {
@@ -38,6 +39,15 @@ export default function Dashboard() {
     }
   };
 
+  const handleSync = async () => {
+    try {
+      setSyncing(true);
+      await loadStatistics();
+    } finally {
+      setSyncing(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex h-96 items-center justify-center">
@@ -55,10 +65,16 @@ export default function Dashboard() {
             Kafka 클러스터 상태를 한눈에 확인하세요
           </p>
         </div>
-        <Button onClick={checkConnection} variant="secondary">
-          <Wifi className="h-4 w-4" />
-          연결 테스트
-        </Button>
+        <div className="flex gap-2">
+          <Button onClick={handleSync} variant="secondary" disabled={syncing}>
+            <RefreshCw className={`h-4 w-4 ${syncing ? "animate-spin" : ""}`} />
+            {syncing ? "동기화 중..." : "동기화"}
+          </Button>
+          <Button onClick={checkConnection} variant="secondary">
+            <Wifi className="h-4 w-4" />
+            연결 테스트
+          </Button>
+        </div>
       </div>
 
       {/* 연결 상태 */}

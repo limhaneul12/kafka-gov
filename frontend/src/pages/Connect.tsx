@@ -3,6 +3,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/Card"
 import Button from "../components/ui/Button";
 import Badge from "../components/ui/Badge";
 import Loading from "../components/ui/Loading";
+import CreateConnectorModal from "../components/connect/CreateConnectorModal";
+import ConnectorDetailModal from "../components/connect/ConnectorDetailModal";
+import PluginsModal from "../components/connect/PluginsModal";
+import ValidateConfigModal from "../components/connect/ValidateConfigModal";
 import { connectAPI, clustersAPI } from "../services/api";
 import {
   Plus,
@@ -14,6 +18,8 @@ import {
   Activity,
   Server,
   AlertCircle,
+  Eye,
+  Package,
 } from "lucide-react";
 import type { ConnectorStatus, KafkaConnect } from "../types";
 
@@ -23,6 +29,12 @@ export default function Connect() {
   const [connectors, setConnectors] = useState<ConnectorStatus[]>([]);
   const [loading, setLoading] = useState(true);
   const [metricsLoading, setMetricsLoading] = useState(false);
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showDetailModal, setShowDetailModal] = useState(false);
+  const [showPluginsModal, setShowPluginsModal] = useState(false);
+  const [showValidateModal, setShowValidateModal] = useState(false);
+  const [selectedConnectorName, setSelectedConnectorName] = useState<string>("");
+  const [selectedPluginClass, setSelectedPluginClass] = useState<string>("");
 
   useEffect(() => {
     loadConnects();
@@ -32,6 +44,7 @@ export default function Connect() {
     if (selectedConnect) {
       loadConnectors();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedConnect]);
 
   const loadConnects = async () => {
@@ -108,6 +121,21 @@ export default function Connect() {
     }
   };
 
+  const handleCreateConnector = async (config: { name: string; config: Record<string, string | number> }) => {
+    await connectAPI.create(selectedConnect, config);
+    await loadConnectors();
+  };
+
+  const handleViewDetails = (name: string) => {
+    setSelectedConnectorName(name);
+    setShowDetailModal(true);
+  };
+
+  const handleSelectPlugin = (pluginClass: string) => {
+    setSelectedPluginClass(pluginClass);
+    setShowValidateModal(true);
+  };
+
   const getStatusBadgeVariant = (state: string) => {
     switch (state?.toUpperCase()) {
       case "RUNNING":
@@ -163,7 +191,11 @@ export default function Connect() {
             <RefreshCw className="h-4 w-4" />
             Refresh
           </Button>
-          <Button>
+          <Button variant="secondary" onClick={() => setShowPluginsModal(true)}>
+            <Package className="h-4 w-4" />
+            View Plugins
+          </Button>
+          <Button onClick={() => setShowCreateModal(true)}>
             <Plus className="h-4 w-4" />
             Add Connector
           </Button>
@@ -359,6 +391,14 @@ export default function Connect() {
                             >
                               <Trash2 className="h-4 w-4 text-red-600" />
                             </Button>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => handleViewDetails(connector.name)}
+                              title="View Details"
+                            >
+                              <Eye className="h-4 w-4 text-gray-600" />
+                            </Button>
                           </div>
                         </td>
                       </tr>
@@ -370,6 +410,45 @@ export default function Connect() {
           )}
         </CardContent>
       </Card>
+
+      {/* Modals */}
+      <CreateConnectorModal
+        isOpen={showCreateModal}
+        onClose={() => setShowCreateModal(false)}
+        onSubmit={handleCreateConnector}
+        connectId={selectedConnect}
+      />
+
+      {selectedConnectorName && (
+        <ConnectorDetailModal
+          isOpen={showDetailModal}
+          onClose={() => {
+            setShowDetailModal(false);
+            setSelectedConnectorName("");
+          }}
+          connectId={selectedConnect}
+          connectorName={selectedConnectorName}
+        />
+      )}
+
+      <PluginsModal
+        isOpen={showPluginsModal}
+        onClose={() => setShowPluginsModal(false)}
+        connectId={selectedConnect}
+        onSelectPlugin={handleSelectPlugin}
+      />
+
+      {selectedPluginClass && (
+        <ValidateConfigModal
+          isOpen={showValidateModal}
+          onClose={() => {
+            setShowValidateModal(false);
+            setSelectedPluginClass("");
+          }}
+          connectId={selectedConnect}
+          pluginClass={selectedPluginClass}
+        />
+      )}
     </div>
   );
 }

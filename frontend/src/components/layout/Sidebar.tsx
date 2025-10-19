@@ -7,6 +7,7 @@ import {
   Server,
   Shield,
   Activity,
+  History as HistoryIcon,
 } from "lucide-react";
 import { cn } from "../../utils/cn";
 
@@ -18,6 +19,7 @@ const navigation = [
   { name: "Connections", to: "/connections", icon: Server },
   { name: "Policies", to: "/policies", icon: Shield },
   { name: "Analysis", to: "/analysis", icon: Activity },
+  { name: "History", to: "/history", icon: HistoryIcon },
 ];
 
 export default function Sidebar() {

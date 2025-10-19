@@ -57,6 +57,16 @@ class PolicyRepository(IPolicyRepository):
     ) -> StoredPolicy:
         """새 정책 생성 (version=1, status=DRAFT)"""
         async with self.session_factory() as session:
+            # 중복 이름 체크
+            stmt = select(PolicyModel).where(PolicyModel.name == name).limit(1)
+            result = await session.execute(stmt)
+            existing = result.scalar_one_or_none()
+
+            if existing:
+                raise ValueError(
+                    f"Policy with name '{name}' already exists (ID: {existing.policy_id})"
+                )
+
             # 새 UUID 생성
             policy_id = str(uuid.uuid4())
 
