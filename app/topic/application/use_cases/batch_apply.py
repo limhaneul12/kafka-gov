@@ -19,7 +19,12 @@ from ...domain.models import (
     DomainTopicSpec,
     TopicName,
 )
-from ...domain.policies.management import IPolicyRepository, PolicyReference
+from ...domain.policies.management import (
+    IPolicyRepository,
+    PolicyReference,
+    PolicyStatus,
+    PolicyType,
+)
 from ...domain.policies.validation import PolicyResolver
 from ...domain.repositories.interfaces import IAuditRepository, ITopicMetadataRepository
 from ...domain.services import TopicPlannerService
@@ -502,8 +507,6 @@ class TopicBatchApplyUseCase:
 
         try:
             # 1. ACTIVE 정책 조회 (type별로)
-            from ...domain.policies.management import PolicyType
-
             naming_policies, _ = await self.policy_repository.list_policies(
                 policy_type=PolicyType.NAMING,
                 status=None,  # ACTIVE만 필터링하려면 get_active_policy 사용
@@ -513,10 +516,8 @@ class TopicBatchApplyUseCase:
             )
 
             # ACTIVE 상태만 필터링
-            from ...domain.policies.management import PolicyStatus
-
-            active_naming = [p for p in naming_policies if p.status == PolicyStatus.ACTIVE]  # type: ignore
-            active_guardrail = [p for p in guardrail_policies if p.status == PolicyStatus.ACTIVE]  # type: ignore
+            active_naming = [p for p in naming_policies if p.status == PolicyStatus.ACTIVE]  # type: ignore[misc]
+            active_guardrail = [p for p in guardrail_policies if p.status == PolicyStatus.ACTIVE]  # type: ignore[misc]
 
             # 2. 정책이 하나도 없으면 스킵
             if not active_naming and not active_guardrail:
