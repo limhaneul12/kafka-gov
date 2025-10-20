@@ -142,6 +142,7 @@ class IPolicyRepository(ABC):
         description: str,
         content: dict,
         created_by: str,
+        target_environment: str = "total",
     ) -> StoredPolicy:
         """Create new custom policy
 
@@ -151,6 +152,7 @@ class IPolicyRepository(ABC):
             description: Policy description
             content: Policy configuration (dict)
             created_by: User who created the policy
+            target_environment: Target environment (dev/stg/prod/total)
 
         Returns:
             Created policy with version=1, status=DRAFT
@@ -218,6 +220,7 @@ class IPolicyRepository(ABC):
         name: str | None = None,
         description: str | None = None,
         content: dict | None = None,
+        target_environment: str | None = None,
     ) -> StoredPolicy:
         """Update policy (creates new version)
 
@@ -226,6 +229,7 @@ class IPolicyRepository(ABC):
             name: New name (None = keep current)
             description: New description (None = keep current)
             content: New content (None = keep current)
+            target_environment: Target environment (None = keep current)
 
         Returns:
             Updated policy with incremented version
@@ -268,27 +272,42 @@ class IPolicyRepository(ABC):
 
     @abstractmethod
     async def delete_policy(self, policy_id: str, version: int | None = None) -> None:
-        """Delete policy (only if DRAFT)
+        """Delete policy (non-ACTIVE versions only)
 
         Args:
             policy_id: Policy UUID
             version: Version to delete (None = delete all DRAFT versions)
 
         Raises:
-            ValueError: If policy not found or not in DRAFT status
+            ValueError: If policy not found or is ACTIVE
         """
         ...
 
     @abstractmethod
-    async def rollback_to_version(self, policy_id: str, target_version: int) -> StoredPolicy:
-        """Rollback policy to previous version (creates new DRAFT)
+    async def delete_all_policy_versions(self, policy_id: str) -> None:
+        """Delete all versions of a policy (including ACTIVE/ARCHIVED)
+
+        Args:
+            policy_id: Policy UUID
+
+        Raises:
+            ValueError: If policy not found
+        """
+        ...
+
+    @abstractmethod
+    async def rollback_to_version(
+        self, policy_id: str, target_version: int, created_by: str = "system"
+    ) -> StoredPolicy:
+        """Rollback policy to previous version (activates target version)
 
         Args:
             policy_id: Policy UUID
             target_version: Version to rollback to
+            created_by: User who triggered rollback (not used)
 
         Returns:
-            New DRAFT policy with content from target version
+            Target version with ACTIVE status
 
         Raises:
             ValueError: If target version not found

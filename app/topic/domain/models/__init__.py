@@ -18,6 +18,14 @@ from .plan import (
     DomainTopicPlanItem,
 )
 
+# Report
+from .report import (
+    DryRunItemReport,
+    DryRunReport,
+    DryRunSummary,
+    ViolationDetail,
+)
+
 # Spec and Batch
 from .spec_batch import (
     DomainTopicBatch,
@@ -57,7 +65,12 @@ __all__ = [
     "DomainTopicPlanItem",
     # Spec and Batch
     "DomainTopicSpec",
+    # Report
+    "DryRunItemReport",
+    "DryRunReport",
+    "DryRunSummary",
     "KafkaMetadata",
     "TeamName",
     "TopicName",
+    "ViolationDetail",
 ]

@@ -24,6 +24,9 @@ from app.cluster.application.use_cases import (
     TestObjectStorageConnectionUseCase,
     TestSchemaRegistryConnectionUseCase,
     UpdateKafkaClusterUseCase,
+    UpdateKafkaConnectUseCase,
+    UpdateObjectStorageUseCase,
+    UpdateSchemaRegistryUseCase,
 )
 from app.cluster.domain.services import ConnectionManager
 from app.cluster.infrastructure.repositories import (
@@ -127,6 +130,12 @@ class ClusterContainer(containers.DeclarativeContainer):
         registry_repo=schema_registry_repository,
     )
 
+    update_schema_registry_use_case = providers.Factory(
+        UpdateSchemaRegistryUseCase,
+        registry_repo=schema_registry_repository,
+        connection_manager=connection_manager,
+    )
+
     delete_schema_registry_use_case = providers.Factory(
         DeleteSchemaRegistryUseCase,
         registry_repo=schema_registry_repository,
@@ -151,6 +160,12 @@ class ClusterContainer(containers.DeclarativeContainer):
     list_object_storages_use_case = providers.Factory(
         ListObjectStoragesUseCase,
         storage_repo=object_storage_repository,
+    )
+
+    update_object_storage_use_case = providers.Factory(
+        UpdateObjectStorageUseCase,
+        storage_repo=object_storage_repository,
+        connection_manager=connection_manager,
     )
 
     delete_object_storage_use_case = providers.Factory(
@@ -180,6 +195,11 @@ class ClusterContainer(containers.DeclarativeContainer):
 
     get_kafka_connect_use_case = providers.Factory(
         GetKafkaConnectUseCase,
+        connect_repo=kafka_connect_repository,
+    )
+
+    update_kafka_connect_use_case = providers.Factory(
+        UpdateKafkaConnectUseCase,
         connect_repo=kafka_connect_repository,
     )
 

@@ -3,7 +3,7 @@
 from dependency_injector.wiring import Provide, inject
 from fastapi import APIRouter, Body, Depends, Path
 
-from app.connect.domain.types import PluginConfig, PluginListResponse, ValidationResponse
+from app.connect.domain.types import PluginConfig, ValidationResponse
 from app.container import AppContainer
 from app.shared.error_handlers import endpoint_error_handler
 
@@ -23,9 +23,10 @@ PluginOperations = Depends(Provide[AppContainer.connect_container.plugin_operati
 async def list_connector_plugins(
     connect_id: str = Path(..., description="Connect ID"),
     use_case=PluginOperations,
-) -> PluginListResponse:
+) -> dict:
     """플러그인 목록 조회"""
-    return await use_case.list_plugins(connect_id)
+    plugins = await use_case.list_plugins(connect_id)
+    return {"plugins": plugins}
 
 
 @router.put(

@@ -22,6 +22,7 @@ from .policy import (
 # Request 스키마
 from .request import (
     TopicBatchRequest,
+    TopicBatchYAMLRequest,
     TopicConfig,
     TopicItem,
     TopicMetadata,
@@ -29,17 +30,21 @@ from .request import (
 
 # Response 스키마
 from .response import (
+    FailureDetail,
     TopicBatchApplyResponse,
     TopicBatchDryRunResponse,
     TopicBulkDeleteResponse,
     TopicListItem,
     TopicListResponse,
+    YAMLBatchResult,
 )
 
 __all__ = [
     # Policy Request
     "ActivatePolicyRequest",
     "CreatePolicyRequest",
+    # Topic Response
+    "FailureDetail",
     # Common
     "KafkaCoreMetadata",
     # Policy Response
@@ -49,11 +54,11 @@ __all__ = [
     "PolicyVersionListResponse",
     "PolicyViolation",
     "RollbackPolicyRequest",
-    # Topic Response
     "TopicBatchApplyResponse",
     "TopicBatchDryRunResponse",
     # Topic Request
     "TopicBatchRequest",
+    "TopicBatchYAMLRequest",
     "TopicBulkDeleteResponse",
     "TopicConfig",
     "TopicItem",
@@ -62,4 +67,5 @@ __all__ = [
     "TopicMetadata",
     "TopicPlanItem",
     "UpdatePolicyRequest",
+    "YAMLBatchResult",
 ]

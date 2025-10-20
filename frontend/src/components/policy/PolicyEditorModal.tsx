@@ -6,11 +6,11 @@ interface PolicyEditorModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSubmit: (data: {
-    policy_type: string;
+    policy_type?: string;
     name: string;
     description: string;
     content: Record<string, unknown>;
-    created_by: string;
+    created_by?: string;
     target_environment?: string;
   }) => Promise<void>;
   initialData?: {
@@ -18,8 +18,10 @@ interface PolicyEditorModalProps {
     name: string;
     description: string | null;
     content: Record<string, unknown>;
+    target_environment?: string;
   } | null;
   mode: "create" | "edit";
+  defaultPolicyType?: "naming" | "guardrail";
 }
 
 export default function PolicyEditorModal({
@@ -28,8 +30,9 @@ export default function PolicyEditorModal({
   onSubmit,
   initialData,
   mode,
+  defaultPolicyType = "naming",
 }: PolicyEditorModalProps) {
-  const [policyType, setPolicyType] = useState<string>("naming");
+  const [policyType, setPolicyType] = useState<string>(defaultPolicyType);
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [contentYaml, setContentYaml] = useState("");
@@ -113,7 +116,6 @@ version: "1.0.0"`
       name: "Development",
       description: "Fast iteration - minimal resources",
       content: `replication_factor: 1
-min_insync_replicas: null
 partitions: 3
 retention_ms: 86400000
 cleanup_policy: delete
@@ -141,7 +143,7 @@ description: "Production environment - high availability and durability (minimum
     },
     custom: {
       name: "Custom",
-      description: "User-defined via YAML",
+      description: "User-defined configuration",
       content: `preset_name: "my_custom_preset"
 version: "1.0.0"
 author: "platform-team"
@@ -150,76 +152,160 @@ min_insync_replicas: 2
 partitions: 12
 retention_ms: 604800000
 cleanup_policy: delete
-description: "Custom preset for specific requirements"
-metadata:
-  sla_target: 99.9
-  compliance:
-    - SOC2
-tags:
-  - critical`
+description: "Custom preset for specific requirements"`
     }
   };
 
   useEffect(() => {
+    if (!isOpen) return;
+    
     if (initialData) {
       setPolicyType(initialData.policy_type);
       setName(initialData.name);
       setDescription(initialData.description || "");
       setContentYaml(JSON.stringify(initialData.content, null, 2));
+      setTargetEnvironment(initialData.target_environment || "total");
     } else {
-      // 기본 템플릿
-      if (policyType === "naming") {
-        // Naming: Preset 사용
-        setContentYaml(NAMING_PRESETS[selectedPreset as keyof typeof NAMING_PRESETS].content);
-      } else if (policyType === "guardrail") {
-        // Guardrail: Preset 사용
-        setContentYaml(GUARDRAIL_PRESETS[selectedPreset as keyof typeof GUARDRAIL_PRESETS].content);
+      // Create 모드: defaultPolicyType 설정
+      setPolicyType(defaultPolicyType);
+      setTargetEnvironment("total");
+      
+      // Policy Type에 맞는 기본 preset 설정
+      if (defaultPolicyType === "naming") {
+        setSelectedPreset("balanced");
+        setContentYaml(NAMING_PRESETS.balanced.content);
+      } else if (defaultPolicyType === "guardrail") {
+        setSelectedPreset("prod");
+        setContentYaml(GUARDRAIL_PRESETS.prod.content);
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [initialData, policyType, selectedPreset]);
+  }, [isOpen, initialData, defaultPolicyType]);
+  
+  // Preset 변경 시 컨텐츠 업데이트
+  useEffect(() => {
+    if (initialData || !isOpen) return;
+    
+    if (policyType === "naming") {
+      const preset = NAMING_PRESETS[selectedPreset as keyof typeof NAMING_PRESETS];
+      if (preset) {
+        setContentYaml(preset.content);
+      }
+    } else if (policyType === "guardrail") {
+      const preset = GUARDRAIL_PRESETS[selectedPreset as keyof typeof GUARDRAIL_PRESETS];
+      if (preset) {
+        setContentYaml(preset.content);
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedPreset, policyType]);
 
   if (!isOpen) return null;
 
   const parseYamlToJson = (yaml: string): Record<string, unknown> | null => {
     try {
+      // JSON 형식 먼저 시도 (Edit 모드에서 JSON 표시)
+      try {
+        const parsed = JSON.parse(yaml);
+        setYamlError(null);
+        return parsed;
+      } catch {
+        // JSON 파싱 실패 시 YAML 파싱 시도
+      }
+      
       // 간단한 YAML 파서 (실제로는 js-yaml 라이브러리 사용 권장)
       const lines = yaml.split("\n").filter((line) => line.trim() && !line.trim().startsWith("#"));
       const result: Record<string, unknown> = {};
       let currentKey: string | null = null;
+      let currentObject: Record<string, unknown> | null = null;
       const arrayValues: string[] = [];
+      let indent = 0;
 
       for (const line of lines) {
         const trimmed = line.trim();
+        const currentIndent = line.search(/\S/);
+        
         if (trimmed.startsWith("-")) {
           // 배열 값
-          arrayValues.push(trimmed.substring(1).trim());
+          const value = trimmed.substring(1).trim();
+          arrayValues.push(value);
         } else if (trimmed.includes(":")) {
-          // 키:값 쌍
+          // 이전 배열 처리
           if (currentKey && arrayValues.length > 0) {
-            result[currentKey] = arrayValues.slice();
+            if (currentObject) {
+              currentObject[currentKey] = arrayValues.slice();
+            } else {
+              result[currentKey] = arrayValues.slice();
+            }
             arrayValues.length = 0;
           }
 
-          const [key, value] = trimmed.split(":").map((s) => s.trim());
-          currentKey = key;
-
-          if (value) {
+          const colonIndex = trimmed.indexOf(":");
+          const key = trimmed.substring(0, colonIndex).trim();
+          const value = trimmed.substring(colonIndex + 1).trim();
+          
+          // 중첩 객체 감지 (값이 없고 다음이 들여쓰기된 경우)
+          if (!value || value === "") {
+            // 새 객체 시작
+            if (currentIndent > indent) {
+              // 중첩 객체
+              if (!currentObject) {
+                currentObject = {};
+                result[currentKey!] = currentObject;
+              }
+              currentKey = key;
+            } else {
+              // 최상위 객체
+              currentKey = key;
+              currentObject = null;
+              indent = currentIndent;
+            }
+          } else {
+            // 값이 있는 경우
+            let parsedValue: string | number | boolean | null = value.replace(/"/g, "");
+            
+            // null 처리
+            if (parsedValue === "null") {
+              parsedValue = null;
+            } 
+            // boolean 처리
+            else if (parsedValue === "true") {
+              parsedValue = true;
+            } else if (parsedValue === "false") {
+              parsedValue = false;
+            }
             // 숫자 변환 시도
-            const numValue = Number(value.replace(/"/g, ""));
-            result[key] = isNaN(numValue) ? value.replace(/"/g, "") : numValue;
+            else {
+              const numValue = Number(parsedValue);
+              if (!isNaN(numValue)) {
+                parsedValue = numValue;
+              }
+            }
+            
+            if (currentObject && currentIndent > indent) {
+              currentObject[key] = parsedValue;
+            } else {
+              result[key] = parsedValue;
+              currentKey = key;
+            }
           }
         }
       }
 
+      // 마지막 배열 처리
       if (currentKey && arrayValues.length > 0) {
-        result[currentKey] = arrayValues;
+        if (currentObject) {
+          currentObject[currentKey] = arrayValues;
+        } else {
+          result[currentKey] = arrayValues;
+        }
       }
 
       setYamlError(null);
       return result;
-    } catch {
-      setYamlError("Invalid YAML format");
+    } catch (error) {
+      console.error("YAML parsing error:", error);
+      setYamlError("Invalid YAML/JSON format");
       return null;
     }
   };
@@ -229,25 +315,39 @@ tags:
 
     const content = parseYamlToJson(contentYaml);
     if (!content) {
-      alert("Invalid YAML format. Please check your syntax.");
+      setYamlError("Invalid YAML format. Please check your syntax.");
       return;
     }
 
     try {
       setLoading(true);
-      await onSubmit({
-        policy_type: policyType,
-        name,
-        description,
-        content,
-        created_by: createdBy,
-        target_environment: targetEnvironment,
-      });
+      
+      if (mode === "create") {
+        // Create 모드: 모든 필드 전송
+        await onSubmit({
+          policy_type: policyType,
+          name,
+          description,
+          content,
+          created_by: createdBy,
+          target_environment: targetEnvironment,
+        });
+      } else {
+        // Edit 모드: name, description, content, target_environment 전송
+        await onSubmit({
+          name,
+          description,
+          content,
+          target_environment: targetEnvironment,
+        });
+      }
+      
+      // 성공 시에만 모달 닫기
       handleClose();
     } catch (err) {
+      // 에러는 상위 컴포넌트에서 Toast로 표시됨
+      // 모달은 닫지 않고 유지
       console.error("Failed to submit policy:", err);
-      const errorMessage = err instanceof Error ? err.message : "Failed to save policy";
-      alert(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -262,8 +362,8 @@ tags:
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 overflow-y-auto">
-      <div className="w-full max-w-4xl m-4 rounded-lg bg-white p-6 shadow-xl">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 overflow-y-auto p-4">
+      <div className="w-full max-w-2xl my-8 rounded-lg bg-white p-6 shadow-xl max-h-[90vh] overflow-y-auto">
         <div className="mb-4 flex items-center justify-between">
           <h2 className="text-2xl font-bold text-gray-900">
             {mode === "create" ? "Create Policy" : "Edit Policy"}
@@ -311,20 +411,6 @@ tags:
                 이 정책이 적용될 환경을 선택하세요
               </p>
             </div>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Created By *
-            </label>
-            <input
-              type="email"
-              value={createdBy}
-              onChange={(e) => setCreatedBy(e.target.value)}
-              required
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-              placeholder="admin@example.com"
-            />
           </div>
 
           {/* Naming Preset Selection */}
@@ -379,29 +465,44 @@ tags:
             </div>
           )}
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Policy Name *
-            </label>
-            <input
-              type="text"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              required
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-              placeholder="Production Naming Policy"
-            />
+          <div className="grid gap-4 md:grid-cols-2">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Policy Name *
+              </label>
+              <input
+                type="text"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                required
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                placeholder="Production Naming Policy"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Created By *
+              </label>
+              <input
+                type="email"
+                value={createdBy}
+                onChange={(e) => setCreatedBy(e.target.value)}
+                required
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                placeholder="admin@example.com"
+              />
+            </div>
           </div>
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Description *
+              Description
             </label>
             <textarea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              required
-              rows={2}
+              rows={3}
               className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
               placeholder="Describe the policy purpose and rules"
             />

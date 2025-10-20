@@ -6,17 +6,21 @@ interface EditTopicMetadataModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSubmit: (data: {
-    owner: string | null;
+    owners: string[];
     doc: string | null;
     tags: string[];
     environment: string;
+    slo: string | null;
+    sla: string | null;
   }) => Promise<void>;
   initialData: {
     name: string;
-    owner: string | null;
+    owners: string[];
     doc: string | null;
     tags: string[];
     environment: string;
+    slo: string | null;
+    sla: string | null;
   };
 }
 
@@ -26,18 +30,22 @@ export default function EditTopicMetadataModal({
   onSubmit,
   initialData,
 }: EditTopicMetadataModalProps) {
-  const [owner, setOwner] = useState(initialData.owner || "");
+  const [owners, setOwners] = useState(initialData.owners.join(", "));
   const [doc, setDoc] = useState(initialData.doc || "");
   const [tags, setTags] = useState(initialData.tags.join(", "));
   const [environment, setEnvironment] = useState(initialData.environment);
+  const [slo, setSlo] = useState(initialData.slo || "");
+  const [sla, setSla] = useState(initialData.sla || "");
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
-      setOwner(initialData.owner || "");
+      setOwners(initialData.owners.join(", "));
       setDoc(initialData.doc || "");
       setTags(initialData.tags.join(", "));
       setEnvironment(initialData.environment);
+      setSlo(initialData.slo || "");
+      setSla(initialData.sla || "");
     }
   }, [isOpen, initialData]);
 
@@ -48,16 +56,23 @@ export default function EditTopicMetadataModal({
     setLoading(true);
 
     try {
+      const ownerArray = owners
+        .split(",")
+        .map((o) => o.trim())
+        .filter((o) => o.length > 0);
+      
       const tagArray = tags
         .split(",")
         .map((t) => t.trim())
         .filter((t) => t.length > 0);
 
       await onSubmit({
-        owner: owner.trim() || null,
+        owners: ownerArray,
         doc: doc.trim() || null,
         tags: tagArray,
         environment,
+        slo: slo.trim() || null,
+        sla: sla.trim() || null,
       });
       onClose();
     } catch (error) {
@@ -86,15 +101,18 @@ export default function EditTopicMetadataModal({
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Team/Owner
+              Teams/Owners (comma-separated)
             </label>
             <input
               type="text"
-              value={owner}
-              onChange={(e) => setOwner(e.target.value)}
-              placeholder="e.g., data-team, ml-team"
+              value={owners}
+              onChange={(e) => setOwners(e.target.value)}
+              placeholder="e.g., team-commerce, team-platform"
               className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
             />
+            <p className="mt-1 text-xs text-gray-500">
+              Multiple owners allowed (최대 5개)
+            </p>
           </div>
 
           <div>
@@ -139,6 +157,32 @@ export default function EditTopicMetadataModal({
               <option value="stg">Staging</option>
               <option value="prod">Production</option>
             </select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              SLO (Service Level Objective)
+            </label>
+            <input
+              type="text"
+              value={slo}
+              onChange={(e) => setSlo(e.target.value)}
+              placeholder="e.g., 99.9% availability, p99 < 100ms"
+              className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              SLA (Service Level Agreement)
+            </label>
+            <input
+              type="text"
+              value={sla}
+              onChange={(e) => setSla(e.target.value)}
+              placeholder="e.g., 99.5% uptime guarantee"
+              className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+            />
           </div>
 
           <div className="flex justify-end gap-2 pt-4">

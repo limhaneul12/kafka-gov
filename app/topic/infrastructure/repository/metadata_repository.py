@@ -43,17 +43,19 @@ class MetadataRepository:
                     return None
 
                 metadata_dict = {
-                    "owner": metadata_model.owner,
+                    "owners": metadata_model.owners or [],
                     "doc": metadata_model.doc,
                     "tags": metadata_model.tags or [],
                     "environment": metadata_model.environment,
+                    "slo": metadata_model.slo,
+                    "sla": metadata_model.sla,
                     "config": metadata_model.config or {},
                     "created_by": metadata_model.created_by,
                     "updated_by": metadata_model.updated_by,
                 }
 
                 logger.debug(
-                    f"Retrieved metadata for {name}: owner={metadata_dict['owner']}, "
+                    f"Retrieved metadata for {name}: owners={metadata_dict['owners']}, "
                     f"doc={metadata_dict['doc']}, env={metadata_dict['environment']}"
                 )
 
@@ -73,16 +75,18 @@ class MetadataRepository:
                 existing = await self._maybe_await(result.scalar_one_or_none())
 
                 logger.info(
-                    f"Saving metadata for {name}: owner={metadata.get('owner')}, "
+                    f"Saving metadata for {name}: owners={metadata.get('owners')}, "
                     f"doc={metadata.get('doc')}, tags={metadata.get('tags')}, env={metadata.get('environment')}"
                 )
 
                 if existing:
                     # 업데이트 후 merge 적용
-                    existing.owner = metadata.get("owner")
+                    existing.owners = metadata.get("owners", [])
                     existing.doc = metadata.get("doc")
                     existing.tags = metadata.get("tags", [])
                     existing.environment = metadata.get("environment")
+                    existing.slo = metadata.get("slo")
+                    existing.sla = metadata.get("sla")
                     existing.config = metadata.get("config", {})
                     existing.updated_by = metadata.get("updated_by", "system")
                     session.add(existing)
@@ -91,10 +95,12 @@ class MetadataRepository:
                     # 새로 생성
                     metadata_model = TopicMetadataModel(
                         topic_name=name,
-                        owner=metadata.get("owner"),
+                        owners=metadata.get("owners", []),
                         doc=metadata.get("doc"),
                         tags=metadata.get("tags", []),
                         environment=metadata.get("environment"),
+                        slo=metadata.get("slo"),
+                        sla=metadata.get("sla"),
                         config=metadata.get("config", {}),
                         created_by=metadata.get("created_by", "system"),
                         updated_by=metadata.get("updated_by", "system"),

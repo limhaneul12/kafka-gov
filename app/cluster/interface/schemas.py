@@ -93,6 +93,21 @@ class SchemaRegistryCreateRequest(BaseModel):
     timeout: int = Field(default=30, description="요청 타임아웃(초)", ge=1)
 
 
+class SchemaRegistryUpdateRequest(BaseModel):
+    """Schema Registry 수정 요청"""
+
+    name: str = Field(..., description="레지스트리 이름", min_length=1, max_length=255)
+    url: str = Field(..., description="레지스트리 URL")
+    description: str | None = Field(None, description="설명")
+    auth_username: str | None = Field(None, description="인증 사용자명")
+    auth_password: str | None = Field(None, description="인증 비밀번호")
+    ssl_ca_location: str | None = Field(None, description="SSL CA 인증서 경로")
+    ssl_cert_location: str | None = Field(None, description="SSL 인증서 경로")
+    ssl_key_location: str | None = Field(None, description="SSL 키 경로")
+    timeout: int = Field(default=30, description="요청 타임아웃(초)", ge=1)
+    is_active: bool = Field(default=True, description="활성화 여부")
+
+
 class SchemaRegistryResponse(BaseModel):
     """Schema Registry 응답"""
 
@@ -133,6 +148,20 @@ class ObjectStorageCreateRequest(BaseModel):
     use_ssl: bool = Field(default=False, description="SSL 사용 여부")
 
 
+class ObjectStorageUpdateRequest(BaseModel):
+    """Object Storage 수정 요청"""
+
+    name: str = Field(..., description="스토리지 이름", min_length=1, max_length=255)
+    endpoint_url: str = Field(..., description="엔드포인트 URL")
+    description: str | None = Field(None, description="설명")
+    access_key: str = Field(..., description="액세스 키", min_length=1)
+    secret_key: str = Field(..., description="시크릿 키", min_length=1)
+    bucket_name: str = Field(..., description="버킷명", min_length=1, max_length=255)
+    region: str = Field(default="us-east-1", description="리전")
+    use_ssl: bool = Field(default=False, description="SSL 사용 여부")
+    is_active: bool = Field(default=True, description="활성화 여부")
+
+
 class ObjectStorageResponse(BaseModel):
     """Object Storage 응답"""
 
@@ -170,6 +199,17 @@ class KafkaConnectCreateRequest(BaseModel):
     description: str | None = Field(None, description="설명")
     auth_username: str | None = Field(None, description="인증 사용자명")
     auth_password: str | None = Field(None, description="인증 비밀번호")
+
+
+class KafkaConnectUpdateRequest(BaseModel):
+    """Kafka Connect 수정 요청"""
+
+    name: str = Field(..., description="Connect 이름", min_length=1, max_length=255)
+    url: str = Field(..., description="Connect URL")
+    description: str | None = Field(None, description="설명")
+    auth_username: str | None = Field(None, description="인증 사용자명")
+    auth_password: str | None = Field(None, description="인증 비밀번호")
+    is_active: bool = Field(default=True, description="활성화 여부")
 
 
 class KafkaConnectResponse(BaseModel):

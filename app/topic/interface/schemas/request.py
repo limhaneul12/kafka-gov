@@ -23,21 +23,33 @@ class TopicMetadata(BaseModel):
 
     model_config = ConfigDict(
         extra="forbid",
-        str_min_length=1,
-        str_strip_whitespace=True,
         frozen=True,
         json_schema_extra={
             "example": {
-                "owner": "team-commerce",
+                "owners": ["team-commerce", "team-platform"],
                 "doc": "https://wiki.company.com/streams/orders",
                 "tags": ["pii", "critical"],
+                "slo": "99.9% availability, p99 < 100ms",
+                "sla": "99.5% uptime guarantee",
             }
         },
     )
 
-    owner: TeamName
+    owners: list[TeamName] = Field(
+        ..., min_length=1, max_length=5, description="소유 팀 목록 (최대 5개)"
+    )
     doc: DocumentUrl | None = None
     tags: list[TagName] = Field(default_factory=list, max_length=10)
+    slo: str | None = Field(default=None, max_length=500, description="Service Level Objective")
+    sla: str | None = Field(default=None, max_length=500, description="Service Level Agreement")
+
+    # Backward compatibility: owner 단일 값도 허용
+    @classmethod
+    def model_validate(cls, obj: dict | object, **kwargs):  # type: ignore
+        """단일 owner를 owners로 변환 (Backward compatibility)"""
+        if isinstance(obj, dict) and "owner" in obj and "owners" not in obj:
+            obj["owners"] = [obj.pop("owner")]
+        return super().model_validate(obj, **kwargs)
 
 
 class TopicConfig(BaseModel):
@@ -122,6 +134,16 @@ class TopicItem(BaseModel):
                 raise ValueError(f"metadata is required for {self.action} action")
 
         return self
+
+
+class TopicBatchYAMLRequest(BaseModel):
+    """YAML 문자열 기반 토픽 배치 요청"""
+
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+    yaml_content: str = Field(
+        ..., min_length=1, description="YAML 형식의 토픽 배치 설정 (Backend에서 파싱)"
+    )
 
 
 class TopicBatchRequest(BaseModel):

@@ -53,6 +53,7 @@ class StoredPolicy:
     # - total: 모든 환경 공통 (global)
     target_environment: str = "total"
     updated_at: str | None = None
+    activated_at: str | None = None  # 활성화 시간 (ACTIVE 상태가 된 시점)
 
 
 @dataclass(frozen=True, slots=True)

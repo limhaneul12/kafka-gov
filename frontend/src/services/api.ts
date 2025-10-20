@@ -82,14 +82,18 @@ export const topicsAPI = {
     api.post(`/v1/topics/batch/dry-run?cluster_id=${clusterId}`, batchRequest),
   create: (clusterId: string, batchRequest: Record<string, unknown>) =>
     api.post(`/v1/topics/batch/apply?cluster_id=${clusterId}`, batchRequest),
+  createFromYAML: (clusterId: string, yamlContent: string) =>
+    api.post(`/v1/topics/batch/apply-yaml?cluster_id=${clusterId}`, { yaml_content: yamlContent }),
   updateMetadata: (
     clusterId: string,
     topicName: string,
     metadata: {
-      owner: string | null;
+      owners: string[];
       doc: string | null;
       tags: string[];
       environment: string;
+      slo: string | null;
+      sla: string | null;
     }
   ) =>
     api.patch(`/v1/topics/${topicName}/metadata?cluster_id=${clusterId}`, metadata),
@@ -114,19 +118,47 @@ export const schemasAPI = {
 };
 
 export const clustersAPI = {
-  listKafka: () => api.get("/v1/clusters/kafka"),
-  createKafka: (data: Record<string, string>) => api.post("/v1/clusters/kafka", data),
+  // Kafka Clusters (Brokers)
+  listKafka: () => api.get("/v1/clusters/brokers"),
+  createKafka: (data: Record<string, string>) => api.post("/v1/clusters/brokers", data),
+  updateKafka: (clusterId: string, data: Record<string, string>) => 
+    api.put(`/v1/clusters/brokers/${clusterId}`, data),
+  deleteKafka: (clusterId: string) => api.delete(`/v1/clusters/brokers/${clusterId}`),
   testKafka: (clusterId: string) =>
-    api.post(`/v1/clusters/kafka/${clusterId}/test`),
+    api.post(`/v1/clusters/brokers/${clusterId}/test`),
+  
+  // Schema Registries
   listRegistries: () => api.get("/v1/clusters/schema-registries"),
   createRegistry: (data: Record<string, string>) => 
     api.post("/v1/clusters/schema-registries", data),
+  updateRegistry: (registryId: string, data: Record<string, string>) => 
+    api.put(`/v1/clusters/schema-registries/${registryId}`, data),
+  deleteRegistry: (registryId: string) => 
+    api.delete(`/v1/clusters/schema-registries/${registryId}`),
+  testRegistry: (registryId: string) =>
+    api.post(`/v1/clusters/schema-registries/${registryId}/test`),
+  
+  // Object Storages
   listStorages: () => api.get("/v1/clusters/storages"),
   createStorage: (data: Record<string, string>) => 
     api.post("/v1/clusters/storages", data),
+  updateStorage: (storageId: string, data: Record<string, string>) => 
+    api.put(`/v1/clusters/storages/${storageId}`, data),
+  deleteStorage: (storageId: string) => 
+    api.delete(`/v1/clusters/storages/${storageId}`),
+  testStorage: (storageId: string) =>
+    api.post(`/v1/clusters/storages/${storageId}/test`),
+  
+  // Kafka Connects
   listConnects: () => api.get("/v1/clusters/connects"),
   createConnect: (data: Record<string, string>) => 
     api.post("/v1/clusters/connects", data),
+  updateConnect: (connectId: string, data: Record<string, string>) => 
+    api.put(`/v1/clusters/connects/${connectId}`, data),
+  deleteConnect: (connectId: string) => 
+    api.delete(`/v1/clusters/connects/${connectId}`),
+  testConnect: (connectId: string) =>
+    api.post(`/v1/clusters/connects/${connectId}/test`),
 };
 
 export const connectAPI = {

@@ -131,5 +131,15 @@ class PolicyResolver:
         if policy.policy_type != PolicyType.GUARDRAIL:
             raise ValueError(f"Expected guardrail policy, got {policy.policy_type}")
 
+        # Validate required fields
+        required_fields = ["preset_name", "version"]
+        missing_fields = [f for f in required_fields if f not in policy.content]
+
+        if missing_fields:
+            raise ValueError(
+                f"Guardrail policy '{policy.name}' (ID: {policy.policy_id}) is missing required fields: {missing_fields}. "
+                f"CustomGuardrailPreset requires: preset_name (str), version (str, e.g., '1.0.0')"
+            )
+
         # Convert dict to CustomGuardrailPreset
         return CustomGuardrailPreset(**policy.content)

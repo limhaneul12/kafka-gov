@@ -9,14 +9,15 @@ from fastapi.responses import StreamingResponse
 from app.container import AppContainer
 from app.shared.error_handlers import handle_api_errors, handle_server_errors
 from app.shared.roles import DEFAULT_USER
-from app.topic.application.use_cases import TopicBulkDeleteUseCase
+from app.topic.application.use_cases import (
+    TopicBatchApplyFromYAMLUseCase,
+    TopicBulkDeleteUseCase,
+)
 from app.topic.interface.adapters import (
     safe_convert_plan_to_response,
     safe_convert_request_to_batch,
 )
 from app.topic.interface.helpers import (
-    generate_csv_report,
-    generate_json_report,
     parse_yaml_content,
     validate_yaml_file,
 )
@@ -24,6 +25,7 @@ from app.topic.interface.schemas import (
     TopicBatchApplyResponse,
     TopicBatchDryRunResponse,
     TopicBatchRequest,
+    TopicBatchYAMLRequest,
     TopicBulkDeleteResponse,
     TopicListItem,
     TopicListResponse,
@@ -57,15 +59,34 @@ async def list_topics(
     topics_data = await use_case.execute(cluster_id)
 
     # dict를 TopicListItem으로 변환
+    def _convert_owner_to_owners(topic_dict: dict) -> list[str]:
+        """owner 또는 owners 필드를 owners 리스트로 변환"""
+        if "owners" in topic_dict:
+            return (
+                topic_dict["owners"]
+                if isinstance(topic_dict["owners"], list)
+                else [topic_dict["owners"]]
+            )
+        if topic_dict.get("owner"):
+            return (
+                [topic_dict["owner"]]
+                if isinstance(topic_dict["owner"], str)
+                else topic_dict["owner"]
+            )
+        return []
+
     topics: list[TopicListItem] = [
         TopicListItem(
             name=topic["name"],
-            owner=topic.get("owner"),
+            owners=_convert_owner_to_owners(topic),
             doc=topic.get("doc"),
             tags=topic.get("tags", []),
             partition_count=topic.get("partition_count"),
             replication_factor=topic.get("replication_factor"),
+            retention_ms=topic.get("retention_ms"),
             environment=topic["environment"],
+            slo=topic.get("slo"),
+            sla=topic.get("sla"),
         )
         for topic in topics_data
     ]
@@ -90,11 +111,11 @@ async def upload_yaml_and_dry_run(
 ) -> TopicBatchDryRunResponse:
     """안전한 YAML 파일 업로드 및 Dry-Run"""
     # 1. 파일 타입 검증 (HTTPException 발생 가능 - pass-through)
-    validate_yaml_file(file)
+    await validate_yaml_file(file)
 
     # 2. YAML 파싱 및 검증 (HTTPException 발생 가능 - pass-through)
     content = await file.read()
-    yaml_data = await parse_yaml_content(content)
+    yaml_data = await parse_yaml_content(content.decode("utf-8"))
 
     # 3. TopicBatchRequest로 변환
     request = TopicBatchRequest(**yaml_data)
@@ -109,20 +130,29 @@ async def upload_yaml_and_dry_run(
     "/batch/dry-run",
     response_model=TopicBatchDryRunResponse,
     status_code=status.HTTP_200_OK,
-    summary="토픽 배치 Dry-Run (멀티 클러스터)",
-    description="토픽 배치 변경사항을 미리 확인합니다.",
+    summary="토픽 배치 Dry-Run (YAML 문자열)",
+    description="YAML 문자열을 받아 토픽 배치 변경사항을 미리 확인합니다.",
     response_description="토픽 배치 계획",
 )
 @inject
 @handle_api_errors(validation_error_message="Validation error")
-async def topic_batch_dry_run(
-    batch_request: TopicBatchRequest,
+async def topic_batch_dry_run_yaml(
+    yaml_request: TopicBatchYAMLRequest,
     cluster_id: str = Query(..., description="Kafka Cluster ID"),
     dry_run_use_case=DryTopicDep,
 ) -> TopicBatchDryRunResponse:
-    """토픽 배치 Dry-Run"""
+    """YAML 기반 토픽 배치 Dry-Run"""
+    # 1. YAML 파싱 및 검증 (Interface 레이어 책임)
+    yaml_data = await parse_yaml_content(yaml_request.yaml_content)
+    batch_request = TopicBatchRequest(**yaml_data)
+
+    # 2. DTO → Domain 변환 (Adapter 책임)
     batch = safe_convert_request_to_batch(batch_request)
+
+    # 3. 비즈니스 로직 실행 (UseCase 호출)
     plan = await dry_run_use_case.execute(cluster_id, batch, DEFAULT_USER)
+
+    # 4. Domain → DTO 변환 (Adapter 책임)
     return safe_convert_plan_to_response(plan, batch_request)
 
 
@@ -150,21 +180,39 @@ async def download_dry_run_report(
     batch = safe_convert_request_to_batch(batch_request)
     plan = await dry_run_use_case.execute(cluster_id, batch, DEFAULT_USER)
 
-    # Report 생성
-    if format == "csv":
-        content = generate_csv_report(plan)
-        media_type = "text/csv"
-        filename = f"dry-run-report-{batch.change_id}.csv"
-    else:  # json
-        content = generate_json_report(plan)
-        media_type = "application/json"
-        filename = f"dry-run-report-{batch.change_id}.json"
+    # Plan -> Response 변환
+    response = safe_convert_plan_to_response(plan, batch_request)
+
+    # Report 생성 (Helper에 위임)
+    from app.topic.interface.helpers import prepare_report_response
+
+    content, media_type, filename = prepare_report_response(response, format, str(batch.change_id))
 
     return StreamingResponse(
         iter([content]),
         media_type=media_type,
         headers={"Content-Disposition": f"attachment; filename={filename}"},
     )
+
+
+@router.post(
+    "/batch/apply-yaml",
+    response_model=TopicBatchApplyResponse,
+    status_code=status.HTTP_200_OK,
+    summary="YAML 기반 토픽 배치 Apply",
+    description="YAML 문자열을 파싱하여 토픽 배치를 적용합니다. Backend에서 YAML 파싱 및 검증을 수행합니다.",
+)
+@inject
+@handle_api_errors(validation_error_message="YAML parsing or policy violation")
+async def topic_batch_apply_yaml(
+    yaml_request: TopicBatchYAMLRequest,
+    cluster_id: str = Query(..., description="Kafka Cluster ID"),
+    apply_use_case=ApplyTopicDep,
+) -> TopicBatchApplyResponse:
+    """YAML 기반 토픽 배치 Apply - UseCase에 위임"""
+    # UseCase 생성 및 실행
+    yaml_use_case = TopicBatchApplyFromYAMLUseCase(apply_use_case)
+    return await yaml_use_case.execute(cluster_id, yaml_request.yaml_content, DEFAULT_USER)
 
 
 @router.post(

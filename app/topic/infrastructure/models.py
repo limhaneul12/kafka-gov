@@ -20,10 +20,12 @@ class TopicMetadataModel(Base):
     topic_name: Mapped[str] = mapped_column(String(255), primary_key=True, comment="토픽 이름")
 
     # 메타데이터 필드
-    owner: Mapped[str | None] = mapped_column(String(100), comment="소유자")
+    owners: Mapped[dict[str, Any] | None] = mapped_column(JSON, comment="소유자 목록 (JSON 배열)")
     doc: Mapped[str | None] = mapped_column(Text, comment="문서/설명")
     tags: Mapped[dict[str, Any] | None] = mapped_column(JSON, comment="태그 (JSON)")
     environment: Mapped[str | None] = mapped_column(String(20), comment="환경 (dev/stg/prod)")
+    slo: Mapped[str | None] = mapped_column(Text, comment="SLO (Service Level Objective)")
+    sla: Mapped[str | None] = mapped_column(Text, comment="SLA (Service Level Agreement)")
 
     # 설정 정보 (JSON으로 저장)
     config: Mapped[dict[str, Any] | None] = mapped_column(JSON, comment="토픽 설정")
@@ -39,7 +41,7 @@ class TopicMetadataModel(Base):
     )
 
     def __repr__(self) -> str:
-        return f"<TopicMetadata(name={self.topic_name}, owner={self.owner})>"
+        return f"<TopicMetadata(name={self.topic_name}, owners={self.owners})>"
 
 
 class TopicPlanModel(Base):
@@ -161,6 +163,11 @@ class PolicyModel(Base):
         JSON, nullable=False, comment="정책 내용 (JSON)"
     )
 
+    # 적용 환경 (dev, stg, prod, total)
+    target_environment: Mapped[str] = mapped_column(
+        String(20), nullable=False, server_default="total", comment="적용 환경"
+    )
+
     # 메타데이터
     created_by: Mapped[str] = mapped_column(String(255), nullable=False, comment="생성자")
     created_at: Mapped[datetime] = mapped_column(
@@ -168,6 +175,9 @@ class PolicyModel(Base):
     )
     updated_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), onupdate=func.now(), nullable=True, comment="수정 시간"
+    )
+    activated_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True, comment="활성화 시간 (ACTIVE 상태가 된 시점)"
     )
 
     # 제약 조건

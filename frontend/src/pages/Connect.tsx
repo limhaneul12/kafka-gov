@@ -22,6 +22,7 @@ import {
   Package,
 } from "lucide-react";
 import type { ConnectorStatus, KafkaConnect } from "../types";
+import { toast } from "sonner";
 
 export default function Connect() {
   const [connects, setConnects] = useState<KafkaConnect[]>([]);
@@ -79,9 +80,14 @@ export default function Connect() {
     try {
       await connectAPI.pause(selectedConnect, name);
       await loadConnectors();
+      toast.success('일시정지 완료', {
+        description: `커넥터 "${name}"이(가) 일시정지되었습니다.`
+      });
     } catch (error) {
       console.error("Failed to pause connector:", error);
-      alert("Failed to pause connector");
+      toast.error('일시정지 실패', {
+        description: '커넥터 일시정지에 실패했습니다.'
+      });
     }
   };
 
@@ -89,9 +95,14 @@ export default function Connect() {
     try {
       await connectAPI.resume(selectedConnect, name);
       await loadConnectors();
+      toast.success('재개 완료', {
+        description: `커넥터 "${name}"이(가) 재개되었습니다.`
+      });
     } catch (error) {
       console.error("Failed to resume connector:", error);
-      alert("Failed to resume connector");
+      toast.error('재개 실패', {
+        description: '커넥터 재개에 실패했습니다.'
+      });
     }
   };
 
@@ -101,9 +112,14 @@ export default function Connect() {
     try {
       await connectAPI.restart(selectedConnect, name);
       await loadConnectors();
+      toast.success('재시작 완료', {
+        description: `커넥터 "${name}"이(가) 재시작되었습니다.`
+      });
     } catch (error) {
       console.error("Failed to restart connector:", error);
-      alert("Failed to restart connector");
+      toast.error('재시작 실패', {
+        description: '커넥터 재시작에 실패했습니다.'
+      });
     }
   };
 
@@ -115,9 +131,14 @@ export default function Connect() {
     try {
       await connectAPI.delete(selectedConnect, name);
       await loadConnectors();
+      toast.success('삭제 완료', {
+        description: `커넥터 "${name}"이(가) 삭제되었습니다.`
+      });
     } catch (error) {
       console.error("Failed to delete connector:", error);
-      alert("Failed to delete connector");
+      toast.error('삭제 실패', {
+        description: '커넥터 삭제에 실패했습니다.'
+      });
     }
   };
 

@@ -7,12 +7,50 @@ from functools import wraps
 from typing import ParamSpec, TypeVar
 
 from fastapi import HTTPException, status
+from pydantic import ValidationError
 
 # 타입 변수 정의
 T = TypeVar("T")  # 반환 타입
 P = ParamSpec("P")  # 함수 파라미터
 
 ErrorHandlerType = Callable[[Callable[P, Awaitable[T]]], Callable[P, Awaitable[T]]]
+
+
+def format_validation_error(error: ValidationError) -> str:
+    """
+    Pydantic ValidationError를 사용자 친화적인 메시지로 변환
+
+    Example:
+        Input: "1 validation error for TopicBatchApplyResponse
+                change_id
+                  Input should be a valid string [type=string_type, input_value=20251020001]"
+
+        Output: "YAML 형식 오류: change_id는 문자열이어야 합니다 (입력값: 20251020001)"
+    """
+    errors = []
+    for err in error.errors():
+        field = " → ".join(str(loc) for loc in err["loc"])
+        error_type = err["type"]
+        input_value = err.get("input", "N/A")
+
+        # 에러 타입별 한글 메시지
+        type_messages = {
+            "string_type": f"{field}는 문자열이어야 합니다",
+            "int_type": f"{field}는 정수여야 합니다",
+            "missing": f"{field}는 필수 항목입니다",
+            "value_error": f"{field}의 값이 유효하지 않습니다",
+            "type_error": f"{field}의 타입이 올바르지 않습니다",
+        }
+
+        message = type_messages.get(error_type, f"{field}: {err['msg']}")
+
+        # 입력값이 너무 길지 않으면 표시
+        if str(input_value) not in ["N/A", "None"] and len(str(input_value)) < 100:
+            message += f" (입력값: {input_value})"
+
+        errors.append(message)
+
+    return "YAML 형식 오류:\n" + "\n".join(f"  • {e}" for e in errors)
 
 
 def endpoint_error_handler(
@@ -52,6 +90,12 @@ def endpoint_error_handler(
             except HTTPException:
                 # FastAPI HTTPException은 그대로 전달
                 raise
+            except ValidationError as exc:
+                # Pydantic ValidationError는 사용자 친화적인 메시지로 변환
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail=format_validation_error(exc),
+                ) from exc
             except Exception as exc:
                 # 예외 타입에 따라 매핑된 상태 코드와 메시지 사용
                 for exc_type, (status_code, message_prefix) in mappings.items():

@@ -72,6 +72,7 @@ async def create_policy(
         description=request.description,
         content=request.content,
         created_by=request.created_by,
+        target_environment=request.target_environment,
     )
     return PolicyResponse(policy=to_policy_dto(policy), message=message)
 
@@ -236,6 +237,7 @@ async def update_policy(
         name=request.name,
         description=request.description,
         content=request.content,
+        target_environment=request.target_environment,
     )
     return PolicyResponse(policy=to_policy_dto(policy), message=message)
 
@@ -292,7 +294,7 @@ async def archive_policy(
     response_model=PolicyDeleteResponse,
     status_code=status.HTTP_200_OK,
     summary="정책 삭제",
-    description="정책을 삭제합니다 (DRAFT만 가능)",
+    description="정책을 삭제합니다 (ACTIVE 제외, DRAFT/ARCHIVED 가능)",
 )
 @inject
 @handle_server_errors(error_message="Failed to delete policy")
@@ -301,8 +303,26 @@ async def delete_policy(
     version: int | None = Query(None, description="삭제할 버전 (미지정 시 모든 DRAFT)"),
     use_case: DeletePolicyUseCase = DeletePolicyDep,
 ) -> PolicyDeleteResponse:
-    """정책 삭제 (DRAFT만)"""
+    """정책 삭제 (ACTIVE 제외)"""
     message = await use_case.execute(policy_id=policy_id, version=version)
+    return PolicyDeleteResponse(message=message)
+
+
+@router.delete(
+    "/{policy_id}/all",
+    response_model=PolicyDeleteResponse,
+    status_code=status.HTTP_200_OK,
+    summary="정책 전체 삭제",
+    description="정책의 모든 버전을 삭제합니다 (ACTIVE/ARCHIVED 포함)",
+)
+@inject
+@handle_server_errors(error_message="Failed to delete all policy versions")
+async def delete_all_policy_versions(
+    policy_id: Annotated[str, Path(description="정책 ID (UUID)")],
+    use_case: DeletePolicyUseCase = DeletePolicyDep,
+) -> PolicyDeleteResponse:
+    """정책 전체 삭제 (모든 버전)"""
+    message = await use_case.execute_delete_all(policy_id=policy_id)
     return PolicyDeleteResponse(message=message)
 
 
@@ -316,7 +336,7 @@ async def delete_policy(
     response_model=PolicyResponse,
     status_code=status.HTTP_200_OK,
     summary="정책 롤백",
-    description="이전 버전으로 롤백합니다 (대상 버전의 content를 복사하여 새 DRAFT 생성)",
+    description="이전 버전으로 롤백합니다 (대상 버전을 ACTIVE로 변경)",
 )
 @inject
 @handle_api_errors(validation_error_message="Policy rollback error")
@@ -327,6 +347,8 @@ async def rollback_policy(
 ) -> PolicyResponse:
     """정책 롤백"""
     policy, message = await use_case.execute(
-        policy_id=policy_id, target_version=request.target_version
+        policy_id=policy_id,
+        target_version=request.target_version,
+        created_by=request.created_by,
     )
     return PolicyResponse(policy=to_policy_dto(policy), message=message)

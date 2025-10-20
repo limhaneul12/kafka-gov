@@ -17,15 +17,19 @@ from app.topic.domain.models import (
 
 
 def create_topic_metadata(
-    owner: str = "team-test",
+    owners: tuple[str, ...] = ("team-test",),
     doc: str | None = None,
     tags: tuple[str, ...] = (),
+    slo: str | None = None,
+    sla: str | None = None,
 ) -> DomainTopicMetadata:
     """토픽 메타데이터 생성"""
     return DomainTopicMetadata(
-        owner=owner,
+        owners=owners,
         doc=doc,
         tags=tags,
+        slo=slo,
+        sla=sla,
     )
 
 

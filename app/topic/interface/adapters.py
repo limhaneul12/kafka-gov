@@ -67,9 +67,11 @@ class TopicTypeAdapters:
             domain_metadata = None
             if item.metadata:
                 domain_metadata = DomainTopicMetadata(
-                    owner=item.metadata.owner,
+                    owners=tuple(item.metadata.owners) if item.metadata.owners else (),
                     doc=item.metadata.doc,
                     tags=tuple(item.metadata.tags),
+                    slo=item.metadata.slo,
+                    sla=item.metadata.sla,
                 )
 
             # TopicSpec 생성 (직접 생성)

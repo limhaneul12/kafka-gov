@@ -5,11 +5,12 @@ import Badge from "../components/ui/Badge";
 import Loading from "../components/ui/Loading";
 import UploadSchemaModal from "../components/schema/UploadSchemaModal";
 import { schemasAPI, clustersAPI } from "../services/api";
-import { Upload, RefreshCw, Trash2, Search } from "lucide-react";
+import { Upload, RefreshCw, Trash2, Search, Database } from "lucide-react";
 import type { SchemaArtifact } from "../types";
 
 export default function Schemas() {
   const [schemas, setSchemas] = useState<SchemaArtifact[]>([]);
+  const [registries, setRegistries] = useState<Array<{ registry_id: string }>>([]);
   const [selectedRegistry, setSelectedRegistry] = useState<string>("");
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
@@ -18,11 +19,14 @@ export default function Schemas() {
   const loadRegistries = async () => {
     try {
       const response = await clustersAPI.listRegistries();
+      setRegistries(response.data);
       if (response.data.length > 0) {
         setSelectedRegistry(response.data[0].registry_id);
       }
     } catch (error) {
       console.error("Failed to load registries:", error);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -62,7 +66,24 @@ export default function Schemas() {
     schema.subject.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  if (loading) {
+  // Registry 연결 없음
+  if (!loading && registries.length === 0) {
+    return (
+      <div className="flex h-96 items-center justify-center">
+        <div className="text-center">
+          <Database className="h-16 w-16 text-gray-400 mx-auto mb-4" />
+          <h2 className="text-xl font-semibold text-gray-900 mb-2">
+            Schema Registry가 설정되지 않았습니다
+          </h2>
+          <p className="text-gray-600">
+            설정 페이지에서 Schema Registry를 먼저 등록해주세요.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  if (loading && !schemas.length) {
     return (
       <div className="flex h-96 items-center justify-center">
         <Loading size="lg" />

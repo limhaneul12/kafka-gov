@@ -7,12 +7,15 @@ export interface APIResponse<T> {
 // Topic Types
 export interface Topic {
   name: string;
-  owner: string | null;
+  owners: string[];
   doc: string | null;
   tags: string[];
   partition_count: number | null;
   replication_factor: number | null;
+  retention_ms: number | null;
   environment: string;
+  slo: string | null;
+  sla: string | null;
 }
 
 export interface TopicListResponse {
@@ -115,6 +118,7 @@ export interface Policy {
   status: "DRAFT" | "ACTIVE" | "ARCHIVED";
   created_by: string;
   created_at: string;
+  target_environment: string;
   updated_at: string | null;
 }
 

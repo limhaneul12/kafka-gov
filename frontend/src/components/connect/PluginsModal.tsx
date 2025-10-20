@@ -38,11 +38,21 @@ export default function PluginsModal({
   const loadPlugins = async () => {
     try {
       setLoading(true);
-      const response = await fetch(`/api/v1/connect/${connectId}/connector-plugins`);
+      const url = `/api/v1/connect/${connectId}/connector-plugins`;
+      console.log("Loading plugins from:", url);
+      const response = await fetch(url);
+      
+      if (!response.ok) {
+        console.error("API Error:", response.status, response.statusText);
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
       const data = await response.json();
+      console.log("Received plugins:", data);
       setPlugins(data.plugins || []);
     } catch (error) {
       console.error("Failed to load plugins:", error);
+      setPlugins([]);
     } finally {
       setLoading(false);
     }
@@ -59,8 +69,8 @@ export default function PluginsModal({
   const types = [...new Set(plugins.map((p) => p.type))];
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 overflow-y-auto">
-      <div className="w-full max-w-4xl m-4 rounded-lg bg-white shadow-xl">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 overflow-y-auto p-4">
+      <div className="w-full max-w-3xl my-8 rounded-lg bg-white shadow-xl max-h-[90vh] overflow-y-auto">
         <div className="border-b border-gray-200 p-6">
           <div className="flex items-start justify-between">
             <div>

@@ -15,9 +15,11 @@ class DomainTopicMetadata:
         dataclasses.asdict() 사용
     """
 
-    owner: TeamName | None = None
+    owners: tuple[TeamName, ...] = ()
     doc: DocumentUrl | None = None
     tags: tuple[str, ...] = ()
+    slo: str | None = None
+    sla: str | None = None
 
 
 @dataclass(slots=True)

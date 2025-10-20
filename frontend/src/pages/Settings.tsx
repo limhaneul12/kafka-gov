@@ -9,6 +9,7 @@ import {
   Database,
   Save,
 } from "lucide-react";
+import { toast } from "sonner";
 
 export default function Settings() {
   const [notifications, setNotifications] = useState(true);
@@ -19,7 +20,9 @@ export default function Settings() {
   const [refreshInterval, setRefreshInterval] = useState("30");
 
   const handleSave = () => {
-    alert("설정이 저장되었습니다.");
+    toast.success('저장 완료', {
+      description: '설정이 저장되었습니다.'
+    });
   };
 
   return (

@@ -16,7 +16,8 @@
     "axios": "^1.7.9",
     "lucide-react": "^0.469.0",
     "clsx": "^2.1.1",
-    "tailwind-merge": "^2.6.0"
+    "tailwind-merge": "^2.6.0",
+    "sonner": "^1.7.2"
   },
   "devDependencies": {
     "@eslint/js": "^9.36.0",

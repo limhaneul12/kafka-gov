@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { toast } from "sonner";
 import Button from "../ui/Button";
 import Badge from "../ui/Badge";
 import Loading from "../ui/Loading";
@@ -26,7 +27,9 @@ interface PolicyVersion {
   content: Record<string, unknown>;
   created_by: string;
   created_at: string;
+  target_environment: string;
   updated_at: string | null;
+  activated_at: string | null;
 }
 
 interface PolicyDetailModalProps {
@@ -65,15 +68,43 @@ export default function PolicyDetailModal({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, policyId, autoShowVersions]);
 
-  const loadPolicy = async () => {
+  const loadPolicy = async (preferActive = false) => {
     try {
       setLoading(true);
-      const response = await policiesAPI.get(policyId);
-      console.log("Policy loaded:", response.data);
-      setPolicy(response.data.policy);
+      let response;
+      
+      if (preferActive) {
+        // ACTIVE 버전 시도
+        console.log("Trying to load ACTIVE policy...");
+        response = await fetch(`/api/v1/policies/${policyId}/active`);
+        
+        if (!response.ok) {
+          if (response.status === 422) {
+            // ACTIVE가 없으면 최신 버전으로 fallback
+            console.log("No ACTIVE version, falling back to latest...");
+            response = await fetch(`/api/v1/policies/${policyId}`);
+          } else {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+          }
+        }
+      } else {
+        // 최신 버전 조회
+        console.log("Loading latest policy...");
+        response = await fetch(`/api/v1/policies/${policyId}`);
+      }
+      
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+      
+      const data = await response.json();
+      console.log("Policy loaded:", data.policy);
+      setPolicy(data.policy);
     } catch (error: any) {
       console.error("Failed to load policy:", error);
-      alert(`Failed to load policy: ${error.response?.data?.detail || error.message}`);
+      toast.error('정책 로드 실패', {
+        description: error.message
+      });
       onClose();
     } finally {
       setLoading(false);
@@ -98,12 +129,13 @@ export default function PolicyDetailModal({
 
     try {
       await policiesAPI.activate(policyId, version);
-      await loadPolicy();
+      // Activate 후에는 ACTIVE 버전을 우선적으로 조회
+      await loadPolicy(true);
       await loadVersions();
       onRefresh();
     } catch (error) {
       console.error("Failed to activate policy:", error);
-      alert("Failed to activate policy");
+      toast.error("Failed to activate policy");
     }
   };
 
@@ -117,12 +149,13 @@ export default function PolicyDetailModal({
       onRefresh();
     } catch (error) {
       console.error("Failed to archive policy:", error);
-      alert("Failed to archive policy");
+      toast.error("Failed to archive policy");
     }
   };
 
   const handleDelete = async () => {
-    if (!confirm("Delete this DRAFT policy? This action cannot be undone.")) return;
+    if (!policy) return;
+    if (!confirm(`Delete policy "${policy.name}"? This cannot be undone.`)) return;
 
     try {
       await policiesAPI.delete(policyId);
@@ -130,30 +163,94 @@ export default function PolicyDetailModal({
       onClose();
     } catch (error) {
       console.error("Failed to delete policy:", error);
-      alert("Failed to delete policy. Only DRAFT policies can be deleted.");
+      toast.error("Failed to delete policy. Only DRAFT policies can be deleted.");
     }
   };
 
-  const handleRollback = async (targetVersion: number) => {
+  const handleDeleteAllVersions = async () => {
+    if (!policy) return;
     if (
       !confirm(
-        `Rollback to version ${targetVersion}? This will create a new DRAFT version with that content.`
+        `정책 "${policy.name}"의 모든 버전을 삭제하시겠습니까?\n\n⚠️ 이 작업은 되돌릴 수 없으며, ACTIVE/ARCHIVED 포함 모든 버전이 삭제됩니다.`
       )
     )
       return;
 
     try {
-      await fetch(`/api/v1/policies/${policyId}/rollback`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ target_version: targetVersion }),
+      // 모든 버전 삭제 API 호출
+      await fetch(`/api/v1/policies/${policyId}/all`, {
+        method: "DELETE",
+      });
+      onRefresh();
+      onClose();
+    } catch (error) {
+      console.error("Failed to delete all versions:", error);
+      toast.error("정책 전체 삭제에 실패했습니다.");
+    }
+  };
+
+  const handleDeleteVersion = async (version: number) => {
+    const versionData = versions.find((v) => v.version === version);
+    if (!versionData) return;
+
+    if (versionData.status === "ACTIVE") {
+      toast.error("ACTIVE 상태의 버전은 삭제할 수 없습니다.");
+      return;
+    }
+
+    if (
+      !confirm(
+        `v${version}을 삭제하시겠습니까?\n\n이 작업은 되돌릴 수 없습니다.`
+      )
+    )
+      return;
+
+    try {
+      await fetch(`/api/v1/policies/${policyId}?version=${version}`, {
+        method: "DELETE",
       });
       await loadPolicy();
       await loadVersions();
       onRefresh();
     } catch (error) {
+      console.error("Failed to delete version:", error);
+      toast.error("버전 삭제에 실패했습니다.");
+    }
+  };
+
+  const handleRollback = async (targetVersion: number) => {
+    // Toast 경고
+    toast.warning(`v${targetVersion}으로 롤백`, {
+      description: "롤백 버튼을 다시 한번 클릭하면 해당 버전이 ACTIVE로 변경됩니다.",
+      duration: 5000,
+    });
+
+    try {
+      const response = await fetch(`/api/v1/policies/${policyId}/rollback`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          target_version: targetVersion,
+          created_by: "admin@example.com",
+        }),
+      });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      // 롤백 후에는 ACTIVE 버전을 우선적으로 조회
+      await loadPolicy(true);
+      await loadVersions();
+      onRefresh();
+      toast.success("롤백 성공", {
+        description: `v${targetVersion}으로 롤백되었습니다.`
+      });
+    } catch (error) {
       console.error("Failed to rollback policy:", error);
-      alert("Failed to rollback policy");
+      toast.error("롤백 실패", {
+        description: error instanceof Error ? error.message : "다시 시도해주세요."
+      });
     }
   };
 
@@ -230,8 +327,8 @@ export default function PolicyDetailModal({
   if (!policy) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 overflow-y-auto">
-      <div className="w-full max-w-4xl m-4 rounded-lg bg-white shadow-xl">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 overflow-y-auto p-4">
+      <div className="w-full max-w-5xl my-8 rounded-lg bg-white shadow-xl max-h-[90vh] overflow-y-auto">
         <div className="border-b border-gray-200 p-6">
           <div className="flex items-start justify-between">
             <div className="flex-1">
@@ -265,6 +362,20 @@ export default function PolicyDetailModal({
               <p className="mt-1 text-sm text-gray-900">{policy.created_by}</p>
             </div>
             <div>
+              <p className="text-sm font-medium text-gray-600">Target Environment</p>
+              <div className="mt-1">
+                <Badge variant={policy.target_environment === "total" ? "default" : "warning"}>
+                  {policy.target_environment}
+                </Badge>
+              </div>
+            </div>
+            <div>
+              <p className="text-sm font-medium text-gray-600">Policy Type</p>
+              <div className="mt-1">
+                <Badge variant="info">{policy.policy_type}</Badge>
+              </div>
+            </div>
+            <div>
               <p className="text-sm font-medium text-gray-600">Created At</p>
               <p className="mt-1 text-sm text-gray-900">
                 {new Date(policy.created_at).toLocaleString()}
@@ -282,7 +393,18 @@ export default function PolicyDetailModal({
 
           {/* Policy Content */}
           <div>
-            <p className="text-sm font-medium text-gray-600 mb-2">Policy Content</p>
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-sm font-medium text-gray-600">Policy Content</p>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => onEdit(policy)}
+                title={policy.status === "ACTIVE" ? "새 버전 생성" : "정책 수정"}
+              >
+                <Edit className="h-4 w-4" />
+                {policy.status === "ACTIVE" ? "Edit (New Version)" : "Edit"}
+              </Button>
+            </div>
             <pre className="rounded-lg bg-gray-50 p-4 text-sm overflow-x-auto">
               {JSON.stringify(policy.content, null, 2)}
             </pre>
@@ -462,31 +584,39 @@ export default function PolicyDetailModal({
                 <table className="w-full">
                   <thead className="bg-gray-50">
                     <tr>
-                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-600">
+                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-600 w-20">
                         Version
                       </th>
-                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-600">
+                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-600 w-24">
                         Status
                       </th>
-                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-600">
+                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-600 w-40">
                         Created By
                       </th>
-                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-600">
+                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-600 w-36">
                         Created At
                       </th>
-                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-600">
+                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-600 w-36">
+                        Using At
+                      </th>
+                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-600 w-36">
                         Actions
                       </th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-200">
                     {versions.map((ver) => (
-                      <tr key={ver.version} className="hover:bg-gray-50">
+                      <tr 
+                        key={ver.version} 
+                        className={`hover:bg-gray-50 ${ver.status === "ACTIVE" ? "bg-green-50" : ""}`}
+                      >
                         <td className="px-4 py-2">
                           <div className="flex items-center gap-2">
-                            <span className="text-sm font-medium text-gray-900">v{ver.version}</span>
-                            {ver.version === policy.version && (
-                              <Badge variant="info" className="text-xs">Current</Badge>
+                            <span className={`text-sm font-medium ${ver.status === "ACTIVE" ? "text-green-700" : "text-gray-900"}`}>
+                              v{ver.version}
+                            </span>
+                            {ver.status === "ACTIVE" && (
+                              <Badge variant="success" className="text-xs">적용중</Badge>
                             )}
                           </div>
                         </td>
@@ -501,27 +631,40 @@ export default function PolicyDetailModal({
                         <td className="px-4 py-2 text-sm text-gray-600">
                           {new Date(ver.created_at).toLocaleString()}
                         </td>
+                        <td className="px-4 py-2 text-sm text-gray-600">
+                          {ver.activated_at ? new Date(ver.activated_at).toLocaleString() : '-'}
+                        </td>
                         <td className="px-4 py-2">
                           <div className="flex gap-1">
-                            {ver.status !== "ACTIVE" && (
+                            {ver.status !== "ACTIVE" && ver.status === "DRAFT" && (
                               <Button
                                 size="sm"
                                 variant="ghost"
                                 onClick={() => handleActivate(ver.version)}
-                                title="Activate this version"
+                                title="이 버전을 활성화"
                               >
                                 <CheckCircle className="h-4 w-4 text-green-600" />
                               </Button>
                             )}
-                            {ver.version !== policy.version && (
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                onClick={() => handleRollback(ver.version)}
-                                title="Rollback to this version"
-                              >
-                                <RotateCcw className="h-4 w-4 text-blue-600" />
-                              </Button>
+                            {ver.status !== "ACTIVE" && (
+                              <>
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={() => handleRollback(ver.version)}
+                                  title={`v${ver.version}을 ACTIVE로 변경`}
+                                >
+                                  <RotateCcw className="h-4 w-4 text-blue-600" />
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={() => handleDeleteVersion(ver.version)}
+                                  title={`v${ver.version} 삭제`}
+                                >
+                                  <Trash2 className="h-4 w-4 text-red-600" />
+                                </Button>
+                              </>
                             )}
                           </div>
                         </td>
@@ -551,11 +694,26 @@ export default function PolicyDetailModal({
                 </>
               )}
               {policy.status === "ACTIVE" && (
-                <Button variant="secondary" onClick={handleArchive}>
-                  <Archive className="h-4 w-4" />
-                  Archive
-                </Button>
+                <>
+                  <Button variant="secondary" onClick={() => onEdit(policy)}>
+                    <Edit className="h-4 w-4" />
+                    Edit (Create New Version)
+                  </Button>
+                  <Button variant="secondary" onClick={handleArchive}>
+                    <Archive className="h-4 w-4" />
+                    Archive
+                  </Button>
+                </>
               )}
+              {/* 정책 전체 삭제 버튼 */}
+              <Button 
+                variant="danger" 
+                onClick={handleDeleteAllVersions}
+                className="ml-auto"
+              >
+                <Trash2 className="h-4 w-4" />
+                Delete All Versions
+              </Button>
             </div>
             <div className="flex gap-2">
               {policy.status === "DRAFT" && (

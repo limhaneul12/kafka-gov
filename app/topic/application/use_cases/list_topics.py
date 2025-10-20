@@ -59,15 +59,34 @@ class TopicListUseCase:
                 f"[{cluster_id}] Topic {topic_name}: owner={owner}, doc={doc}, tags={tags}, env={environment}"
             )
 
+            # retention.ms 추출 (Kafka config에서)
+            config = kafka_info.get("config", {})
+            retention_ms_str = config.get("retention.ms")
+            retention_ms = int(retention_ms_str) if retention_ms_str else None
+
+            # owners 추출 (metadata에서 owners 또는 owner)
+            owners = metadata.get("owners") if metadata else None
+            if not owners and owner:
+                owners = [owner]
+            elif not owners:
+                owners = []
+
+            # slo/sla 추출
+            slo = metadata.get("slo") if metadata else None
+            sla = metadata.get("sla") if metadata else None
+
             topics_with_metadata.append(
                 {
                     "name": topic_name,
-                    "owner": owner,
+                    "owners": owners,
                     "doc": doc,
                     "tags": tags,
                     "partition_count": kafka_info.get("partition_count"),
                     "replication_factor": kafka_info.get("replication_factor"),
+                    "retention_ms": retention_ms,
                     "environment": environment,
+                    "slo": slo,
+                    "sla": sla,
                 }
             )
 

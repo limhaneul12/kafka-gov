@@ -16,9 +16,10 @@ class CreatePolicyRequest(BaseModel):
 
     policy_type: PolicyType
     name: str = Field(..., min_length=1, max_length=255)
-    description: str = Field(..., min_length=1)
+    description: str = Field(default="", description="정책 설명 (선택사항)")
     content: dict = Field(..., description="CustomNamingRules 또는 CustomGuardrailPreset의 dict")
     created_by: str = Field(..., min_length=1, max_length=255)
+    target_environment: str = Field(default="total", description="적용 환경 (dev/stg/prod/total)")
 
 
 class UpdatePolicyRequest(BaseModel):
@@ -27,8 +28,9 @@ class UpdatePolicyRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     name: str | None = Field(None, min_length=1, max_length=255)
-    description: str | None = Field(None, min_length=1)
+    description: str | None = Field(None, description="정책 설명 (선택사항)")
     content: dict | None = None
+    target_environment: str | None = Field(None, description="적용 환경 (dev/stg/prod/total)")
 
 
 class ActivatePolicyRequest(BaseModel):
@@ -45,6 +47,9 @@ class RollbackPolicyRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     target_version: int = Field(..., gt=0, description="롤백할 대상 버전")
+    created_by: str = Field(
+        default="system", min_length=1, max_length=255, description="롤백 실행자"
+    )
 
 
 # ============================================================================
@@ -66,7 +71,9 @@ class PolicyDTO(BaseModel):
     content: dict[str, str | int | bool | list[str]]
     created_by: str
     created_at: str
+    target_environment: str = "total"
     updated_at: str | None = None
+    activated_at: str | None = None
 
 
 class PolicyResponse(BaseModel):
@@ -178,5 +185,7 @@ def to_policy_dto(policy: StoredPolicy) -> PolicyDTO:
         content=policy.content,
         created_by=policy.created_by,
         created_at=policy.created_at,
+        target_environment=policy.target_environment,
         updated_at=policy.updated_at,
+        activated_at=policy.activated_at,
     )

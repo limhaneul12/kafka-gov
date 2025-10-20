@@ -27,6 +27,7 @@ class CreatePolicyUseCase:
         description: str,
         content: dict,
         created_by: str,
+        target_environment: str = "total",
     ) -> tuple[StoredPolicy, str]:
         """정책 생성 (version=1, status=DRAFT)"""
         logger.info(f"Creating policy: type={policy_type.value}, name={name}, by={created_by}")
@@ -37,6 +38,7 @@ class CreatePolicyUseCase:
             description=description,
             content=content,
             created_by=created_by,
+            target_environment=target_environment,
         )
 
         logger.info(f"Policy created: {policy.policy_id} v{policy.version}")
@@ -125,6 +127,7 @@ class UpdatePolicyUseCase:
         name: str | None = None,
         description: str | None = None,
         content: dict | None = None,
+        target_environment: str | None = None,
     ) -> tuple[StoredPolicy, str]:
         """정책 수정 (새 버전 DRAFT 생성)"""
         logger.info(f"Updating policy: {policy_id}")
@@ -134,6 +137,7 @@ class UpdatePolicyUseCase:
             name=name,
             description=description,
             content=content,
+            target_environment=target_environment,
         )
 
         logger.info(f"Policy updated: {policy.policy_id} v{policy.version} (DRAFT)")
@@ -179,19 +183,28 @@ class ArchivePolicyUseCase:
 
 
 class DeletePolicyUseCase:
-    """정책 삭제 UseCase (DRAFT만 가능)"""
+    """정책 삭제 UseCase"""
 
     def __init__(self, policy_repository: IPolicyRepository) -> None:
         self.policy_repo = policy_repository
 
     async def execute(self, policy_id: str, version: int | None = None) -> str:
-        """정책 삭제 (DRAFT만)"""
+        """정책 삭제 (ACTIVE 제외, DRAFT/ARCHIVED 가능)"""
         logger.info(f"Deleting policy: {policy_id} (version={version})")
 
         await self.policy_repo.delete_policy(policy_id, version)
 
         logger.info(f"Policy deleted: {policy_id}")
         return f"Policy {policy_id} (version={version or 'all drafts'}) deleted successfully"
+
+    async def execute_delete_all(self, policy_id: str) -> str:
+        """정책 전체 삭제 (모든 버전)"""
+        logger.info(f"Deleting all versions of policy: {policy_id}")
+
+        await self.policy_repo.delete_all_policy_versions(policy_id)
+
+        logger.info(f"All versions of policy deleted: {policy_id}")
+        return f"All versions of policy {policy_id} deleted successfully"
 
 
 class RollbackPolicyUseCase:
@@ -200,19 +213,16 @@ class RollbackPolicyUseCase:
     def __init__(self, policy_repository: IPolicyRepository) -> None:
         self.policy_repo = policy_repository
 
-    async def execute(self, policy_id: str, target_version: int) -> tuple[StoredPolicy, str]:
-        """이전 버전으로 롤백 (새 DRAFT 버전 생성)"""
+    async def execute(
+        self, policy_id: str, target_version: int, created_by: str = "system"
+    ) -> tuple[StoredPolicy, str]:
+        """이전 버전으로 롤백 (해당 버전을 ACTIVE로 변경)"""
         logger.info(f"Rolling back policy: {policy_id} to version {target_version}")
 
         policy = await self.policy_repo.rollback_to_version(
-            policy_id=policy_id, target_version=target_version
+            policy_id=policy_id, target_version=target_version, created_by=created_by
         )
 
-        logger.info(
-            f"Policy rolled back: {policy.policy_id} v{target_version} → v{policy.version} (DRAFT)"
-        )
-        message = (
-            f"Policy '{policy.name}' rolled back to version {target_version}. "
-            f"New version {policy.version} created (DRAFT). Activate to apply."
-        )
+        logger.info(f"Policy rolled back: {policy.policy_id} to v{target_version} (now ACTIVE)")
+        message = f"Policy '{policy.name}' v{target_version} is now active"
         return policy, message

@@ -16,6 +16,7 @@ from .cluster.interface.router import router as cluster_router
 from .connect.interface.router import router as connect_router
 from .container import AppContainer, register_event_handlers
 from .schema.interface.router import router as schema_router
+from .shared.error_handlers import format_validation_error
 from .shared.interface.router import router as shared_router
 from .topic.interface.policy_router import router as policy_router
 from .topic.interface.router import router as topic_router
@@ -118,17 +119,17 @@ def create_app() -> FastAPI:
 
     @app.exception_handler(RequestValidationError)
     async def validation_exception_handler(request: Request, exc: RequestValidationError):
-        """Pydantic validation 에러를 상세히 로깅"""
+        """Pydantic validation 에러를 사용자 친화적인 메시지로 변환"""
         logger.error(f"Validation error on {request.method} {request.url.path}")
         logger.error(f"Request body: {await request.body()}")
         logger.error(f"Validation errors: {exc.errors()}")
 
+        # 사용자 친화적인 메시지로 변환
+        friendly_message = format_validation_error(exc)  # type: ignore[arg-type]
+
         return ORJSONResponse(
             status_code=422,
-            content={
-                "detail": exc.errors(),
-                "body": exc.body if hasattr(exc, "body") else None,
-            },
+            content={"detail": friendly_message},
         )
 
     @app.exception_handler(404)

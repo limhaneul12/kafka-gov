@@ -20,7 +20,7 @@ items:
       cleanup_policy: delete
       max_message_bytes: 1048576  # 1MB
     metadata:
-      owner: team-commerce
+      owners: ["team-commerce"]
       doc: "https://wiki.company.com/topics/orders/created"
       tags: ["orders", "critical", "pii"]
   
@@ -32,7 +32,7 @@ items:
       retention_ms: 604800000
       min_insync_replicas: 2
     metadata:
-      owner: team-commerce
+      owners: ["team-commerce"]
       doc: "https://wiki.company.com/topics/orders/updated"
       tags: ["orders", "critical"]
   
@@ -44,7 +44,7 @@ items:
       retention_ms: 2592000000  # 30일
       min_insync_replicas: 2
     metadata:
-      owner: team-commerce
+      owners: ["team-commerce"]
       doc: "https://wiki.company.com/topics/orders/cancelled"
       tags: ["orders"]
   
@@ -61,7 +61,7 @@ items:
       min_insync_replicas: 2
       max_message_bytes: 2097152  # 2MB
     metadata:
-      owner: team-payment
+      owners: ["team-payment"]
       doc: "https://wiki.company.com/topics/payments/completed"
       tags: ["payments", "critical", "pii", "financial"]
   
@@ -73,7 +73,7 @@ items:
       retention_ms: 7776000000
       min_insync_replicas: 2
     metadata:
-      owner: team-payment
+      owners: ["team-payment"]
       doc: "https://wiki.company.com/topics/payments/failed"
       tags: ["payments", "debugging"]
   
@@ -89,7 +89,7 @@ items:
       retention_ms: 2592000000  # 30일
       min_insync_replicas: 2
     metadata:
-      owner: team-growth
+      owners: ["team-growth"]
       doc: "https://wiki.company.com/topics/users/signup"
       tags: ["users", "events", "pii"]
   
@@ -101,7 +101,7 @@ items:
       retention_ms: 2592000000
       min_insync_replicas: 2
     metadata:
-      owner: team-growth
+      owners: ["team-growth"]
       doc: "https://wiki.company.com/topics/users/profile-updated"
       tags: ["users", "events"]
   
@@ -117,7 +117,7 @@ items:
       retention_ms: 604800000  # 7일 (최소 요구사항)
       min_insync_replicas: 2
     metadata:
-      owner: team-notification
+      owners: ["team-notification"]
       doc: "https://wiki.company.com/topics/notifications/email"
       tags: ["notifications", "transient"]
   
@@ -129,7 +129,7 @@ items:
       retention_ms: 604800000  # 7일 (최소 요구사항)
       min_insync_replicas: 2
     metadata:
-      owner: team-notification
+      owners: ["team-notification"]
       doc: "https://wiki.company.com/topics/notifications/sms"
       tags: ["notifications", "transient"]
   
@@ -145,6 +145,6 @@ items:
       retention_ms: 604800000  # 7일
       min_insync_replicas: 2
     metadata:
-      owner: team-platform
+      owners: ["team-platform"]
       doc: "https://wiki.company.com/topics/logs/application"
       tags: ["logs", "monitoring"]

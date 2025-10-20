@@ -1,4 +1,5 @@
 import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { Toaster } from "sonner";
 import Layout from "./components/layout/Layout";
 import Dashboard from "./pages/Dashboard";
 import Topics from "./pages/Topics";
@@ -12,26 +13,29 @@ import History from "./pages/History";
 
 function App() {
   return (
-    <BrowserRouter
-      future={{
-        v7_startTransition: true,
-        v7_relativeSplatPath: true,
-      }}
-    >
-      <Routes>
-        <Route path="/" element={<Layout />}>
-          <Route index element={<Dashboard />} />
-          <Route path="topics" element={<Topics />} />
-          <Route path="schemas" element={<Schemas />} />
-          <Route path="connect" element={<Connect />} />
-          <Route path="connections" element={<Connections />} />
-          <Route path="policies" element={<Policies />} />
-          <Route path="analysis" element={<Analysis />} />
-          <Route path="history" element={<History />} />
-          <Route path="settings" element={<Settings />} />
-        </Route>
-      </Routes>
-    </BrowserRouter>
+    <>
+      <Toaster position="top-right" richColors closeButton />
+      <BrowserRouter
+        future={{
+          v7_startTransition: true,
+          v7_relativeSplatPath: true,
+        }}
+      >
+        <Routes>
+          <Route path="/" element={<Layout />}>
+            <Route index element={<Dashboard />} />
+            <Route path="topics" element={<Topics />} />
+            <Route path="schemas" element={<Schemas />} />
+            <Route path="connect" element={<Connect />} />
+            <Route path="connections" element={<Connections />} />
+            <Route path="policies" element={<Policies />} />
+            <Route path="analysis" element={<Analysis />} />
+            <Route path="history" element={<History />} />
+            <Route path="settings" element={<Settings />} />
+          </Route>
+        </Routes>
+      </BrowserRouter>
+    </>
   );
 }
 

@@ -91,8 +91,8 @@ export default function ValidateConfigModal({
   const errorConfigs = result?.configs.filter((c) => c.value.errors.length > 0) || [];
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 overflow-y-auto">
-      <div className="w-full max-w-4xl m-4 rounded-lg bg-white shadow-xl">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 overflow-y-auto p-4">
+      <div className="w-full max-w-3xl my-8 rounded-lg bg-white shadow-xl max-h-[90vh] overflow-y-auto">
         <div className="border-b border-gray-200 p-6">
           <div className="flex items-start justify-between">
             <div>

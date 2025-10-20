@@ -6,6 +6,11 @@ import logging
 
 from app.cluster.domain.services import IConnectionManager
 from app.shared.constants import AuditAction, AuditStatus, AuditTarget
+from app.shared.domain.policy_types import (
+    DomainPolicySeverity,
+    DomainPolicyViolation,
+    DomainResourceType,
+)
 from app.topic.infrastructure.kafka_adapter import KafkaTopicAdapter
 
 from ...domain.models import DomainTopicBatch, DomainTopicPlan, DomainTopicSpec
@@ -16,8 +21,52 @@ from ...domain.policies.management import (
     PolicyType,
 )
 from ...domain.policies.validation import PolicyResolver
-from ...domain.repositories.interfaces import IAuditRepository, ITopicMetadataRepository
+from ...domain.repositories import IAuditRepository, ITopicMetadataRepository
 from ...domain.services import TopicPlannerService
+
+
+def _translate_policy_error(error: Exception) -> str:
+    """정책 검증 에러를 사용자 친화적인 메시지로 변환
+
+    Args:
+        error: 원본 에러
+
+    Returns:
+        사용자 친화적인 에러 메시지
+    """
+    error_str = str(error)
+
+    # Pydantic ValidationError 파싱
+    if "validation error" in error_str.lower():
+        # 정책 타입 추출
+        policy_type = "정책"
+        if "CustomNamingRules" in error_str:
+            policy_type = "Naming 정책"
+        elif "CustomGuardrailPreset" in error_str:
+            policy_type = "Guardrail 정책"
+
+        # 필수 필드 추출
+        missing_fields = []
+        if "pattern" in error_str and "required" in error_str:
+            missing_fields.append("pattern (토픽 이름 패턴)")
+        if "preset_name" in error_str and "required" in error_str:
+            missing_fields.append("preset_name (프리셋 이름)")
+        if "version" in error_str and "required" in error_str:
+            missing_fields.append("version (버전)")
+
+        if missing_fields:
+            fields_str = "\n".join(f"  • {field}" for field in missing_fields)
+            return f"{policy_type}의 필수 항목이 누락되었습니다:\n{fields_str}\n\n관리자에게 문의하거나 정책을 다시 설정해주세요."
+
+        # 기타 검증 에러
+        return f"{policy_type} 설정이 올바르지 않습니다. 관리자에게 문의해주세요."
+
+    # Guardrail policy 필드 누락
+    if "missing required fields" in error_str.lower():
+        return "Guardrail 정책의 필수 항목(preset_name, version)이 누락되었습니다.\n\n정책을 다시 생성하거나 관리자에게 문의해주세요."
+
+    # 일반 에러
+    return "정책 검증 중 오류가 발생했습니다. 관리자에게 문의해주세요."
 
 
 class TopicBatchDryRunUseCase:
@@ -161,10 +210,24 @@ class TopicBatchDryRunUseCase:
 
         except Exception as e:
             logger.error(f"Policy validation error: {e}", exc_info=True)
-            # 정책 검증 에러는 fail-open (통과) 처리
-            # 정책 시스템 장애 시 토픽 생성이 막히지 않도록
-            logger.warning("Policy validation failed, allowing operation (fail-open)")
-            return []
+            # 정책 검증 에러를 violations로 반환 (사용자에게 경고 표시)
+            logger.warning(
+                "Policy validation failed, returning as violations for user confirmation"
+            )
+
+            # 사용자 친화적인 에러 메시지 생성
+            user_friendly_message = _translate_policy_error(e)
+
+            return [
+                DomainPolicyViolation(
+                    resource_type=DomainResourceType.TOPIC,
+                    resource_name="POLICY_CONFIG_ERROR",
+                    rule_id="policy.configuration.invalid",
+                    message=user_friendly_message,
+                    severity=DomainPolicySeverity.ERROR,
+                    field=None,
+                )
+            ]
 
     async def _get_active_policy(self, policy_type: PolicyType, env: str):
         """환경별 ACTIVE 정책 조회 (우선순위: env-specific > total)
