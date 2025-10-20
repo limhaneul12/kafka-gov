@@ -49,6 +49,7 @@ export default function Policies() {
     description: string;
     content: Record<string, unknown>;
     created_by: string;
+    target_environment?: string;
   }) => {
     await policiesAPI.create(data);
     await loadPolicies();

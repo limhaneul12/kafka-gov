@@ -12,6 +12,8 @@ import {
   Trash2,
   Edit,
   CheckCircle,
+  GitCompare,
+  ChevronRight,
 } from "lucide-react";
 
 interface PolicyVersion {
@@ -48,6 +50,11 @@ export default function PolicyDetailModal({
   const [versions, setVersions] = useState<PolicyVersion[]>([]);
   const [loading, setLoading] = useState(true);
   const [showVersions, setShowVersions] = useState(autoShowVersions);
+  
+  // Diff 상태
+  const [showDiff, setShowDiff] = useState(false);
+  const [diffBaseVersion, setDiffBaseVersion] = useState<number | null>(null);
+  const [diffTargetVersion, setDiffTargetVersion] = useState<number | null>(null);
 
   useEffect(() => {
     if (isOpen && policyId) {
@@ -163,6 +170,51 @@ export default function PolicyDetailModal({
     }
   };
 
+  // Diff 계산 함수
+  const calculateDiff = (v1: number, v2: number) => {
+    const version1 = versions.find(v => v.version === v1);
+    const version2 = versions.find(v => v.version === v2);
+    
+    if (!version1 || !version2) return null;
+
+    const content1 = version1.content;
+    const content2 = version2.content;
+
+    const diff: {
+      added: Array<{ key: string; value: any }>;
+      removed: Array<{ key: string; value: any }>;
+      changed: Array<{ key: string; old: any; new: any }>;
+    } = {
+      added: [],
+      removed: [],
+      changed: [],
+    };
+
+    const allKeys = new Set([
+      ...Object.keys(content1),
+      ...Object.keys(content2),
+    ]);
+
+    allKeys.forEach(key => {
+      const val1 = content1[key];
+      const val2 = content2[key];
+
+      if (val1 === undefined && val2 !== undefined) {
+        diff.added.push({ key, value: val2 });
+      } else if (val1 !== undefined && val2 === undefined) {
+        diff.removed.push({ key, value: val1 });
+      } else if (JSON.stringify(val1) !== JSON.stringify(val2)) {
+        diff.changed.push({ key, old: val1, new: val2 });
+      }
+    });
+
+    return diff;
+  };
+
+  const diffResult = (diffBaseVersion && diffTargetVersion) 
+    ? calculateDiff(diffBaseVersion, diffTargetVersion)
+    : null;
+
   if (!isOpen) return null;
 
   if (loading) {
@@ -240,15 +292,170 @@ export default function PolicyDetailModal({
           <div>
             <div className="flex items-center justify-between mb-3">
               <p className="text-sm font-medium text-gray-600">Version History</p>
-              <Button
-                size="sm"
-                variant="secondary"
-                onClick={() => setShowVersions(!showVersions)}
-              >
-                <History className="h-4 w-4" />
-                {showVersions ? "Hide" : "Show"} Versions ({versions.length})
-              </Button>
+              <div className="flex gap-2">
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  onClick={() => {
+                    setShowDiff(!showDiff);
+                    if (!showDiff) {
+                      setShowVersions(true);
+                      setDiffBaseVersion(null);
+                      setDiffTargetVersion(null);
+                    }
+                  }}
+                >
+                  <GitCompare className="h-4 w-4" />
+                  {showDiff ? "Hide" : "Compare"} Versions
+                </Button>
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  onClick={() => setShowVersions(!showVersions)}
+                >
+                  <History className="h-4 w-4" />
+                  {showVersions ? "Hide" : "Show"} Versions ({versions.length})
+                </Button>
+              </div>
             </div>
+
+            {/* Diff UI */}
+            {showDiff && (
+              <div className="mb-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
+                <h4 className="text-sm font-semibold text-gray-900 mb-3">
+                  비교할 버전 선택
+                </h4>
+                <div className="grid grid-cols-3 gap-3 items-center">
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">
+                      이전 버전 (Base)
+                    </label>
+                    <select
+                      value={diffBaseVersion || ""}
+                      onChange={(e) => setDiffBaseVersion(e.target.value ? Number(e.target.value) : null)}
+                      className="w-full text-sm rounded border border-gray-300 px-3 py-2"
+                    >
+                      <option value="">선택하세요</option>
+                      {versions.map(v => (
+                        <option key={v.version} value={v.version}>
+                          v{v.version} ({v.status})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  
+                  <div className="text-center">
+                    <ChevronRight className="h-5 w-5 text-gray-400 mx-auto" />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">
+                      이후 버전 (Target)
+                    </label>
+                    <select
+                      value={diffTargetVersion || ""}
+                      onChange={(e) => setDiffTargetVersion(e.target.value ? Number(e.target.value) : null)}
+                      className="w-full text-sm rounded border border-gray-300 px-3 py-2"
+                    >
+                      <option value="">선택하세요</option>
+                      {versions.map(v => (
+                        <option key={v.version} value={v.version}>
+                          v{v.version} ({v.status})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                {/* Diff 결과 */}
+                {diffResult && (
+                  <div className="mt-4 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <h5 className="text-sm font-semibold text-gray-900">
+                        비교 결과: v{diffBaseVersion} → v{diffTargetVersion}
+                      </h5>
+                      <div className="flex gap-3 text-xs">
+                        <span className="text-green-700">+ {diffResult.added.length} 추가</span>
+                        <span className="text-red-700">- {diffResult.removed.length} 삭제</span>
+                        <span className="text-blue-700">~ {diffResult.changed.length} 변경</span>
+                      </div>
+                    </div>
+
+                    <div className="border border-gray-200 rounded-lg overflow-hidden">
+                      {/* 추가된 항목 */}
+                      {diffResult.added.length > 0 && (
+                        <div className="bg-green-50 border-b border-green-200">
+                          <div className="px-3 py-2 bg-green-100 border-b border-green-200">
+                            <span className="text-xs font-semibold text-green-900">
+                              ✚ 추가됨 ({diffResult.added.length})
+                            </span>
+                          </div>
+                          {diffResult.added.map(({ key, value }) => (
+                            <div key={key} className="px-3 py-2 font-mono text-xs">
+                              <span className="text-green-700 font-semibold">+ {key}:</span>{" "}
+                              <span className="text-green-800">{JSON.stringify(value)}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* 삭제된 항목 */}
+                      {diffResult.removed.length > 0 && (
+                        <div className="bg-red-50 border-b border-red-200">
+                          <div className="px-3 py-2 bg-red-100 border-b border-red-200">
+                            <span className="text-xs font-semibold text-red-900">
+                              ✖ 삭제됨 ({diffResult.removed.length})
+                            </span>
+                          </div>
+                          {diffResult.removed.map(({ key, value }) => (
+                            <div key={key} className="px-3 py-2 font-mono text-xs">
+                              <span className="text-red-700 font-semibold">- {key}:</span>{" "}
+                              <span className="text-red-800">{JSON.stringify(value)}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* 변경된 항목 */}
+                      {diffResult.changed.length > 0 && (
+                        <div className="bg-blue-50">
+                          <div className="px-3 py-2 bg-blue-100 border-b border-blue-200">
+                            <span className="text-xs font-semibold text-blue-900">
+                              ⟳ 변경됨 ({diffResult.changed.length})
+                            </span>
+                          </div>
+                          {diffResult.changed.map(({ key, old, new: newVal }) => (
+                            <div key={key} className="px-3 py-2 space-y-1">
+                              <div className="font-mono text-xs">
+                                <span className="text-blue-700 font-semibold">~ {key}:</span>
+                              </div>
+                              <div className="ml-4 space-y-1">
+                                <div className="font-mono text-xs">
+                                  <span className="text-red-700">- </span>
+                                  <span className="text-red-800 line-through">{JSON.stringify(old)}</span>
+                                </div>
+                                <div className="font-mono text-xs">
+                                  <span className="text-green-700">+ </span>
+                                  <span className="text-green-800">{JSON.stringify(newVal)}</span>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    {diffResult.added.length === 0 && 
+                     diffResult.removed.length === 0 && 
+                     diffResult.changed.length === 0 && (
+                      <div className="text-center py-4 text-sm text-gray-500">
+                        두 버전이 동일합니다
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
 
             {showVersions && (
               <div className="rounded-lg border border-gray-200 overflow-hidden">

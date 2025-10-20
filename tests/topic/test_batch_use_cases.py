@@ -18,12 +18,14 @@ class TestTopicBatchDryRunUseCase:
         mock_connection_manager,
         mock_metadata_repository,
         mock_audit_repository,
+        mock_policy_repository,
     ):
         """DryRun은 계획만 반환 (실행 안 함)"""
         use_case = TopicBatchDryRunUseCase(
             mock_connection_manager,
             mock_metadata_repository,
             mock_audit_repository,
+            mock_policy_repository,
         )
 
         batch = create_topic_batch(
@@ -47,12 +49,14 @@ class TestTopicBatchDryRunUseCase:
         mock_connection_manager,
         mock_metadata_repository,
         mock_audit_repository,
+        mock_policy_repository,
     ):
         """여러 토픽 DryRun"""
         use_case = TopicBatchDryRunUseCase(
             mock_connection_manager,
             mock_metadata_repository,
             mock_audit_repository,
+            mock_policy_repository,
         )
 
         batch = create_topic_batch(
@@ -73,12 +77,14 @@ class TestTopicBatchDryRunUseCase:
         mock_connection_manager,
         mock_metadata_repository,
         mock_audit_repository,
+        mock_policy_repository,
     ):
         """연결 실패 시 예외 발생"""
         use_case = TopicBatchDryRunUseCase(
             mock_connection_manager,
             mock_metadata_repository,
             mock_audit_repository,
+            mock_policy_repository,
         )
 
         batch = create_topic_batch()
@@ -103,6 +109,7 @@ class TestTopicBatchApplyUseCase:
         mock_admin_client,
         mock_metadata_repository,
         mock_audit_repository,
+        mock_policy_repository,
     ):
         """토픽 생성 실행"""
         # AdminClient mock 설정
@@ -119,6 +126,7 @@ class TestTopicBatchApplyUseCase:
             mock_connection_manager,
             mock_metadata_repository,
             mock_audit_repository,
+            mock_policy_repository,
         )
 
         batch = create_topic_batch(
@@ -145,6 +153,7 @@ class TestTopicBatchApplyUseCase:
         mock_admin_client,
         mock_metadata_repository,
         mock_audit_repository,
+        mock_policy_repository,
     ):
         """일부 실패해도 계속 진행"""
         # 첫 번째 토픽 성공, 두 번째 실패
@@ -167,6 +176,7 @@ class TestTopicBatchApplyUseCase:
             mock_connection_manager,
             mock_metadata_repository,
             mock_audit_repository,
+            mock_policy_repository,
         )
 
         batch = create_topic_batch(
@@ -189,6 +199,7 @@ class TestTopicBatchApplyUseCase:
         mock_admin_client,
         mock_metadata_repository,
         mock_audit_repository,
+        mock_policy_repository,
     ):
         """Apply 결과 요약 정보"""
         mock_future = MagicMock()
@@ -203,6 +214,7 @@ class TestTopicBatchApplyUseCase:
             mock_connection_manager,
             mock_metadata_repository,
             mock_audit_repository,
+            mock_policy_repository,
         )
 
         batch = create_topic_batch(
@@ -226,6 +238,7 @@ class TestBatchUseCaseIntegration:
         mock_admin_client,
         mock_metadata_repository,
         mock_audit_repository,
+        mock_policy_repository,
     ):
         """일반적인 워크플로우: DryRun → 검토 → Apply"""
         # 1. DryRun
@@ -233,6 +246,7 @@ class TestBatchUseCaseIntegration:
             mock_connection_manager,
             mock_metadata_repository,
             mock_audit_repository,
+            mock_policy_repository,
         )
 
         batch = create_topic_batch(
@@ -257,6 +271,7 @@ class TestBatchUseCaseIntegration:
             mock_connection_manager,
             mock_metadata_repository,
             mock_audit_repository,
+            mock_policy_repository,
         )
 
         result = await apply_use_case.execute("default", batch, actor="test-user")

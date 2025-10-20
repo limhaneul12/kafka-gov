@@ -103,6 +103,58 @@ async def list_policies(
 
 
 @router.get(
+    "/active/environment",
+    response_model=dict,
+    status_code=status.HTTP_200_OK,
+    summary="환경별 활성 정책 조회",
+    description="특정 환경(dev/stg/prod)의 ACTIVE 정책을 조회합니다 (우선순위: env-specific > total)",
+)
+@inject
+@handle_server_errors(error_message="Failed to get active policies by environment")
+async def get_active_policies_by_environment(
+    environment: str = Query(..., regex="^(dev|stg|prod)$", description="환경 (dev/stg/prod)"),
+    list_use_case: ListPoliciesUseCase = ListPoliciesDep,
+) -> dict:
+    """환경별 ACTIVE 정책 조회
+
+    Returns:
+        {
+            "environment": "prod",
+            "naming_policy": {...} or null,
+            "guardrail_policy": {...} or null
+        }
+    """
+
+    async def get_policy_for_env(policy_type: PolicyType):
+        """환경별 정책 조회 헬퍼"""
+        policies, _ = await list_use_case.execute(
+            policy_type=policy_type,
+            status=PolicyStatus.ACTIVE,
+        )
+
+        # env-specific 우선
+        for policy in policies:
+            if policy.target_environment == environment:
+                return to_policy_dto(policy)
+
+        # total fallback
+        for policy in policies:
+            if policy.target_environment == "total":
+                return to_policy_dto(policy)
+
+        return None
+
+    naming_policy = await get_policy_for_env(PolicyType.NAMING)
+    guardrail_policy = await get_policy_for_env(PolicyType.GUARDRAIL)
+
+    return {
+        "environment": environment,
+        "naming_policy": naming_policy,
+        "guardrail_policy": guardrail_policy,
+    }
+
+
+@router.get(
     "/{policy_id}",
     response_model=PolicyResponse,
     status_code=status.HTTP_200_OK,

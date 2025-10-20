@@ -29,6 +29,7 @@ class StoredPolicy:
     사용자가 UI에서 생성한 커스텀 정책을 DB에 저장하는 모델
     """
 
+    # Required fields (no defaults)
     policy_id: str  # UUID
     policy_type: PolicyType
     name: str  # 정책 이름 (예: "financial-critical", "dev-team-standard")
@@ -41,9 +42,16 @@ class StoredPolicy:
     # - guardrail일 경우: CustomGuardrailPreset의 dict
     content: dict[str, str | int | bool | list[str]]
 
-    # 메타데이터
     created_by: str
     created_at: str  # ISO 8601
+
+    # Optional fields (with defaults) - MUST come after required fields
+    # 적용 환경 (dev, stg, prod, total)
+    # - dev: Development 환경 전용
+    # - stg: Staging 환경 전용
+    # - prod: Production 환경 전용
+    # - total: 모든 환경 공통 (global)
+    target_environment: str = "total"
     updated_at: str | None = None
 
 

@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Button from "../ui/Button";
-import { X, Upload, FileText, Plus } from "lucide-react";
+import { X, Upload, FileText, Plus, Info } from "lucide-react";
 
 interface CreateTopicModalProps {
   isOpen: boolean;
@@ -19,6 +19,45 @@ export default function CreateTopicModal({
   const [yamlContent, setYamlContent] = useState("");
   const [loading, setLoading] = useState(false);
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
+  
+  // Environment & Policy 상태
+  const [environment, setEnvironment] = useState<"dev" | "stg" | "prod">("dev");
+  const [activePolicies, setActivePolicies] = useState<{
+    naming: { name: string; version: number } | null;
+    guardrail: { name: string; version: number } | null;
+  }>({ naming: null, guardrail: null });
+  const [policiesLoading, setPoliciesLoading] = useState(false);
+
+  // 환경 변경 시 정책 로드
+  useEffect(() => {
+    if (isOpen) {
+      loadActivePolicies(environment);
+    }
+  }, [isOpen, environment]);
+
+  const loadActivePolicies = async (env: string) => {
+    try {
+      setPoliciesLoading(true);
+      const response = await fetch(`/api/v1/policies/active/environment?environment=${env}`);
+      if (response.ok) {
+        const data = await response.json();
+        setActivePolicies({
+          naming: data.naming_policy ? {
+            name: data.naming_policy.name,
+            version: data.naming_policy.version
+          } : null,
+          guardrail: data.guardrail_policy ? {
+            name: data.guardrail_policy.name,
+            version: data.guardrail_policy.version
+          } : null,
+        });
+      }
+    } catch (error) {
+      console.error("Failed to load policies:", error);
+    } finally {
+      setPoliciesLoading(false);
+    }
+  };
 
   if (!isOpen) return null;
 
@@ -40,6 +79,8 @@ export default function CreateTopicModal({
     setYamlContent("");
     setUploadedFile(null);
     setMode("batch");
+    setEnvironment("dev");
+    setActivePolicies({ naming: null, guardrail: null });
     onClose();
   };
 
@@ -118,6 +159,89 @@ export default function CreateTopicModal({
 
           <form onSubmit={handleSubmit} className="flex flex-col max-h-[calc(90vh-80px)]">
             <div className="p-6 space-y-6 overflow-y-auto flex-1">
+              {/* Environment 선택 */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Environment *
+                </label>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setEnvironment("dev")}
+                    className={`flex-1 px-4 py-2 rounded-lg font-medium transition-colors ${
+                      environment === "dev"
+                        ? "bg-blue-600 text-white"
+                        : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                    }`}
+                  >
+                    Development
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setEnvironment("stg")}
+                    className={`flex-1 px-4 py-2 rounded-lg font-medium transition-colors ${
+                      environment === "stg"
+                        ? "bg-blue-600 text-white"
+                        : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                    }`}
+                  >
+                    Staging
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setEnvironment("prod")}
+                    className={`flex-1 px-4 py-2 rounded-lg font-medium transition-colors ${
+                      environment === "prod"
+                        ? "bg-blue-600 text-white"
+                        : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                    }`}
+                  >
+                    Production
+                  </button>
+                </div>
+              </div>
+
+              {/* 적용 중인 정책 표시 */}
+              <div className="p-4 rounded-lg bg-blue-50 border border-blue-200">
+                <div className="flex items-start gap-2">
+                  <Info className="w-4 h-4 text-blue-600 mt-0.5 flex-shrink-0" />
+                  <div className="flex-1">
+                    <h3 className="text-sm font-semibold text-blue-900 mb-2">
+                      {environment.toUpperCase()} 환경 정책
+                    </h3>
+                    {policiesLoading ? (
+                      <p className="text-xs text-blue-700">정책 로딩 중...</p>
+                    ) : (
+                      <div className="space-y-1.5">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-medium text-blue-800">Naming:</span>
+                          {activePolicies.naming ? (
+                            <span className="text-xs text-blue-700">
+                              {activePolicies.naming.name} (v{activePolicies.naming.version})
+                            </span>
+                          ) : (
+                            <span className="text-xs text-gray-500 italic">정책 없음</span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-medium text-blue-800">Guardrail:</span>
+                          {activePolicies.guardrail ? (
+                            <span className="text-xs text-blue-700">
+                              {activePolicies.guardrail.name} (v{activePolicies.guardrail.version})
+                            </span>
+                          ) : (
+                            <span className="text-xs text-gray-500 italic">정책 없음</span>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                    <p className="text-xs text-blue-700 mt-2">
+                      💡 Dry-run 및 생성 시 위 정책이 자동으로 적용됩니다
+                    </p>
+                  </div>
+                </div>
+              </div>
+
               {mode === "single" ? (
                 <div className="space-y-4">
                   <p className="text-sm text-gray-600">

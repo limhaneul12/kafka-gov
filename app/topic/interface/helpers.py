@@ -1,7 +1,13 @@
 """Topic Interface 레이어 헬퍼 함수"""
 
+import csv
+import io
+import json
+
 import yaml
 from fastapi import HTTPException, UploadFile, status
+
+from ..domain.models import DomainTopicPlan
 
 
 def validate_yaml_file(file: UploadFile) -> None:
@@ -61,3 +67,129 @@ async def parse_yaml_content(content: bytes) -> dict:
         )
 
     return yaml_data
+
+
+# ============================================================================
+# Report 생성 함수
+# ============================================================================
+
+
+def generate_csv_report(plan: DomainTopicPlan) -> str:
+    """Dry-Run 결과를 CSV 형식으로 생성
+
+    Args:
+        plan: DomainTopicPlan 객체
+
+    Returns:
+        CSV 문자열
+    """
+    output = io.StringIO()
+    writer = csv.writer(output)
+
+    # Header
+    writer.writerow(
+        ["Topic Name", "Action", "Status", "Violation Type", "Violation Message", "Severity"]
+    )
+
+    # Violation 맵 생성
+    violation_map: dict[str, list] = {}
+    for violation in plan.violations:
+        target = str(violation.target) if hasattr(violation, "target") else "unknown"
+        if target not in violation_map:
+            violation_map[target] = []
+        violation_map[target].append(violation)
+
+    # Plan Items
+    for item in plan.items:
+        violations = violation_map.get(str(item.name), [])
+        if violations:
+            for v in violations:
+                writer.writerow(
+                    [
+                        item.name,
+                        item.action.value if hasattr(item.action, "value") else str(item.action),
+                        "❌ VIOLATION",
+                        getattr(v, "policy_type", "unknown"),
+                        getattr(v, "message", str(v)),
+                        getattr(v, "level", "error"),
+                    ]
+                )
+        else:
+            writer.writerow(
+                [
+                    item.name,
+                    item.action.value if hasattr(item.action, "value") else str(item.action),
+                    "✅ OK",
+                    "-",
+                    "-",
+                    "-",
+                ]
+            )
+
+    # Summary
+    writer.writerow([])
+    writer.writerow(["Summary"])
+    writer.writerow(["Total Topics", len(plan.items)])
+    writer.writerow(["Violations", len(plan.violations)])
+    error_violations = [v for v in plan.violations if getattr(v, "level", "") == "error"]
+    writer.writerow(["Error Violations", len(error_violations)])
+    writer.writerow(["Can Apply", "Yes" if len(error_violations) == 0 else "No"])
+
+    return output.getvalue()
+
+
+def generate_json_report(plan: DomainTopicPlan) -> str:
+    """Dry-Run 결과를 JSON 형식으로 생성
+
+    Args:
+        plan: DomainTopicPlan 객체
+
+    Returns:
+        JSON 문자열
+    """
+    # Violation 맵 생성
+    violation_map: dict[str, list] = {}
+    for violation in plan.violations:
+        target = str(violation.target) if hasattr(violation, "target") else "unknown"
+        if target not in violation_map:
+            violation_map[target] = []
+        violation_map[target].append(
+            {
+                "policy_type": getattr(violation, "policy_type", "unknown"),
+                "message": getattr(violation, "message", str(violation)),
+                "level": getattr(violation, "level", "error"),
+            }
+        )
+
+    error_violations = [v for v in plan.violations if getattr(v, "level", "") == "error"]
+
+    report = {
+        "change_id": plan.change_id,
+        "env": plan.env,
+        "summary": {
+            "total_items": len(plan.items),
+            "total_violations": len(plan.violations),
+            "error_violations": len(error_violations),
+            "can_apply": len(error_violations) == 0,
+        },
+        "items": [
+            {
+                "name": str(item.name),
+                "action": item.action.value if hasattr(item.action, "value") else str(item.action),
+                "diff": item.diff if hasattr(item, "diff") else {},
+                "violations": violation_map.get(str(item.name), []),
+            }
+            for item in plan.items
+        ],
+        "violations": [
+            {
+                "target": str(getattr(v, "target", "unknown")),
+                "policy_type": getattr(v, "policy_type", "unknown"),
+                "message": getattr(v, "message", str(v)),
+                "level": getattr(v, "level", "error"),
+            }
+            for v in plan.violations
+        ],
+    }
+
+    return json.dumps(report, indent=2, ensure_ascii=False)

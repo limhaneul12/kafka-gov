@@ -11,6 +11,7 @@ interface PolicyEditorModalProps {
     description: string;
     content: Record<string, unknown>;
     created_by: string;
+    target_environment?: string;
   }) => Promise<void>;
   initialData?: {
     policy_type: string;
@@ -36,6 +37,7 @@ export default function PolicyEditorModal({
   const [loading, setLoading] = useState(false);
   const [yamlError, setYamlError] = useState<string | null>(null);
   const [selectedPreset, setSelectedPreset] = useState<string>("balanced");
+  const [targetEnvironment, setTargetEnvironment] = useState<string>("total");
 
   // Naming Presets (백엔드 스키마 정확히 매칭)
   const NAMING_PRESETS = {
@@ -239,6 +241,7 @@ tags:
         description,
         content,
         created_by: createdBy,
+        target_environment: targetEnvironment,
       });
       handleClose();
     } catch (err) {
@@ -292,17 +295,36 @@ tags:
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Created By *
+                Target Environment *
               </label>
-              <input
-                type="email"
-                value={createdBy}
-                onChange={(e) => setCreatedBy(e.target.value)}
-                required
+              <select
+                value={targetEnvironment}
+                onChange={(e) => setTargetEnvironment(e.target.value)}
                 className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                placeholder="admin@example.com"
-              />
+              >
+                <option value="dev">Development (개발 전용)</option>
+                <option value="stg">Staging (스테이징 전용)</option>
+                <option value="prod">Production (프로덕션 전용)</option>
+                <option value="total">Total (모든 환경 공통)</option>
+              </select>
+              <p className="mt-1 text-xs text-gray-500">
+                이 정책이 적용될 환경을 선택하세요
+              </p>
             </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Created By *
+            </label>
+            <input
+              type="email"
+              value={createdBy}
+              onChange={(e) => setCreatedBy(e.target.value)}
+              required
+              className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              placeholder="admin@example.com"
+            />
           </div>
 
           {/* Naming Preset Selection */}

@@ -4,6 +4,7 @@ from typing import Annotated
 
 from dependency_injector.wiring import Provide, inject
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
+from fastapi.responses import StreamingResponse
 
 from app.container import AppContainer
 from app.shared.error_handlers import handle_api_errors, handle_server_errors
@@ -13,7 +14,12 @@ from app.topic.interface.adapters import (
     safe_convert_plan_to_response,
     safe_convert_request_to_batch,
 )
-from app.topic.interface.helpers import parse_yaml_content, validate_yaml_file
+from app.topic.interface.helpers import (
+    generate_csv_report,
+    generate_json_report,
+    parse_yaml_content,
+    validate_yaml_file,
+)
 from app.topic.interface.schemas import (
     TopicBatchApplyResponse,
     TopicBatchDryRunResponse,
@@ -118,6 +124,47 @@ async def topic_batch_dry_run(
     batch = safe_convert_request_to_batch(batch_request)
     plan = await dry_run_use_case.execute(cluster_id, batch, DEFAULT_USER)
     return safe_convert_plan_to_response(plan, batch_request)
+
+
+@router.post(
+    "/batch/dry-run/report",
+    response_class=StreamingResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Dry-Run Report 다운로드",
+    description="Dry-Run 결과를 CSV 또는 JSON 형식으로 다운로드합니다.",
+)
+@inject
+@handle_api_errors(validation_error_message="Validation error")
+async def download_dry_run_report(
+    batch_request: TopicBatchRequest,
+    cluster_id: str = Query(..., description="Kafka Cluster ID"),
+    format: str = Query("csv", regex="^(csv|json)$", description="Report format (csv/json)"),
+    dry_run_use_case=DryTopicDep,
+) -> StreamingResponse:
+    """Dry-Run Report 다운로드
+
+    Returns:
+        StreamingResponse: CSV 또는 JSON 파일
+    """
+    # Dry-Run 실행
+    batch = safe_convert_request_to_batch(batch_request)
+    plan = await dry_run_use_case.execute(cluster_id, batch, DEFAULT_USER)
+
+    # Report 생성
+    if format == "csv":
+        content = generate_csv_report(plan)
+        media_type = "text/csv"
+        filename = f"dry-run-report-{batch.change_id}.csv"
+    else:  # json
+        content = generate_json_report(plan)
+        media_type = "application/json"
+        filename = f"dry-run-report-{batch.change_id}.json"
+
+    return StreamingResponse(
+        iter([content]),
+        media_type=media_type,
+        headers={"Content-Disposition": f"attachment; filename={filename}"},
+    )
 
 
 @router.post(

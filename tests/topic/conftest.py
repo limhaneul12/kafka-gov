@@ -7,6 +7,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from app.cluster.domain.services import IConnectionManager
+from app.topic.domain.policies.management import IPolicyRepository
 from app.topic.domain.repositories.interfaces import (
     IAuditRepository,
     ITopicMetadataRepository,
@@ -42,6 +43,22 @@ def mock_audit_repository() -> IAuditRepository:
     """Mock Audit Repository"""
     mock = AsyncMock(spec=IAuditRepository)
     mock.log_topic_operation.return_value = "audit-123"
+    return mock
+
+
+@pytest.fixture
+def mock_policy_repository() -> IPolicyRepository:
+    """Mock Policy Repository"""
+    mock = AsyncMock(spec=IPolicyRepository)
+    # 기본 반환 값 설정 - 정책이 없는 경우 (테스트에서 필요 시 override)
+    mock.get_active_policy.return_value = None
+    mock.get_policy.return_value = None
+    mock.list_policies.return_value = []
+    mock.create_policy.return_value = None
+    mock.update_policy.return_value = None
+    mock.activate_policy.return_value = None
+    mock.archive_policy.return_value = None
+    mock.delete_policy.return_value = None
     return mock
 
 

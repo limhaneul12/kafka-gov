@@ -68,6 +68,7 @@ class TopicContainer(containers.DeclarativeContainer):
         connection_manager=cluster.connection_manager,  # ConnectionManager 주입
         metadata_repository=metadata_repository,
         audit_repository=audit_repository,
+        policy_repository=policy_repository,  # 정책 검증용
     )
 
     apply_use_case: providers.Provider[TopicBatchApplyUseCase] = providers.Factory(
