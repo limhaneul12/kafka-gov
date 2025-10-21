@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="./image/kafka_gov_logo.png" alt="Kafka Gov Logo" width="400"/>
+  <img src="./image/kafka_gov_logo.png" alt="Kafka Gov Logo" width="300"/>
   
   # 🛡️ Kafka Governance Platform
   
@@ -144,7 +144,7 @@ Kafka-Gov transforms Kafka into a **governed enterprise platform**:
 Monitor your Kafka ecosystem at a glance with real-time metrics and health status.
 
 <div align="center">
-  <img src="./image/dashboard.png" alt="Kafka Gov Dashboard" width="100%"/>
+  <img src="./image/dashboard.png" alt="Kafka Gov Dashboard" width="800"/>
   <p><em>Unified dashboard showing total topics, schemas, correlations, and cluster health</em></p>
 </div>
 
@@ -161,7 +161,7 @@ Monitor your Kafka ecosystem at a glance with real-time metrics and health statu
 Manage all topics at a glance from the unified dashboard.
 
 <div align="center">
-  <img src="./image/topic_list.png" alt="Topic Management Dashboard" width="100%"/>
+  <img src="./image/topic_list.png" alt="Topic Management Dashboard" width="800"/>
   <p><em>Filter and search topics with rich metadata</em></p>
 </div>
 
@@ -228,7 +228,7 @@ curl -X POST /api/v1/naming-policy/custom \
 **Create/update/delete dozens of topics at once:**
 
 <div align="center">
-  <img src="./image/create_topic.png" alt="Create Topic - Single & Batch" width="90%"/>
+  <img src="./image/create_topic.png" alt="Create Topic - Single & Batch" width="800"/>
   <p><em>Choose between single topic creation or YAML batch creation</em></p>
 </div>
 
@@ -258,7 +258,7 @@ items:
 - 📋 **YAML Upload**: Instant dry-run via file upload
 
 <div align="center">
-  <img src="./image/batch_result.png" alt="Batch Processing Result" width="90%"/>
+  <img src="./image/batch_result.png" alt="Batch Processing Result" width="800"/>
   <p><em>View batch processing results in real-time and download in text/JSON format</em></p>
 </div>
 
@@ -301,7 +301,7 @@ See [`example/batch_topics.yml`](./example/batch_topics.yml) for a full example.
 Apply different policies per environment to ensure operational stability.
 
 <div align="center">
-  <img src="./image/policy.png" alt="Policy Detail View" width="90%"/>
+  <img src="./image/policy.png" alt="Policy Detail View" width="800"/>
   <p><em>Policy detail view - Define and manage rules in JSON format</em></p>
 </div>
 
@@ -319,7 +319,7 @@ Apply different policies per environment to ensure operational stability.
 ```
 
 <div align="center">
-  <img src="./image/policy_versing.png" alt="Policy Version Management" width="90%"/>
+  <img src="./image/policy_versing.png" alt="Policy Version Management" width="800"/>
   <p><em>Policy version management - Track policy change history with Draft, Active, Archived states</em></p>
 </div>
 
