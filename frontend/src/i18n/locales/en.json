@@ -48,6 +48,10 @@
     "createBatch": "Batch Creation",
     "edit": "Edit Topic",
     "delete": "Delete Topic",
+    "deleteConfirm": "Delete topic \"{name}\"",
+    "deleteWarning": "Click delete again to permanently remove this topic.",
+    "deleteFailed": "Failed to delete topic",
+    "deleteError": "An error occurred while deleting.",
     "name": "Topic Name",
     "owner": "Owner",
     "team": "Team",
@@ -63,7 +67,16 @@
     "filterByTags": "Filter by Tags",
     "filterByEnvironment": "Filter by Environment",
     "noTopics": "No topics available",
-    "selectEnvironment": "Select Environment"
+    "selectEnvironment": "Select Environment",
+    "batchComplete": "Batch processing completed!",
+    "batchFailed": "Batch processing failed",
+    "batchError": "{count} batches failed. Check the detailed report.",
+    "created": "Created/Updated: {count} items",
+    "skipped": "Skipped: {count} items (already exist or no changes)",
+    "failed": "Failed: {count} items",
+    "noItems": "No items processed.",
+    "createFailed": "Failed to create topic",
+    "unknownError": "An unknown error occurred."
   },
   "schema": {
     "list": "Schemas",

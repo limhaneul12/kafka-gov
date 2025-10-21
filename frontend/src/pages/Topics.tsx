@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/Card";
 import Button from "../components/ui/Button";
@@ -16,6 +17,7 @@ import { getOwnerColor, getTagColor } from "../utils/colors";
 import { formatRetention } from "../utils/format";
 
 export default function Topics() {
+  const { t } = useTranslation();
   const [topics, setTopics] = useState<Topic[]>([]);
   const [clusters, setClusters] = useState<KafkaCluster[]>([]);
   const [selectedCluster, setSelectedCluster] = useState<string>("");
