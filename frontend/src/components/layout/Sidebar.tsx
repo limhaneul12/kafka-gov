@@ -9,6 +9,7 @@ import {
   Shield,
   Activity,
   History as HistoryIcon,
+  Users,
 } from "lucide-react";
 import { cn } from "../../utils/cn";
 
@@ -23,6 +24,7 @@ export default function Sidebar() {
     { name: t("nav.connections"), to: "/connections", icon: Server },
     { name: t("nav.policies"), to: "/policies", icon: Shield },
     { name: t("nav.analysis"), to: "/analysis", icon: Activity },
+    { name: "Team Analytics", to: "/team-analytics", icon: Users },
     { name: t("nav.history"), to: "/history", icon: HistoryIcon },
   ];
   return (

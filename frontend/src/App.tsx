@@ -10,6 +10,7 @@ import Policies from "./pages/Policies";
 import Analysis from "./pages/Analysis";
 import Settings from "./pages/Settings";
 import History from "./pages/History";
+import TeamAnalytics from "./pages/TeamAnalytics";
 
 function App() {
   return (
@@ -30,6 +31,7 @@ function App() {
             <Route path="connections" element={<Connections />} />
             <Route path="policies" element={<Policies />} />
             <Route path="analysis" element={<Analysis />} />
+            <Route path="team-analytics" element={<TeamAnalytics />} />
             <Route path="history" element={<History />} />
             <Route path="settings" element={<Settings />} />
           </Route>

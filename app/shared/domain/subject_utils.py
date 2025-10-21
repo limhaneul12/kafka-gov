@@ -40,20 +40,26 @@ def extract_topics_from_subject(subject: str, strategy: SubjectStrategy | str) -
         except ValueError:
             return []
 
-    if strategy == SubjectStrategy.TOPIC_NAME:
-        # 예: "orders-value" -> ["orders"]
-        if subject.endswith(("-key", "-value")):
-            topic_name = subject.rsplit("-", 1)[0]
-            return [topic_name]
+    # match-case를 사용한 전략별 분기 (Python 3.10+)
+    match strategy:
+        case SubjectStrategy.TOPIC_NAME:
+            # 예: "orders-value" -> ["orders"]
+            if subject.endswith(("-key", "-value")):
+                topic_name = subject.rsplit("-", 1)[0]
+                return [topic_name]
+            return []
 
-    elif strategy == SubjectStrategy.TOPIC_RECORD_NAME:
-        # 예: "orders-com.example.Order" -> ["orders"]
-        parts = subject.split("-", 1)
-        if len(parts) >= 2:
-            return [parts[0]]
+        case SubjectStrategy.TOPIC_RECORD_NAME:
+            # 예: "orders-com.example.Order" -> ["orders"]
+            parts = subject.split("-", 1)
+            if len(parts) >= 2:
+                return [parts[0]]
+            return []
 
-    elif strategy == SubjectStrategy.RECORD_NAME:
-        # 예: "com.example.Order" -> 토픽명 추론 불가
-        return []
+        case SubjectStrategy.RECORD_NAME:
+            # 예: "com.example.Order" -> 토픽명 추론 불가
+            return []
 
-    return []
+        case _:
+            # 알 수 없는 전략
+            return []

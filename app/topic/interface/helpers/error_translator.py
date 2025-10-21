@@ -1,12 +1,125 @@
-"""에러를 사용자 친화적 메시지로 변환하는 Helper"""
+"""에러를 사용자 친화적 메시지로 변환하는 Helper
+
+Chain of Responsibility 패턴 사용:
+- 각 에러 타입별 핸들러가 처리 가능 여부를 판단
+- 확장 가능하고 테스트 용이한 구조
+"""
 
 from __future__ import annotations
 
+from abc import ABC, abstractmethod
 from typing import Any
 
 from pydantic import ValidationError
 
 from ..schemas import FailureDetail
+
+
+class ErrorHandler(ABC):
+    """에러 핸들러 추상 베이스 클래스"""
+
+    def __init__(self) -> None:
+        self._next_handler: ErrorHandler | None = None
+
+    def set_next(self, handler: ErrorHandler) -> ErrorHandler:
+        """다음 핸들러 설정"""
+        self._next_handler = handler
+        return handler
+
+    @abstractmethod
+    def can_handle(self, err: dict[str, Any]) -> bool:
+        """이 핸들러가 처리 가능한 에러인지 판단"""
+
+    @abstractmethod
+    def handle(self, err: dict[str, Any]) -> tuple[str, list[str]]:
+        """에러 처리 후 (에러 메시지, 제안 리스트) 반환"""
+
+    def process(self, err: dict[str, Any]) -> tuple[str, list[str]]:
+        """에러 처리 (Chain of Responsibility)"""
+        if self.can_handle(err):
+            return self.handle(err)
+        if self._next_handler:
+            return self._next_handler.process(err)
+        return self._default_handle(err)
+
+    def _default_handle(self, err: dict[str, Any]) -> tuple[str, list[str]]:
+        """기본 핸들러 (처리 불가능한 경우)"""
+        loc = " → ".join(str(x) for x in err["loc"])
+        msg = err["msg"]
+        return (f"❌ {loc}: {msg}", [])
+
+
+class FieldRequiredHandler(ErrorHandler):
+    """필수 필드 누락 에러 핸들러"""
+
+    def can_handle(self, err: dict[str, Any]) -> bool:
+        return "Field required" in err["msg"]
+
+    def handle(self, err: dict[str, Any]) -> tuple[str, list[str]]:
+        loc = " → ".join(str(x) for x in err["loc"])
+        error_msg = f"❌ 필수 필드 누락: {loc}"
+        suggestions = self._get_field_suggestions(err["loc"])
+        return (error_msg, suggestions)
+
+    def _get_field_suggestions(self, loc: tuple[str | int, ...]) -> list[str]:
+        """필드별 제안사항 반환"""
+        loc_str = str(loc)
+        if "env" in loc_str:
+            return ["최상위에 'env: dev' (또는 stg/prod)를 추가하세요"]
+        if "change_id" in loc_str:
+            return ["최상위에 'change_id: 2025-10-20_001' 형식으로 추가하세요"]
+        if "items" in loc_str:
+            return ["'topics:' 대신 'items:'를 사용하세요"]
+        return []
+
+
+class ExtraInputsHandler(ErrorHandler):
+    """허용되지 않는 필드 에러 핸들러"""
+
+    def can_handle(self, err: dict[str, Any]) -> bool:
+        return "Extra inputs are not permitted" in err["msg"]
+
+    def handle(self, err: dict[str, Any]) -> tuple[str, list[str]]:
+        field_name = str(err["loc"][-1]) if err["loc"] else "unknown"
+        error_msg = f"❌ 허용되지 않는 필드: {field_name}"
+        suggestions = self._get_field_suggestions(field_name)
+        return (error_msg, suggestions)
+
+    def _get_field_suggestions(self, field_name: str) -> list[str]:
+        """필드명별 제안사항 반환"""
+        if field_name == "topics":
+            return ["'topics:' 대신 'items:'를 사용하세요"]
+        if "environment" in field_name:
+            return ["'environment'는 metadata가 아니라 최상위에 'env'로 지정하세요"]
+        return []
+
+
+class KafkaConfigHandler(ErrorHandler):
+    """Kafka 설정 필드명 에러 핸들러"""
+
+    def can_handle(self, err: dict[str, Any]) -> bool:
+        loc_str = str(err["loc"])
+        return "retention.ms" in loc_str or "compression.type" in loc_str
+
+    def handle(self, err: dict[str, Any]) -> tuple[str, list[str]]:
+        loc = " → ".join(str(x) for x in err["loc"])
+        error_msg = f"❌ 잘못된 필드명: {loc}"
+        suggestions = [
+            "Kafka config는 점(.)이 아니라 언더스코어(_)를 사용하세요",
+            "예: retention.ms → retention_ms, compression.type → compression_type",
+        ]
+        return (error_msg, suggestions)
+
+
+def _build_error_handler_chain() -> ErrorHandler:
+    """에러 핸들러 체인 생성"""
+    # Chain: FieldRequired → ExtraInputs → KafkaConfig
+    field_required = FieldRequiredHandler()
+    extra_inputs = ExtraInputsHandler()
+    kafka_config = KafkaConfigHandler()
+
+    field_required.set_next(extra_inputs).set_next(kafka_config)
+    return field_required
 
 
 def translate_validation_error(e: ValidationError, parsed: dict[str, Any]) -> FailureDetail:
@@ -19,39 +132,19 @@ def translate_validation_error(e: ValidationError, parsed: dict[str, Any]) -> Fa
     Returns:
         사용자 친화적 에러 메시지가 포함된 FailureDetail
     """
-    user_friendly_errors = []
-    suggestions = []
+    # 에러 핸들러 체인 생성
+    handler_chain = _build_error_handler_chain()
 
+    user_friendly_errors: list[str] = []
+    suggestions: list[str] = []
+
+    # 각 에러를 핸들러 체인으로 처리
     for err in e.errors():
-        loc = " → ".join(str(x) for x in err["loc"])
-        msg = err["msg"]
+        error_msg, error_suggestions = handler_chain.process(err)
+        user_friendly_errors.append(error_msg)
+        suggestions.extend(error_suggestions)
 
-        # 일반적인 에러를 사용자 친화적으로 변환
-        if "Field required" in msg:
-            user_friendly_errors.append(f"❌ 필수 필드 누락: {loc}")  # type: ignore[arg-type]
-            if "env" in str(err["loc"]):
-                suggestions.append("최상위에 'env: dev' (또는 stg/prod)를 추가하세요")
-            elif "change_id" in str(err["loc"]):
-                suggestions.append("최상위에 'change_id: 2025-10-20_001' 형식으로 추가하세요")
-            elif "items" in str(err["loc"]):
-                suggestions.append("'topics:' 대신 'items:'를 사용하세요")
-        elif "Extra inputs are not permitted" in msg:
-            field_name = str(err["loc"][-1]) if err["loc"] else "unknown"
-            user_friendly_errors.append(f"❌ 허용되지 않는 필드: {field_name}")  # type: ignore[arg-type]
-            if field_name == "topics":
-                suggestions.append("'topics:' 대신 'items:'를 사용하세요")
-            elif "environment" in field_name:
-                suggestions.append("'environment'는 metadata가 아니라 최상위에 'env'로 지정하세요")
-        elif "retention.ms" in str(err["loc"]) or "compression.type" in str(err["loc"]):
-            user_friendly_errors.append(f"❌ 잘못된 필드명: {loc}")  # type: ignore[arg-type]
-            suggestions.append("Kafka config는 점(.)이 아니라 언더스코어(_)를 사용하세요")
-            suggestions.append(
-                "예: retention.ms → retention_ms, compression.type → compression_type"
-            )
-        else:
-            user_friendly_errors.append(f"❌ {loc}: {msg}")  # type: ignore[arg-type]
-
-    # 공통 제안사항 추가
+    # 공통 제안사항 추가 (에러별 제안이 없는 경우)
     if not suggestions:
         suggestions = [
             "올바른 YAML 형식: env, change_id, items 필드가 필요합니다",
