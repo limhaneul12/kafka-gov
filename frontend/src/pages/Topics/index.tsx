@@ -1,0 +1,155 @@
+import { useState } from "react";
+import { useTranslation } from "react-i18next";
+import { Plus, RefreshCw, Server } from "lucide-react";
+import { Card } from "../../components/ui/Card";
+import Button from "../../components/ui/Button";
+import { useTopics } from "./hooks/useTopics";
+import { useTopicFilters } from "./hooks/useTopicFilters";
+import { TopicFilters } from "./components/TopicFilters";
+import { TopicTable } from "./components/TopicTable";
+import { CreateTopicModal } from "./components/modals/CreateTopicModal";
+import EditTopicMetadataModal from "../../components/topic/EditTopicMetadataModal";
+import type { Topic } from "./Topics.types";
+
+export default function Topics() {
+  const { t } = useTranslation();
+  
+  // Topics data & operations
+  const {
+    topics,
+    clusters,
+    selectedCluster,
+    loading,
+    setSelectedCluster,
+    loadTopics,
+    deleteTopic,
+    updateMetadata,
+  } = useTopics();
+
+  // Filters
+  const {
+    searchQuery,
+    setSearchQuery,
+    envFilter,
+    setEnvFilter,
+    ownerFilter,
+    setOwnerFilter,
+    tagFilter,
+    setTagFilter,
+    allOwners,
+    allTags,
+    filteredTopics,
+    resetFilters,
+  } = useTopicFilters(topics);
+
+  // Modal states
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [editingTopic, setEditingTopic] = useState<Topic | null>(null);
+
+  const handleCreateTopic = async (clusterId: string, yamlContent: string) => {
+    // TODO: Implement batch create logic from old Topics.tsx
+    console.log("Creating topics:", { clusterId, yamlContent });
+    await loadTopics();
+  };
+
+  const handleEditMetadata = async (data: {
+    owners: string[];
+    doc: string | null;
+    tags: string[];
+    environment: string;
+    slo: string | null;
+    sla: string | null;
+  }) => {
+    if (!editingTopic) return;
+    await updateMetadata(editingTopic.name, data);
+    setEditingTopic(null);
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900">{t("topic.list")}</h1>
+          <p className="mt-2 text-gray-600">
+            Manage Kafka topics with metadata and policies
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <Button onClick={loadTopics} variant="secondary">
+            <RefreshCw className="h-4 w-4" />
+          </Button>
+          <Button onClick={() => setShowCreateModal(true)}>
+            <Plus className="h-4 w-4" />
+            {t("topic.create")}
+          </Button>
+        </div>
+      </div>
+
+      {/* Cluster Selector */}
+      {clusters.length > 0 && (
+        <Card className="p-4">
+          <div className="flex items-center gap-4">
+            <Server className="h-5 w-5 text-gray-500" />
+            <label className="text-sm font-medium text-gray-700">
+              {t("dashboard.selectCluster")}:
+            </label>
+            <select
+              value={selectedCluster}
+              onChange={(e) => setSelectedCluster(e.target.value)}
+              className="rounded-lg border border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+            >
+              {clusters.map((cluster) => (
+                <option key={cluster.cluster_id} value={cluster.cluster_id}>
+                  {cluster.name} ({cluster.cluster_id})
+                </option>
+              ))}
+            </select>
+          </div>
+        </Card>
+      )}
+
+      {/* Filters */}
+      <TopicFilters
+        searchQuery={searchQuery}
+        onSearchChange={setSearchQuery}
+        envFilter={envFilter}
+        onEnvFilterChange={setEnvFilter}
+        ownerFilter={ownerFilter}
+        onOwnerFilterChange={setOwnerFilter}
+        tagFilter={tagFilter}
+        onTagFilterChange={setTagFilter}
+        allOwners={allOwners}
+        allTags={allTags}
+        onReset={resetFilters}
+      />
+
+      {/* Table */}
+      <Card>
+        <TopicTable
+          topics={filteredTopics}
+          loading={loading}
+          onEdit={setEditingTopic}
+          onDelete={deleteTopic}
+        />
+      </Card>
+
+      {/* Modals */}
+      <CreateTopicModal
+        isOpen={showCreateModal}
+        onClose={() => setShowCreateModal(false)}
+        onSubmit={handleCreateTopic}
+        clusterId={selectedCluster}
+      />
+
+      {editingTopic && (
+        <EditTopicMetadataModal
+          isOpen={true}
+          onClose={() => setEditingTopic(null)}
+          topic={editingTopic}
+          onSubmit={handleEditMetadata}
+        />
+      )}
+    </div>
+  );
+}
