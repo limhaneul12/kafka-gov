@@ -1,0 +1,54 @@
+{
+  "error": {
+    "topic_not_found": "Topic '{name}' not found",
+    "topic_already_exists": "Topic '{name}' already exists",
+    "schema_not_found": "Schema '{subject}' not found",
+    "cluster_not_found": "Cluster '{id}' not found",
+    "connection_failed": "Connection failed: {reason}",
+    "invalid_value": "Invalid value for {field}: {value}",
+    "validation_failed": "Validation failed: {reason}",
+    "policy_violation": "Policy violation: {reason}",
+    "insufficient_permissions": "Insufficient permissions",
+    "kafka_error": "Kafka error: {message}",
+    "database_error": "Database error: {message}",
+    "general": "An error occurred"
+  },
+  "success": {
+    "topic_created": "Topic '{name}' created successfully",
+    "topic_updated": "Topic '{name}' updated successfully",
+    "topic_deleted": "Topic '{name}' deleted successfully",
+    "schema_uploaded": "Schema '{subject}' uploaded successfully",
+    "policy_created": "Policy '{name}' created successfully",
+    "policy_activated": "Policy '{name}' activated successfully",
+    "connection_successful": "Connection test successful",
+    "batch_completed": "Batch operation completed: {count} items processed"
+  },
+  "validation": {
+    "required_field": "{field} is required",
+    "invalid_format": "Invalid format for {field}",
+    "min_value": "{field} must be at least {min}",
+    "max_value": "{field} must be at most {max}",
+    "invalid_environment": "Invalid environment: {env}",
+    "invalid_naming": "Topic name violates naming policy: {reason}"
+  },
+  "policy": {
+    "naming_violation": "Naming policy violation: {reason}",
+    "guardrail_violation": "Guardrail policy violation: {reason}",
+    "min_isr_too_low": "min.insync.replicas must be at least {required} in {env} environment (current: {current})",
+    "replication_too_low": "replication.factor must be at least {required} in {env} environment (current: {current})",
+    "forbidden_prefix": "Prefix '{prefix}' is forbidden in {env} environment"
+  },
+  "batch": {
+    "dry_run_started": "Dry-run started",
+    "dry_run_completed": "Dry-run completed: {count} items",
+    "applying_changes": "Applying changes...",
+    "apply_completed": "Batch application completed",
+    "partial_success": "Partial success: {success}/{total}"
+  },
+  "info": {
+    "loading": "Loading...",
+    "processing": "Processing...",
+    "no_data": "No data available",
+    "cluster_selected": "Cluster '{name}' selected"
+  }
+}

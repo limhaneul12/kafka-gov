@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/Card";
 import Button from "../components/ui/Button";
@@ -8,6 +9,7 @@ import { Activity, Database, FileCode, List, Wifi, RefreshCw } from "lucide-reac
 import type { Statistics, KafkaCluster } from "../types";
 
 export default function Dashboard() {
+  const { t } = useTranslation();
   const [stats, setStats] = useState<Statistics | null>(null);
   const [clusters, setClusters] = useState<KafkaCluster[]>([]);
   const [selectedCluster, setSelectedCluster] = useState<string>("");
@@ -38,8 +40,8 @@ export default function Dashboard() {
       }
     } catch (error) {
       console.error("Failed to load clusters:", error);
-      toast.error('클러스터 로드 실패', {
-        description: '클러스터 목록을 불러오지 못했습니다.'
+      toast.error(t('error.general'), {
+        description: t('error.network')
       });
     }
   };
@@ -58,15 +60,15 @@ export default function Dashboard() {
   const checkConnection = async () => {
     const result = await testAPIConnection();
     if (result.success) {
-      setConnectionStatus("✅ 백엔드 연결 성공");
-      toast.success('연결 성공', {
-        description: '백엔드 서버에 정상적으로 연결되었습니다.'
+      setConnectionStatus(`✅ ${t('dashboard.healthy')}`);
+      toast.success(t('common.success'), {
+        description: t('connection.test')
       });
     } else {
-      setConnectionStatus(`❌ 백엔드 연결 실패: ${JSON.stringify(result.details)}`);
+      setConnectionStatus(`❌ ${t('dashboard.unhealthy')}: ${JSON.stringify(result.details)}`);
       console.error("Connection details:", result);
-      toast.error('연결 실패', {
-        description: '백엔드 서버 연결에 실패했습니다.'
+      toast.error(t('common.error'), {
+        description: t('error.network')
       });
     }
   };
@@ -87,13 +89,13 @@ export default function Dashboard() {
     try {
       setSyncing(true);
       await Promise.all([loadStatistics(), loadTopicCount()]);
-      toast.success('동기화 완료', {
-        description: '통계 데이터가 업데이트되었습니다.'
+      toast.success(t('common.success'), {
+        description: t('dashboard.subtitle')
       });
     } catch (error) {
       console.error('Sync failed:', error);
-      toast.error('동기화 실패', {
-        description: '데이터를 새로고침하는데 실패했습니다.'
+      toast.error(t('common.error'), {
+        description: t('error.network')
       });
     } finally {
       setSyncing(false);
@@ -112,19 +114,19 @@ export default function Dashboard() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Dashboard</h1>
+          <h1 className="text-3xl font-bold text-gray-900">{t('dashboard.title')}</h1>
           <p className="mt-2 text-gray-600">
-            Kafka 클러스터 상태를 한눈에 확인하세요
+            {t('dashboard.subtitle')}
           </p>
         </div>
         <div className="flex gap-2">
           <Button onClick={handleSync} variant="secondary" disabled={syncing}>
             <RefreshCw className={`h-4 w-4 ${syncing ? "animate-spin" : ""}`} />
-            {syncing ? "동기화 중..." : "동기화"}
+            {syncing ? t('common.loading') : t('common.filter')}
           </Button>
           <Button onClick={checkConnection} variant="secondary">
             <Wifi className="h-4 w-4" />
-            연결 테스트
+            {t('connection.test')}
           </Button>
         </div>
       </div>
@@ -147,7 +149,7 @@ export default function Dashboard() {
           <CardContent className="pt-6">
             <div className="flex items-center gap-4">
               <label className="text-sm font-medium text-gray-700">
-                Kafka 클러스터:
+                {t('dashboard.selectCluster')}:
               </label>
               <select
                 value={selectedCluster}

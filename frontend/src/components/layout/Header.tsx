@@ -1,5 +1,6 @@
 import { Settings, User } from "lucide-react";
 import { Link } from "react-router-dom";
+import { LanguageSwitcher } from "../LanguageSwitcher";
 
 export default function Header() {
   return (
@@ -12,6 +13,8 @@ export default function Header() {
         </div>
 
         <div className="flex items-center gap-4">
+          <LanguageSwitcher />
+          
           <Link
             to="/settings"
             className="rounded-lg p-2 text-gray-600 hover:bg-gray-100 transition-colors"

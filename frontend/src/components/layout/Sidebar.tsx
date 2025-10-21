@@ -1,4 +1,5 @@
 import { NavLink } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import {
   LayoutDashboard,
   List,
@@ -11,18 +12,19 @@ import {
 } from "lucide-react";
 import { cn } from "../../utils/cn";
 
-const navigation = [
-  { name: "Dashboard", to: "/", icon: LayoutDashboard },
-  { name: "Topics", to: "/topics", icon: List },
-  { name: "Schemas", to: "/schemas", icon: FileCode },
-  { name: "Kafka Connect", to: "/connect", icon: Plug },
-  { name: "Connections", to: "/connections", icon: Server },
-  { name: "Policies", to: "/policies", icon: Shield },
-  { name: "Analysis", to: "/analysis", icon: Activity },
-  { name: "History", to: "/history", icon: HistoryIcon },
-];
-
 export default function Sidebar() {
+  const { t } = useTranslation();
+  
+  const navigation = [
+    { name: t("nav.dashboard"), to: "/", icon: LayoutDashboard },
+    { name: t("nav.topics"), to: "/topics", icon: List },
+    { name: t("nav.schemas"), to: "/schemas", icon: FileCode },
+    { name: t("nav.kafkaConnect"), to: "/connect", icon: Plug },
+    { name: t("nav.connections"), to: "/connections", icon: Server },
+    { name: t("nav.policies"), to: "/policies", icon: Shield },
+    { name: t("nav.analysis"), to: "/analysis", icon: Activity },
+    { name: t("nav.history"), to: "/history", icon: HistoryIcon },
+  ];
   return (
     <div className="flex h-screen w-64 flex-col fixed left-0 top-0 bg-gray-900 text-white">
       {/* Logo */}
