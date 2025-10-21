@@ -39,7 +39,6 @@ export default function PluginsModal({
     try {
       setLoading(true);
       const url = `/api/v1/connect/${connectId}/connector-plugins`;
-      console.log("Loading plugins from:", url);
       const response = await fetch(url);
       
       if (!response.ok) {
@@ -48,7 +47,6 @@ export default function PluginsModal({
       }
       
       const data = await response.json();
-      console.log("Received plugins:", data);
       setPlugins(data.plugins || []);
     } catch (error) {
       console.error("Failed to load plugins:", error);

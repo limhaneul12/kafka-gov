@@ -62,6 +62,7 @@ export default function Topics() {
     if (selectedCluster) {
       loadTopics();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedCluster]);
 
   const loadClusters = async () => {
@@ -138,11 +139,6 @@ export default function Topics() {
       for (const doc of documents) {
         try {
           const response = await topicsAPI.createFromYAML(clusterId, doc);
-          console.log('✅ Backend Response:', {
-            status: response.status,
-            data: response.data,
-            failed: response.data.failed
-          });
           
           // Backend가 200을 반환해도 failed가 있으면 실패로 간주
           const hasFailures = response.data.failed && response.data.failed.length > 0;
@@ -167,7 +163,6 @@ export default function Topics() {
           // Axios 에러에서 Backend 리포트 추출
           if (error && typeof error === 'object' && 'response' in error) {
             const axiosError = error as { response?: { data?: unknown; status?: number; statusText?: string } };
-            console.log('Backend Error Data:', axiosError.response?.data);
             
             // Backend에서 구조화된 에러를 반환한 경우
             if (axiosError.response?.data && typeof axiosError.response.data === 'object') {
@@ -256,7 +251,6 @@ export default function Topics() {
         const totalSkipped = results.reduce((sum, r) => sum + (r.response?.skipped?.length || 0), 0);
         const totalFailed = results.reduce((sum, r) => sum + (r.response?.failed?.length || 0), 0);
         
-        console.log('📊 Summary:', { totalApplied, totalSkipped, totalFailed, results });
         
         const messageParts = ['✅ 배치 처리 완료!', ''];
         
@@ -308,19 +302,8 @@ export default function Topics() {
         }
       });
       
-      const report = reportLines.join('\n');
+      // const report = reportLines.join('\n'); // Unused for now
       
-      // 콘솔에 전체 리포트 출력
-      console.group('🔍 토픽 배치 처리 상세 리포트');
-      console.log(report);
-      results.forEach((r, i) => {
-        if (!r.success && r.response) {
-          console.groupCollapsed(`배치 ${i + 1} 상세`);
-          console.log('Response:', r.response);
-          console.groupEnd();
-        }
-      });
-      console.groupEnd();
       
       // 실패 리포트 모달 표시
       setFailureResults(results);
@@ -391,10 +374,10 @@ export default function Topics() {
         <div className="text-center">
           <Server className="h-16 w-16 text-gray-400 mx-auto mb-4" />
           <h2 className="text-xl font-semibold text-gray-900 mb-2">
-            Kafka 클러스터가 설정되지 않았습니다
+            {t("topic.notConfigured")}
           </h2>
           <p className="text-gray-600">
-            설정 페이지에서 Kafka 클러스터를 먼저 등록해주세요.
+            {t("topic.pleaseConfigureFirst")}
           </p>
         </div>
       </div>
@@ -413,8 +396,8 @@ export default function Topics() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Topics</h1>
-          <p className="mt-2 text-gray-600">Kafka 토픽을 관리합니다</p>
+          <h1 className="text-3xl font-bold text-gray-900">{t("topic.list")}</h1>
+          <p className="mt-2 text-gray-600">{t("topic.description")}</p>
         </div>
         <div className="flex gap-2">
           <Button variant="secondary" onClick={loadTopics}>

@@ -71,6 +71,17 @@ class ListObjectStoragesUseCase:
         return await self.storage_repo.list_all(active_only=active_only)
 
 
+class GetObjectStorageUseCase:
+    """Object Storage 단일 조회 Use Case"""
+
+    def __init__(self, storage_repo: IObjectStorageRepository) -> None:
+        self.storage_repo = storage_repo
+
+    async def execute(self, storage_id: str) -> ObjectStorage | None:
+        """스토리지 단일 조회"""
+        return await self.storage_repo.get_by_id(storage_id)
+
+
 class UpdateObjectStorageUseCase:
     """Object Storage 수정 Use Case"""
 

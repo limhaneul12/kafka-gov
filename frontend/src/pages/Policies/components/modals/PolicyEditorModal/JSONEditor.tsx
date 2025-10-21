@@ -1,14 +1,12 @@
-import { useTranslation } from "react-i18next";
 import { AlertCircle } from "lucide-react";
 
 interface JSONEditorProps {
   value: string;
   onChange: (value: string) => void;
-  error: string | null;
+  error?: string;
 }
 
 export function JSONEditor({ value, onChange, error }: JSONEditorProps) {
-  const { t } = useTranslation();
 
   return (
     <div className="space-y-2">

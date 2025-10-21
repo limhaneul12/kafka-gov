@@ -27,6 +27,7 @@ from .connect import (
 from .registry import (
     CreateSchemaRegistryUseCase,
     DeleteSchemaRegistryUseCase,
+    GetSchemaRegistryUseCase,
     ListSchemaRegistriesUseCase,
     TestSchemaRegistryConnectionUseCase,
     UpdateSchemaRegistryUseCase,
@@ -34,6 +35,7 @@ from .registry import (
 from .storage import (
     CreateObjectStorageUseCase,
     DeleteObjectStorageUseCase,
+    GetObjectStorageUseCase,
     ListObjectStoragesUseCase,
     TestObjectStorageConnectionUseCase,
     UpdateObjectStorageUseCase,
@@ -58,6 +60,8 @@ __all__ = [
     "GetConnectorStatusUseCase",
     "GetKafkaClusterUseCase",
     "GetKafkaConnectUseCase",
+    "GetObjectStorageUseCase",
+    "GetSchemaRegistryUseCase",
     # Connectors
     "ListConnectorsUseCase",
     "ListKafkaClustersUseCase",

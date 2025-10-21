@@ -21,16 +21,16 @@ export function PolicyHeader({
 }: PolicyHeaderProps) {
   const { t } = useTranslation();
 
-  const getStatusColor = (status: string) => {
+  const getStatusColor = (status: string): "success" | "warning" | "default" => {
     switch (status) {
       case "ACTIVE":
-        return "green";
+        return "success";
       case "DRAFT":
-        return "yellow";
+        return "warning";
       case "ARCHIVED":
-        return "gray";
+        return "default";
       default:
-        return "gray";
+        return "default";
     }
   };
 
@@ -43,7 +43,7 @@ export function PolicyHeader({
             <Badge variant={getStatusColor(policy.status)}>
               {policy.status}
             </Badge>
-            <Badge variant="blue">v{policy.version}</Badge>
+            <Badge variant="info">v{policy.version}</Badge>
           </div>
           <p className="text-sm text-gray-600 mt-1">{policy.description}</p>
         </div>

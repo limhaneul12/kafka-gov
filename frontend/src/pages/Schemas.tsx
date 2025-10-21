@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/Card";
 import Button from "../components/ui/Button";
 import Badge from "../components/ui/Badge";
@@ -9,6 +10,7 @@ import { Upload, RefreshCw, Trash2, Search, Database } from "lucide-react";
 import type { SchemaArtifact } from "../types";
 
 export default function Schemas() {
+  const { t } = useTranslation();
   const [schemas, setSchemas] = useState<SchemaArtifact[]>([]);
   const [registries, setRegistries] = useState<Array<{ registry_id: string }>>([]);
   const [selectedRegistry, setSelectedRegistry] = useState<string>("");
@@ -73,10 +75,10 @@ export default function Schemas() {
         <div className="text-center">
           <Database className="h-16 w-16 text-gray-400 mx-auto mb-4" />
           <h2 className="text-xl font-semibold text-gray-900 mb-2">
-            Schema Registry가 설정되지 않았습니다
+            {t("schema.notConfigured")}
           </h2>
           <p className="text-gray-600">
-            설정 페이지에서 Schema Registry를 먼저 등록해주세요.
+            {t("schema.pleaseConfigureFirst")}
           </p>
         </div>
       </div>
@@ -95,8 +97,8 @@ export default function Schemas() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Schemas</h1>
-          <p className="mt-2 text-gray-600">스키마를 관리합니다</p>
+          <h1 className="text-3xl font-bold text-gray-900">{t("schema.list")}</h1>
+          <p className="mt-2 text-gray-600">{t("schema.description")}</p>
         </div>
         <div className="flex gap-2">
           <Button variant="secondary" onClick={loadSchemas}>

@@ -15,6 +15,8 @@ from app.cluster.application.use_cases import (
     DeleteSchemaRegistryUseCase,
     GetKafkaClusterUseCase,
     GetKafkaConnectUseCase,
+    GetObjectStorageUseCase,
+    GetSchemaRegistryUseCase,
     ListKafkaClustersUseCase,
     ListKafkaConnectsUseCase,
     ListObjectStoragesUseCase,
@@ -130,6 +132,11 @@ class ClusterContainer(containers.DeclarativeContainer):
         registry_repo=schema_registry_repository,
     )
 
+    get_schema_registry_use_case = providers.Factory(
+        GetSchemaRegistryUseCase,
+        registry_repo=schema_registry_repository,
+    )
+
     update_schema_registry_use_case = providers.Factory(
         UpdateSchemaRegistryUseCase,
         registry_repo=schema_registry_repository,
@@ -159,6 +166,11 @@ class ClusterContainer(containers.DeclarativeContainer):
 
     list_object_storages_use_case = providers.Factory(
         ListObjectStoragesUseCase,
+        storage_repo=object_storage_repository,
+    )
+
+    get_object_storage_use_case = providers.Factory(
+        GetObjectStorageUseCase,
         storage_repo=object_storage_repository,
     )
 

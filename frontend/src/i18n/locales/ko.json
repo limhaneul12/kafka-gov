@@ -43,6 +43,9 @@
   },
   "topic": {
     "list": "토픽 목록",
+    "description": "Kafka 토픽을 관리합니다",
+    "notConfigured": "Kafka 클러스터가 설정되지 않았습니다",
+    "pleaseConfigureFirst": "설정 페이지에서 Kafka 클러스터를 먼저 등록해주세요.",
     "create": "토픽 생성",
     "createSingle": "단일 생성",
     "createBatch": "배치 생성",
@@ -80,6 +83,9 @@
   },
   "schema": {
     "list": "스키마 목록",
+    "description": "스키마를 관리합니다",
+    "notConfigured": "Schema Registry가 설정되지 않았습니다",
+    "pleaseConfigureFirst": "설정 페이지에서 Schema Registry를 먼저 등록해주세요.",
     "upload": "스키마 업로드",
     "subject": "Subject",
     "version": "버전",
@@ -89,6 +95,7 @@
   },
   "policy": {
     "list": "정책 목록",
+    "description": "토픽 정책을 생성하고 버전을 관리합니다",
     "create": "정책 생성",
     "edit": "정책 수정",
     "delete": "정책 삭제",
@@ -106,6 +113,7 @@
   },
   "connection": {
     "list": "연결 목록",
+    "description": "Kafka 클러스터 및 관련 리소스 연결을 관리합니다",
     "add": "연결 추가",
     "edit": "연결 수정",
     "delete": "연결 삭제",
@@ -125,6 +133,8 @@
   },
   "connect": {
     "list": "커넥터 목록",
+    "notConfigured": "Kafka Connect가 설정되지 않았습니다",
+    "pleaseConfigureFirst": "설정 페이지에서 Kafka Connect를 먼저 등록해주세요.",
     "create": "커넥터 생성",
     "name": "커넥터명",
     "type": "유형",
@@ -139,6 +149,11 @@
     "title": "분석",
     "topicSchemaCorrelation": "토픽-스키마 상관관계",
     "noData": "분석 데이터가 없습니다"
+  },
+  "settings": {
+    "title": "설정",
+    "description": "애플리케이션 설정을 관리합니다",
+    "manageApiKeys": "API 키를 관리합니다"
   },
   "error": {
     "general": "오류가 발생했습니다",

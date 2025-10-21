@@ -1,4 +1,3 @@
-import { useTranslation } from "react-i18next";
 import type { PolicyVersion } from "../../../Policies.types";
 
 interface PolicyContentViewProps {
@@ -6,8 +5,6 @@ interface PolicyContentViewProps {
 }
 
 export function PolicyContentView({ policy }: PolicyContentViewProps) {
-  const { t } = useTranslation();
-
   return (
     <div className="space-y-6">
       {/* Metadata */}

@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/Card";
 import Button from "../components/ui/Button";
@@ -11,6 +12,7 @@ import { Plus, RefreshCw, Shield, Eye, Filter, Trash2, Edit } from "lucide-react
 import type { Policy } from "../types";
 
 export default function Policies() {
+  const { t } = useTranslation();
   const [policies, setPolicies] = useState<Policy[]>([]);
   const [loading, setLoading] = useState(true);
   const [showEditorModal, setShowEditorModal] = useState(false);
@@ -34,7 +36,6 @@ export default function Policies() {
       if (statusFilter) params.append("status", statusFilter);
       
       const url = `/api/v1/policies?${params.toString()}`;
-      console.log("Loading policies from:", url);
       const response = await fetch(url);
       
       if (!response.ok) {
@@ -43,7 +44,6 @@ export default function Policies() {
       }
       
       const data = await response.json();
-      console.log("Received data:", data);
       setPolicies(data.policies || []);
     } catch (error) {
       console.error("Failed to load policies:", error);
@@ -109,7 +109,6 @@ export default function Policies() {
     }
     
     try {
-      console.log("Updating policy:", selectedPolicyId, data);
       // Edit 모드: name, description, content, target_environment 전송
       await policiesAPI.update(selectedPolicyId, {
         name: data.name,
@@ -188,7 +187,7 @@ export default function Policies() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Policies</h1>
-          <p className="mt-2 text-gray-600">토픽 정책을 생성하고 버전을 관리합니다</p>
+          <p className="mt-2 text-gray-600">{t("policy.description")}</p>
         </div>
         <div className="flex gap-2">
           <Button variant="secondary" onClick={loadPolicies}>

@@ -19,6 +19,7 @@ CreateStorageUseCase = Depends(
     Provide[AppContainer.cluster_container.create_object_storage_use_case]
 )
 ListStoragesUseCase = Depends(Provide[AppContainer.cluster_container.list_object_storages_use_case])
+GetStorageUseCase = Depends(Provide[AppContainer.cluster_container.get_object_storage_use_case])
 UpdateStorageUseCase = Depends(
     Provide[AppContainer.cluster_container.update_object_storage_use_case]
 )
@@ -133,6 +134,47 @@ async def update_object_storage(
         is_active=storage.is_active,
         created_at=storage.created_at,
         updated_at=storage.updated_at,
+    )
+
+
+@router.patch("/{storage_id}/activate", response_model=ObjectStorageResponse)
+@inject
+@endpoint_error_handler(default_message="Failed to activate Object Storage")
+async def activate_object_storage(
+    storage_id: str = Path(..., description="스토리지 ID"),
+    get_use_case=GetStorageUseCase,
+    update_use_case=UpdateStorageUseCase,
+) -> ObjectStorageResponse:
+    """Object Storage 활성화 (is_active를 true로 변경)"""
+    # 현재 스토리지 조회
+    storage = await get_use_case.execute(storage_id)
+
+    # is_active만 변경하여 업데이트
+    updated_storage = await update_use_case.execute(
+        storage_id=storage_id,
+        name=storage.name,
+        endpoint_url=storage.endpoint_url,
+        description=storage.description,
+        access_key=storage.access_key,
+        secret_key=storage.secret_key,  # 기존 값 유지 (도메인 엔티티에 저장되어 있음)
+        bucket_name=storage.bucket_name,
+        region=storage.region,
+        use_ssl=storage.use_ssl,
+        is_active=True,  # 활성화
+    )
+
+    return ObjectStorageResponse(
+        storage_id=updated_storage.storage_id,
+        name=updated_storage.name,
+        endpoint_url=updated_storage.endpoint_url,
+        description=updated_storage.description,
+        access_key=updated_storage.access_key,
+        bucket_name=updated_storage.bucket_name,
+        region=updated_storage.region,
+        use_ssl=updated_storage.use_ssl,
+        is_active=updated_storage.is_active,
+        created_at=updated_storage.created_at,
+        updated_at=updated_storage.updated_at,
     )
 
 

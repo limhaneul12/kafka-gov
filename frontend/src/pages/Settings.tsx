@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/Card";
 import Button from "../components/ui/Button";
 import {
@@ -12,6 +13,7 @@ import {
 import { toast } from "sonner";
 
 export default function Settings() {
+  const { t } = useTranslation();
   const [notifications, setNotifications] = useState(true);
   const [emailAlerts, setEmailAlerts] = useState(false);
   const [theme, setTheme] = useState("light");
@@ -30,7 +32,7 @@ export default function Settings() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Settings</h1>
-          <p className="mt-2 text-gray-600">애플리케이션 설정을 관리합니다</p>
+          <p className="mt-2 text-gray-600">{t("settings.description")}</p>
         </div>
         <Button onClick={handleSave}>
           <Save className="h-4 w-4" />
@@ -198,7 +200,7 @@ export default function Settings() {
               Manage API Keys
             </Button>
             <p className="text-sm text-gray-600">
-              API 키를 관리합니다
+              {t("settings.manageApiKeys")}
             </p>
           </div>
         </CardContent>

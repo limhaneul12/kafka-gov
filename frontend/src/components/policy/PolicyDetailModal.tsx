@@ -75,13 +75,11 @@ export default function PolicyDetailModal({
       
       if (preferActive) {
         // ACTIVE 버전 시도
-        console.log("Trying to load ACTIVE policy...");
         response = await fetch(`/api/v1/policies/${policyId}/active`);
         
         if (!response.ok) {
           if (response.status === 422) {
             // ACTIVE가 없으면 최신 버전으로 fallback
-            console.log("No ACTIVE version, falling back to latest...");
             response = await fetch(`/api/v1/policies/${policyId}`);
           } else {
             throw new Error(`HTTP ${response.status}: ${response.statusText}`);
@@ -89,7 +87,6 @@ export default function PolicyDetailModal({
         }
       } else {
         // 최신 버전 조회
-        console.log("Loading latest policy...");
         response = await fetch(`/api/v1/policies/${policyId}`);
       }
       
@@ -98,7 +95,6 @@ export default function PolicyDetailModal({
       }
       
       const data = await response.json();
-      console.log("Policy loaded:", data.policy);
       setPolicy(data.policy);
     } catch (error: any) {
       console.error("Failed to load policy:", error);

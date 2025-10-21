@@ -186,6 +186,57 @@ async def update_kafka_cluster(
     )
 
 
+@router.patch("/{cluster_id}/activate", response_model=KafkaClusterResponse)
+@inject
+@endpoint_error_handler(default_message="Failed to activate Kafka cluster")
+async def activate_kafka_cluster(
+    cluster_id: str = Path(..., description="클러스터 ID"),
+    get_use_case=GetClusterUseCase,
+    update_use_case=UpdateClusterUseCase,
+) -> KafkaClusterResponse:
+    """Kafka 클러스터 활성화 (is_active를 true로 변경)"""
+    # 현재 클러스터 조회
+    cluster = await get_use_case.execute(cluster_id)
+
+    # is_active만 변경하여 업데이트
+    updated_cluster = await update_use_case.execute(
+        cluster_id=cluster_id,
+        name=cluster.name,
+        bootstrap_servers=cluster.bootstrap_servers,
+        description=cluster.description,
+        security_protocol=cluster.security_protocol,
+        sasl_mechanism=cluster.sasl_mechanism,
+        sasl_username=cluster.sasl_username,
+        sasl_password=None,  # 기존 값 유지
+        ssl_ca_location=cluster.ssl_ca_location,
+        ssl_cert_location=cluster.ssl_cert_location,
+        ssl_key_location=cluster.ssl_key_location,
+        request_timeout_ms=cluster.request_timeout_ms,
+        socket_timeout_ms=cluster.socket_timeout_ms,
+        is_active=True,  # 활성화
+    )
+
+    return KafkaClusterResponse(
+        cluster_id=updated_cluster.cluster_id,
+        name=updated_cluster.name,
+        bootstrap_servers=updated_cluster.bootstrap_servers,
+        description=updated_cluster.description,
+        security_protocol=updated_cluster.security_protocol.value,
+        sasl_mechanism=updated_cluster.sasl_mechanism.value
+        if updated_cluster.sasl_mechanism
+        else None,
+        sasl_username=updated_cluster.sasl_username,
+        ssl_ca_location=updated_cluster.ssl_ca_location,
+        ssl_cert_location=updated_cluster.ssl_cert_location,
+        ssl_key_location=updated_cluster.ssl_key_location,
+        request_timeout_ms=updated_cluster.request_timeout_ms,
+        socket_timeout_ms=updated_cluster.socket_timeout_ms,
+        is_active=updated_cluster.is_active,
+        created_at=updated_cluster.created_at,
+        updated_at=updated_cluster.updated_at,
+    )
+
+
 @router.delete("/{cluster_id}", status_code=status.HTTP_204_NO_CONTENT)
 @inject
 @endpoint_error_handler(default_message="Failed to delete Kafka cluster")

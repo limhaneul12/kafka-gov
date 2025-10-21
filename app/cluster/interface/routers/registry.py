@@ -21,6 +21,7 @@ CreateRegistryUseCase = Depends(
 ListRegistriesUseCase = Depends(
     Provide[AppContainer.cluster_container.list_schema_registries_use_case]
 )
+GetRegistryUseCase = Depends(Provide[AppContainer.cluster_container.get_schema_registry_use_case])
 UpdateRegistryUseCase = Depends(
     Provide[AppContainer.cluster_container.update_schema_registry_use_case]
 )
@@ -140,6 +141,49 @@ async def update_schema_registry(
         is_active=registry.is_active,
         created_at=registry.created_at,
         updated_at=registry.updated_at,
+    )
+
+
+@router.patch("/{registry_id}/activate", response_model=SchemaRegistryResponse)
+@inject
+@endpoint_error_handler(default_message="Failed to activate Schema Registry")
+async def activate_schema_registry(
+    registry_id: str = Path(..., description="레지스트리 ID"),
+    get_use_case=GetRegistryUseCase,
+    update_use_case=UpdateRegistryUseCase,
+) -> SchemaRegistryResponse:
+    """Schema Registry 활성화 (is_active를 true로 변경)"""
+    # 현재 레지스트리 조회
+    registry = await get_use_case.execute(registry_id)
+
+    # is_active만 변경하여 업데이트
+    updated_registry = await update_use_case.execute(
+        registry_id=registry_id,
+        name=registry.name,
+        url=registry.url,
+        description=registry.description,
+        auth_username=registry.auth_username,
+        auth_password=None,  # 기존 값 유지
+        ssl_ca_location=registry.ssl_ca_location,
+        ssl_cert_location=registry.ssl_cert_location,
+        ssl_key_location=registry.ssl_key_location,
+        timeout=registry.timeout,
+        is_active=True,  # 활성화
+    )
+
+    return SchemaRegistryResponse(
+        registry_id=updated_registry.registry_id,
+        name=updated_registry.name,
+        url=updated_registry.url,
+        description=updated_registry.description,
+        auth_username=updated_registry.auth_username,
+        ssl_ca_location=updated_registry.ssl_ca_location,
+        ssl_cert_location=updated_registry.ssl_cert_location,
+        ssl_key_location=updated_registry.ssl_key_location,
+        timeout=updated_registry.timeout,
+        is_active=updated_registry.is_active,
+        created_at=updated_registry.created_at,
+        updated_at=updated_registry.updated_at,
     )
 
 

@@ -73,6 +73,17 @@ class ListSchemaRegistriesUseCase:
         return await self.registry_repo.list_all(active_only=active_only)
 
 
+class GetSchemaRegistryUseCase:
+    """Schema Registry 단일 조회 Use Case"""
+
+    def __init__(self, registry_repo: ISchemaRegistryRepository) -> None:
+        self.registry_repo = registry_repo
+
+    async def execute(self, registry_id: str) -> SchemaRegistry | None:
+        """레지스트리 단일 조회"""
+        return await self.registry_repo.get_by_id(registry_id)
+
+
 class UpdateSchemaRegistryUseCase:
     """Schema Registry 수정 Use Case"""
 

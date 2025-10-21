@@ -81,36 +81,36 @@ export function PolicyDetailModal({
     }
   };
 
-  const handleArchive = async (policyId: string, version: number) => {
+  const handleArchive = async (policyId: string) => {
     try {
-      await policiesAPI.archive(policyId, version);
+      await policiesAPI.archive(policyId);
       toast.success(t("policy.archive"));
       await loadPolicy();
       await loadVersions();
       onRefresh();
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     } catch (error) {
-      console.error("Failed to archive policy:", error);
       toast.error(t("error.general"));
     }
   };
 
-  const handleDelete = async (policyId: string, version: number) => {
+  const handleDeleteVersion = async (policyId: string, version: number) => {
     if (!confirm(`Delete version ${version}?`)) return;
 
     try {
-      await policiesAPI.deleteVersion(policyId, version);
+      await policiesAPI.delete(policyId, version);
       toast.success(t("common.success"));
       await loadVersions();
       onRefresh();
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     } catch (error) {
-      console.error("Failed to delete version:", error);
       toast.error(t("error.general"));
     }
   };
 
-  const handleCompare = (version: number) => {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const handleCompare = (_version: number) => {
     // TODO: Implement version comparison
-    console.log("Compare with version:", version);
     toast.info("Version comparison coming soon!");
   };
 
@@ -149,7 +149,7 @@ export function PolicyDetailModal({
                       onVersionSelect={handleVersionSelect}
                       onActivate={handleActivate}
                       onArchive={handleArchive}
-                      onDelete={handleDelete}
+                      onDelete={handleDeleteVersion}
                       onCompare={handleCompare}
                     />
                   </div>

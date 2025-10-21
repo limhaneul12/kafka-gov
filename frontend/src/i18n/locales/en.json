@@ -43,6 +43,9 @@
   },
   "topic": {
     "list": "Topics",
+    "description": "Manage Kafka topics",
+    "notConfigured": "Kafka cluster is not configured",
+    "pleaseConfigureFirst": "Please register a Kafka cluster in the settings page first.",
     "create": "Create Topic",
     "createSingle": "Single Creation",
     "createBatch": "Batch Creation",
@@ -80,6 +83,9 @@
   },
   "schema": {
     "list": "Schemas",
+    "description": "Manage schemas",
+    "notConfigured": "Schema Registry is not configured",
+    "pleaseConfigureFirst": "Please register a Schema Registry in the settings page first.",
     "upload": "Upload Schema",
     "subject": "Subject",
     "version": "Version",
@@ -89,6 +95,7 @@
   },
   "policy": {
     "list": "Policies",
+    "description": "Create and manage topic policy versions",
     "create": "Create Policy",
     "edit": "Edit Policy",
     "delete": "Delete Policy",
@@ -106,6 +113,7 @@
   },
   "connection": {
     "list": "Connections",
+    "description": "Manage Kafka cluster and related resource connections",
     "add": "Add Connection",
     "edit": "Edit Connection",
     "delete": "Delete Connection",
@@ -125,6 +133,8 @@
   },
   "connect": {
     "list": "Connectors",
+    "notConfigured": "Kafka Connect is not configured",
+    "pleaseConfigureFirst": "Please register a Kafka Connect in the settings page first.",
     "create": "Create Connector",
     "name": "Connector Name",
     "type": "Type",
@@ -139,6 +149,11 @@
     "title": "Analysis",
     "topicSchemaCorrelation": "Topic-Schema Correlation",
     "noData": "No analysis data available"
+  },
+  "settings": {
+    "title": "Settings",
+    "description": "Manage application settings",
+    "manageApiKeys": "Manage API keys"
   },
   "error": {
     "general": "An error occurred",

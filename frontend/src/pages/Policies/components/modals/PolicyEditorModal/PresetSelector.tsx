@@ -1,4 +1,3 @@
-import { useTranslation } from "react-i18next";
 import { FileCode } from "lucide-react";
 
 interface Preset {
@@ -20,7 +19,6 @@ export function PresetSelector({
   presets,
   onPresetChange,
 }: PresetSelectorProps) {
-  const { t } = useTranslation();
 
   return (
     <div className="space-y-3">

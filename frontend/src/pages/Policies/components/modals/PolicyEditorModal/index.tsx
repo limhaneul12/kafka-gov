@@ -69,8 +69,17 @@ export function PolicyEditorModal({
 
   const handlePresetChange = (preset: string) => {
     setSelectedPreset(preset);
-    const presets = policyType === "naming" ? NAMING_PRESETS : GUARDRAIL_PRESETS;
-    setContentYaml(presets[preset].content);
+    if (policyType === "naming") {
+      const data = NAMING_PRESETS[preset as keyof typeof NAMING_PRESETS];
+      if (data) {
+        setContentYaml(data.content);
+      }
+    } else {
+      const data = GUARDRAIL_PRESETS[preset as keyof typeof GUARDRAIL_PRESETS];
+      if (data) {
+        setContentYaml(data.content);
+      }
+    }
     setYamlError(null);
   };
 
@@ -107,7 +116,7 @@ export function PolicyEditorModal({
     // Simple YAML to JSON parser (for basic key: value pairs)
     try {
       const lines = yaml.split("\n");
-      const result: Record<string, any> = {};
+      const result: Record<string, unknown> = {};
       let currentKey: string | null = null;
       let currentArray: string[] = [];
 
@@ -151,6 +160,8 @@ export function PolicyEditorModal({
 
       return result;
     } catch (error) {
+      console.error("Failed to save policy:", error);
+      setYamlError("Invalid YAML format. Please check your syntax.");
       throw new Error("Invalid YAML format");
     }
   };
@@ -203,7 +214,7 @@ export function PolicyEditorModal({
           <JSONEditor
             value={contentYaml}
             onChange={setContentYaml}
-            error={yamlError}
+            error={yamlError || undefined}
           />
 
           {/* Actions */}

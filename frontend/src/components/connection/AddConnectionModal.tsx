@@ -6,6 +6,7 @@ interface AddConnectionModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSubmit: (type: string, data: Record<string, string>) => Promise<void>;
+  defaultType?: string;
 }
 
 type ConnectionType = "kafka" | "registry" | "storage" | "connect";
@@ -14,8 +15,9 @@ export default function AddConnectionModal({
   isOpen,
   onClose,
   onSubmit,
+  defaultType,
 }: AddConnectionModalProps) {
-  const [connectionType, setConnectionType] = useState<ConnectionType>("kafka");
+  const [connectionType, setConnectionType] = useState<ConnectionType>((defaultType as ConnectionType) || "kafka");
   const [formData, setFormData] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
 

@@ -12,15 +12,17 @@ interface CreateConnectorModalProps {
   onClose: () => void;
   onSubmit: (config: ConnectorConfig) => Promise<void>;
   connectId: string;
+  selectedPluginClass?: string;
 }
 
 export default function CreateConnectorModal({
   isOpen,
   onClose,
   onSubmit,
+  selectedPluginClass,
 }: CreateConnectorModalProps) {
   const [connectorName, setConnectorName] = useState("");
-  const [connectorClass, setConnectorClass] = useState("");
+  const [connectorClass, setConnectorClass] = useState(selectedPluginClass || "");
   const [tasksMax, setTasksMax] = useState("1");
   const [customConfig, setCustomConfig] = useState("");
   const [loading, setLoading] = useState(false);

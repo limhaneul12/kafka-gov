@@ -49,7 +49,6 @@ api.interceptors.response.use(
 export const testAPIConnection = async () => {
   try {
     const response = await api.get("");
-    console.log("✅ API Connection OK:", response.data);
     return { success: true, data: response.data };
   } catch (error: any) {
     console.error("❌ API Connection Failed:", error.message);
@@ -120,73 +119,130 @@ export const schemasAPI = {
 export const clustersAPI = {
   // Kafka Clusters (Brokers)
   listKafka: () => api.get("/v1/clusters/brokers"),
+  getKafka: (clusterId: string) => api.get(`/v1/clusters/brokers/${clusterId}`),
   createKafka: (data: Record<string, string>) => api.post("/v1/clusters/brokers", data),
-  updateKafka: (clusterId: string, data: Record<string, string>) => 
+  updateKafka: (clusterId: string, data: Record<string, unknown>) => 
     api.put(`/v1/clusters/brokers/${clusterId}`, data),
   deleteKafka: (clusterId: string) => api.delete(`/v1/clusters/brokers/${clusterId}`),
+  activateKafka: (clusterId: string) => api.patch(`/v1/clusters/brokers/${clusterId}/activate`),
   testKafka: (clusterId: string) =>
     api.post(`/v1/clusters/brokers/${clusterId}/test`),
   
   // Schema Registries
   listRegistries: () => api.get("/v1/clusters/schema-registries"),
+  getRegistry: (registryId: string) => api.get(`/v1/clusters/schema-registries/${registryId}`),
   createRegistry: (data: Record<string, string>) => 
     api.post("/v1/clusters/schema-registries", data),
-  updateRegistry: (registryId: string, data: Record<string, string>) => 
+  updateRegistry: (registryId: string, data: Record<string, unknown>) => 
     api.put(`/v1/clusters/schema-registries/${registryId}`, data),
   deleteRegistry: (registryId: string) => 
     api.delete(`/v1/clusters/schema-registries/${registryId}`),
+  activateRegistry: (registryId: string) => api.patch(`/v1/clusters/schema-registries/${registryId}/activate`),
   testRegistry: (registryId: string) =>
     api.post(`/v1/clusters/schema-registries/${registryId}/test`),
   
   // Object Storages
   listStorages: () => api.get("/v1/clusters/storages"),
+  getStorage: (storageId: string) => api.get(`/v1/clusters/storages/${storageId}`),
   createStorage: (data: Record<string, string>) => 
     api.post("/v1/clusters/storages", data),
-  updateStorage: (storageId: string, data: Record<string, string>) => 
+  updateStorage: (storageId: string, data: Record<string, unknown>) => 
     api.put(`/v1/clusters/storages/${storageId}`, data),
   deleteStorage: (storageId: string) => 
     api.delete(`/v1/clusters/storages/${storageId}`),
+  activateStorage: (storageId: string) => api.patch(`/v1/clusters/storages/${storageId}/activate`),
   testStorage: (storageId: string) =>
     api.post(`/v1/clusters/storages/${storageId}/test`),
   
   // Kafka Connects
   listConnects: () => api.get("/v1/clusters/connects"),
+  getConnect: (connectId: string) => api.get(`/v1/clusters/connects/${connectId}`),
   createConnect: (data: Record<string, string>) => 
     api.post("/v1/clusters/connects", data),
-  updateConnect: (connectId: string, data: Record<string, string>) => 
+  updateConnect: (connectId: string, data: Record<string, unknown>) => 
     api.put(`/v1/clusters/connects/${connectId}`, data),
   deleteConnect: (connectId: string) => 
     api.delete(`/v1/clusters/connects/${connectId}`),
+  activateConnect: (connectId: string) => api.patch(`/v1/clusters/connects/${connectId}/activate`),
   testConnect: (connectId: string) =>
     api.post(`/v1/clusters/connects/${connectId}/test`),
 };
 
 export const connectAPI = {
-  list: (connectId: string) =>
-    api.get(`/v1/connect/${connectId}/connectors`),
+  list: (connectId: string, expand?: string) => {
+    const params = expand ? `?expand=${expand}` : '';
+    return api.get(`/v1/connect/${connectId}/connectors${params}`);
+  },
   get: (connectId: string, name: string) =>
     api.get(`/v1/connect/${connectId}/connectors/${name}`),
-  create: (connectId: string, config: any) =>
+  getConfig: (connectId: string, name: string) =>
+    api.get(`/v1/connect/${connectId}/connectors/${name}/config`),
+  getStatus: (connectId: string, name: string) =>
+    api.get(`/v1/connect/${connectId}/connectors/${name}/status`),
+  create: (connectId: string, config: Record<string, unknown>) =>
     api.post(`/v1/connect/${connectId}/connectors`, config),
+  updateConfig: (connectId: string, name: string, config: Record<string, unknown>) =>
+    api.put(`/v1/connect/${connectId}/connectors/${name}/config`, config),
   delete: (connectId: string, name: string) =>
     api.delete(`/v1/connect/${connectId}/connectors/${name}`),
   pause: (connectId: string, name: string) =>
-    api.post(`/v1/connect/${connectId}/connectors/${name}/pause`),
+    api.put(`/v1/connect/${connectId}/connectors/${name}/pause`, {}),
   resume: (connectId: string, name: string) =>
-    api.post(`/v1/connect/${connectId}/connectors/${name}/resume`),
+    api.put(`/v1/connect/${connectId}/connectors/${name}/resume`, {}),
   restart: (connectId: string, name: string) =>
     api.post(`/v1/connect/${connectId}/connectors/${name}/restart`),
+  // Task operations
+  getTasks: (connectId: string, name: string) =>
+    api.get(`/v1/connect/${connectId}/connectors/${name}/tasks`),
+  getTaskStatus: (connectId: string, name: string, taskId: number) =>
+    api.get(`/v1/connect/${connectId}/connectors/${name}/tasks/${taskId}/status`),
+  restartTask: (connectId: string, name: string, taskId: number) =>
+    api.post(`/v1/connect/${connectId}/connectors/${name}/tasks/${taskId}/restart`),
+  // Plugin operations
+  getPlugins: (connectId: string) =>
+    api.get(`/v1/connect/${connectId}/connector-plugins`),
+  validateConfig: (connectId: string, pluginClass: string, config: Record<string, unknown>) =>
+    api.put(`/v1/connect/${connectId}/connector-plugins/${pluginClass}/config/validate`, config),
+  // Topic operations
+  getTopics: (connectId: string, name: string) =>
+    api.get(`/v1/connect/${connectId}/connectors/${name}/topics`),
+  resetTopics: (connectId: string, name: string) =>
+    api.put(`/v1/connect/${connectId}/connectors/${name}/topics/reset`, {}),
+  // Metadata operations (거버넌스)
+  getMetadata: (connectId: string, name: string) =>
+    api.get(`/v1/connect/${connectId}/connectors/${name}/metadata`),
+  updateMetadata: (connectId: string, name: string, metadata: Record<string, unknown>) =>
+    api.patch(`/v1/connect/${connectId}/connectors/${name}/metadata`, metadata),
+  deleteMetadata: (connectId: string, name: string) =>
+    api.delete(`/v1/connect/${connectId}/connectors/${name}/metadata`),
+  getMetadataByTeam: (connectId: string, team: string) =>
+    api.get(`/v1/connect/${connectId}/metadata/by-team/${team}`),
 };
 
 export const policiesAPI = {
-  list: () => api.get("/v1/policies"),
+  list: (policyType?: string, status?: string) => {
+    const params = new URLSearchParams();
+    if (policyType) params.append("policy_type", policyType);
+    if (status) params.append("status", status);
+    return api.get(`/v1/policies?${params.toString()}`);
+  },
   get: (policyId: string) => api.get(`/v1/policies/${policyId}`),
-  create: (data: any) => api.post("/v1/policies", data),
-  update: (policyId: string, data: any) =>
+  getActive: (policyId: string) => api.get(`/v1/policies/${policyId}/active`),
+  getVersions: (policyId: string) => api.get(`/v1/policies/${policyId}/versions`),
+  create: (data: Record<string, unknown>) => api.post("/v1/policies", data),
+  update: (policyId: string, data: Record<string, unknown>) =>
     api.put(`/v1/policies/${policyId}`, data),
-  delete: (policyId: string) => api.delete(`/v1/policies/${policyId}`),
+  delete: (policyId: string, version?: number) => {
+    const params = version !== undefined ? `?version=${version}` : '';
+    return api.delete(`/v1/policies/${policyId}${params}`);
+  },
+  deleteAll: (policyId: string) => api.delete(`/v1/policies/${policyId}/all`),
   activate: (policyId: string, version?: number) =>
     api.post(`/v1/policies/${policyId}/activate`, version !== undefined ? { version } : {}),
+  archive: (policyId: string) =>
+    api.post(`/v1/policies/${policyId}/archive`),
+  rollback: (policyId: string, targetVersion: number, createdBy: string = "system") =>
+    api.post(`/v1/policies/${policyId}/rollback`, { target_version: targetVersion, created_by: createdBy }),
 };
 
 export const auditAPI = {

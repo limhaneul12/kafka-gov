@@ -1,4 +1,3 @@
-import { useTranslation } from "react-i18next";
 import { Play, Archive, Trash2, GitCompare, CheckCircle } from "lucide-react";
 import Badge from "../../../../../components/ui/Badge";
 import type { PolicyVersion } from "../../../Policies.types";
@@ -22,18 +21,17 @@ export function PolicyVersionList({
   onDelete,
   onCompare,
 }: PolicyVersionListProps) {
-  const { t } = useTranslation();
 
-  const getStatusColor = (status: string) => {
+  const getStatusColor = (status: string): "success" | "warning" | "default" => {
     switch (status) {
       case "ACTIVE":
-        return "green";
+        return "success";
       case "DRAFT":
-        return "yellow";
+        return "warning";
       case "ARCHIVED":
-        return "gray";
+        return "default";
       default:
-        return "gray";
+        return "default";
     }
   };
 

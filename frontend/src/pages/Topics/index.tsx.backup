@@ -46,9 +46,9 @@ export default function Topics() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [editingTopic, setEditingTopic] = useState<Topic | null>(null);
 
-  const handleCreateTopic = async (clusterId: string, yamlContent: string) => {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const handleCreateTopic = async (_clusterId: string, _yamlContent: string) => {
     // TODO: Implement batch create logic from old Topics.tsx
-    console.log("Creating topics:", { clusterId, yamlContent });
     await loadTopics();
   };
 
@@ -146,7 +146,15 @@ export default function Topics() {
         <EditTopicMetadataModal
           isOpen={true}
           onClose={() => setEditingTopic(null)}
-          topic={editingTopic}
+          initialData={{
+            name: editingTopic.name,
+            owners: editingTopic.owners,
+            doc: editingTopic.doc,
+            tags: editingTopic.tags,
+            environment: editingTopic.environment,
+            slo: editingTopic.slo,
+            sla: editingTopic.sla,
+          }}
           onSubmit={handleEditMetadata}
         />
       )}

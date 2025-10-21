@@ -149,6 +149,41 @@ async def update_kafka_connect(
     )
 
 
+@router.patch("/{connect_id}/activate", response_model=KafkaConnectResponse)
+@inject
+@endpoint_error_handler(default_message="Failed to activate Kafka Connect")
+async def activate_kafka_connect(
+    connect_id: str = Path(..., description="Connect ID"),
+    get_use_case=GetConnectUseCase,
+    update_use_case=UpdateConnectUseCase,
+) -> KafkaConnectResponse:
+    """Kafka Connect 활성화 (is_active를 true로 변경)"""
+    # 현재 Connect 조회
+    connect = await get_use_case.execute(connect_id)
+
+    # is_active만 변경하여 업데이트
+    updated_connect = await update_use_case.execute(
+        connect_id=connect_id,
+        name=connect.name,
+        url=connect.url,
+        description=connect.description,
+        cluster_id=connect.cluster_id,
+        is_active=True,  # 활성화
+    )
+
+    return KafkaConnectResponse(
+        connect_id=updated_connect.connect_id,
+        cluster_id=updated_connect.cluster_id,
+        name=updated_connect.name,
+        url=updated_connect.url,
+        description=updated_connect.description,
+        auth_username=updated_connect.auth_username,
+        is_active=updated_connect.is_active,
+        created_at=updated_connect.created_at,
+        updated_at=updated_connect.updated_at,
+    )
+
+
 @router.delete("/{connect_id}", status_code=status.HTTP_204_NO_CONTENT)
 @inject
 @endpoint_error_handler(default_message="Failed to delete Kafka Connect")
