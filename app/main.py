@@ -11,10 +11,9 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import ORJSONResponse
 
-from .analysis.interface.router import router as analysis_router
 from .cluster.interface.router import router as cluster_router
 from .connect.interface.router import router as connect_router
-from .container import AppContainer, register_event_handlers
+from .container import AppContainer
 from .schema.interface.router import router as schema_router
 from .shared.error_handlers import format_validation_error
 from .shared.interface.router import router as shared_router
@@ -31,9 +30,8 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
     try:
         container.init_resources()
-        register_event_handlers(container)
 
-        logger.info("컨테이너 초기화 및 이벤트 핸들러 등록 완료")
+        logger.info("컨테이너 초기화 완료")
         yield
     except Exception:
         logger.exception("초기화 중 오류 발생")
@@ -81,7 +79,6 @@ def create_app() -> FastAPI:
     app.state.cluster_container = container.cluster_container()
     app.state.topic_container = container.topic_container()
     app.state.schema_container = container.schema_container()
-    app.state.analysis_container = container.analysis_container()
     app.state.connect_container = container.connect_container()
 
     # ✅ (중요) 와이어링 - wiring_config가 있으면 생략 가능하지만,
@@ -93,9 +90,7 @@ def create_app() -> FastAPI:
             "app.connect.interface",  # Connect API
             "app.topic.interface",
             "app.schema.interface",
-            "app.analysis.interface",
             "app.shared.interface",
-            "app.analysis.application",
         ]
     )
 
@@ -106,7 +101,6 @@ def create_app() -> FastAPI:
     app.include_router(topic_router, prefix="/api")
     app.include_router(policy_router, prefix="/api")  # Policy API
     app.include_router(schema_router, prefix="/api")
-    app.include_router(analysis_router, prefix="/api")
 
     @app.get("/api")
     @app.get("/api/")

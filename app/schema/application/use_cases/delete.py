@@ -5,7 +5,6 @@ from __future__ import annotations
 import logging
 import uuid
 
-from app.analysis.domain.repositories import ICorrelationRepository
 from app.cluster.domain.services import IConnectionManager
 from app.schema.infrastructure.schema_registry_adapter import ConfluentSchemaRegistryAdapter
 
@@ -25,12 +24,10 @@ class SchemaDeleteUseCase:
         connection_manager: IConnectionManager,
         metadata_repository: ISchemaMetadataRepository,
         audit_repository: ISchemaAuditRepository,
-        correlation_repository: ICorrelationRepository | None = None,
     ) -> None:
         self.connection_manager = connection_manager
         self.metadata_repository = metadata_repository
         self.audit_repository = audit_repository
-        self.correlation_repository = correlation_repository
 
     async def analyze(
         self,
@@ -127,20 +124,6 @@ class SchemaDeleteUseCase:
             except Exception as db_error:
                 logger = logging.getLogger(__name__)
                 logger.warning(f"Failed to delete artifact from DB for {subject}: {db_error}")
-
-            # Correlation에서 스키마 참조 제거
-            if self.correlation_repository:
-                try:
-                    updated_count = await self.correlation_repository.remove_schema_reference(
-                        subject
-                    )
-                    logger = logging.getLogger(__name__)
-                    logger.info(f"Removed schema reference from {updated_count} correlations")
-                except Exception as corr_error:
-                    logger = logging.getLogger(__name__)
-                    logger.warning(
-                        f"Failed to remove correlation reference for {subject}: {corr_error}"
-                    )
 
             # 4. 감사 로그 기록 (성공)
             await self.audit_repository.log_operation(

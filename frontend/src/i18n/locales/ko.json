@@ -146,9 +146,16 @@
     "noConnectors": "커넥터가 없습니다"
   },
   "analysis": {
-    "title": "분석",
-    "topicSchemaCorrelation": "토픽-스키마 상관관계",
-    "noData": "분석 데이터가 없습니다"
+    "title": "스키마 사용 현황",
+    "description": "등록된 스키마의 메타데이터를 조회합니다",
+    "schemaUsageReport": "Schema Usage Report",
+    "subject": "Subject",
+    "version": "버전",
+    "schemaType": "스키마 타입",
+    "compatibilityMode": "호환성 모드",
+    "owner": "소유자",
+    "noSchemas": "등록된 스키마가 없습니다",
+    "totalSchemas": "전체 스키마"
   },
   "teamAnalytics": {
     "title": "Team Analytics",

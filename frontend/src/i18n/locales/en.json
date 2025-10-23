@@ -146,9 +146,16 @@
     "noConnectors": "No connectors available"
   },
   "analysis": {
-    "title": "Analysis",
-    "topicSchemaCorrelation": "Topic-Schema Correlation",
-    "noData": "No analysis data available"
+    "title": "Schema Usage Report",
+    "description": "View metadata of registered schemas",
+    "schemaUsageReport": "Schema Usage Report",
+    "subject": "Subject",
+    "version": "Version",
+    "schemaType": "Schema Type",
+    "compatibilityMode": "Compatibility Mode",
+    "owner": "Owner",
+    "noSchemas": "No schemas registered",
+    "totalSchemas": "Total Schemas"
   },
   "teamAnalytics": {
     "title": "Team Analytics",

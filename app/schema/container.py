@@ -32,9 +32,6 @@ class SchemaContainer(containers.DeclarativeContainer):
     # 인프라스트럭처 컨테이너 참조
     infrastructure = providers.DependenciesContainer()
 
-    # Analysis 컨테이너 참조 (correlation_repository 사용)
-    analysis = providers.DependenciesContainer()
-
     # Cluster 컨테이너 참조 (ConnectionManager 사용)
     cluster = providers.DependenciesContainer()
 
@@ -93,7 +90,5 @@ class SchemaContainer(containers.DeclarativeContainer):
         connection_manager=cluster.connection_manager,  # ConnectionManager 주입
         metadata_repository=metadata_repository,
         audit_repository=audit_repository,
-        correlation_repository=analysis.correlation_repository,  # Optional
+        correlation_repository=None,  # Analysis 모듈 제거로 None
     )
-
-    # delete_analysis_use_case는 delete_use_case.analyze()로 통합됨
