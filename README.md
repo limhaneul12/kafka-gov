@@ -7,7 +7,7 @@
   
   [![Python](https://img.shields.io/badge/Python-3.12+-blue.svg)](https://python.org)
   [![FastAPI](https://img.shields.io/badge/FastAPI-0.117.1+-green.svg)](https://fastapi.tiangolo.com)
-  [![Confluent Kafka](https://img.shields.io/badge/Confluent--Kafka-2.11.-orange.svg)](https://github.com/confluentinc/confluent-kafka-python)
+  [![Confluent Kafka](https://img.shields.io/badge/Confluent--Kafka-2.6.1-orange.svg)](https://github.com/confluentinc/confluent-kafka-python)
   [![Pydantic](https://img.shields.io/badge/Pydantic-2.11.9+-e92063.svg)](https://docs.pydantic.dev/)
 
   [![React](https://img.shields.io/badge/React-19.1-61dafb.svg)](https://react.dev)
