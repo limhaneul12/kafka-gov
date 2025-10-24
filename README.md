@@ -7,17 +7,17 @@
   
   [![Python](https://img.shields.io/badge/Python-3.12+-blue.svg)](https://python.org)
   [![FastAPI](https://img.shields.io/badge/FastAPI-0.117.1+-green.svg)](https://fastapi.tiangolo.com)
-  [![Confluent Kafka](https://img.shields.io/badge/Confluent--Kafka-2.6.1-orange.svg)](https://github.com/confluentinc/confluent-kafka-python)
+  [![Confluent Kafka](https://img.shields.io/badge/Confluent--Kafka-2.11.-orange.svg)](https://github.com/confluentinc/confluent-kafka-python)
   [![Pydantic](https://img.shields.io/badge/Pydantic-2.11.9+-e92063.svg)](https://docs.pydantic.dev/)
 
   [![React](https://img.shields.io/badge/React-19.1-61dafb.svg)](https://react.dev)
   [![TypeScript](https://img.shields.io/badge/TypeScript-5.9+-3178c6.svg)](https://www.typescriptlang.org/)
-  [![Coverage](https://img.shields.io/badge/Coverage-64%25-brightgreen.svg)](https://github.com/limhaneul12/kafka-gov)
+  [![Coverage](https://img.shields.io/badge/Coverage-64%25-yellow.svg)](https://github.com/limhaneul12/kafka-gov)
   [![License](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
   
   **"Without knowing who owns a topic and what it's used for, Kafka is just a message queue."**
   
-  [🚀 Quick Start](#-quick-start) • [✨ Features](#-features) • [📖 Documentation](#-documentation) • [🏗️ Architecture](#️-architecture) • [📦 Modules](#-module-responsibilities) • [🗺️ Roadmap](#️-roadmap)
+  [🚀 Quick Start](#-quick-start) • [✨ Features](#-features) • [📖 Documentation](#-documentation) • [🏗️ Architecture](#️-architecture) • [📦 Modules](#-module-overview) • [🗺️ Roadmap](#️-roadmap)
 </div>
 
 ---
@@ -332,12 +332,31 @@ Apply different policies per environment to ensure operational stability.
 
 ### 📊 Complete Audit Trail
 
-- **Who**: Actor and team
-- **When**: UTC timestamp
-- **What**: Before/after config snapshots
-- **Why**: Change ID linking to deployment
-- **Result**: Success/partial/failed with details
-- **Schema Events**: Track schema uploads, compatibility changes, and deletions
+**Track every change with comprehensive audit logs:**
+
+- **Who**: Actor and team attribution
+- **When**: UTC timestamp with timezone
+- **What**: Before/after config snapshots (JSON diff)
+- **Why**: Change ID linking to deployment/ticket
+- **Result**: Success/partial/failed with error details
+- **Schema Events**: Schema uploads, compatibility changes, deletions
+- **Searchable**: Filter by date, actor, environment, action type
+
+### 📊 Team Analytics
+
+**Monitor team resource usage and activity trends:**
+
+<div align="center">
+  <img src="./image/analysis.png" alt="Team Analytics" width="800"/>
+  <p><em>Analyze team resources and activity trends across environments</em></p>
+</div>
+
+**Analytics Features:**
+- 📈 **Total Topics**: Per-team topic count
+- 🌍 **Env Distribution**: DEV/STG/PROD breakdown
+- 📊 **Avg Partitions**: Resource usage metrics
+- 📅 **Activity Trend**: Create/update/delete operations over time
+- 🔍 **Topic List**: Quick access to all team topics
 
 ---
 
@@ -366,7 +385,12 @@ open http://localhost:8000
 **Main Endpoints:**
 - 🌐 **Web UI**: http://localhost:8000
 - 📚 **API Docs**: http://localhost:8000/docs (Swagger UI)
+- 📖 **ReDoc**: http://localhost:8000/redoc (Alternative API docs)
 - 💚 **Health Check**: http://localhost:8000/health
+
+**Default Credentials:**
+- No authentication required in development mode
+- Production: Configure via environment variables
 
 ### Option 2: Local Development
 
@@ -490,29 +514,30 @@ Built on **Clean Architecture** principles with domain-driven design:
 app/
 ├── shared/          # 공통 인프라 & 도메인 이벤트
 │   ├── domain/      # 공통 도메인 모델 (Environment, AuditLog 등)
-│   ├── infra/       # DB, 암호화, 이벤트 버스
+│   ├── infrastructure/ # DB, 암호화, 이벤트 버스
+│   ├── security/    # 보안 관련 유틸리티
+│   ├── utils/       # 공통 유틸리티
 │   └── interface/   # 공통 HTTP 예외 처리
 ├── cluster/         # Multi-cluster 연결 관리
 │   ├── domain/      # Cluster 엔티티 & 값 객체
 │   ├── application/ # Connection 관리 유즈케이스
-│   ├── infra/       # Kafka/Schema Registry 클라이언트
+│   ├── infrastructure/ # Kafka/Schema Registry 클라이언트
 │   └── interface/   # REST API 엔드포인트
-├── connect/         # Kafka Connect 관리
-│   ├── domain/      # Connector 도메인 모델
-│   ├── application/ # Connector 생성/제어 유즈케이스
-│   └── interface/   # Connect API 엔드포인트
 ├── topic/           # Topic 관리 (핵심 도메인)
 │   ├── domain/      # Topic, TopicBatch 엔티티
 │   ├── application/ # 토픽 생성/수정/삭제 유즈케이스
-│   ├── infra/       # Kafka Admin API & DB 저장소
+│   ├── infrastructure/ # Kafka Admin API & DB 저장소
 │   └── interface/   # 배치/단일 토픽 API
 ├── schema/          # Schema Registry 관리
 │   ├── domain/      # Schema, Compatibility 모델
 │   ├── application/ # 스키마 등록/동기화 유즈케이스
-│   └── infra/       # Schema Registry & MinIO
-├── analysis/        # 토픽-스키마 연관분석
-│   ├── application/ # Impact analysis 유즈케이스
-│   └── interface/   # 분석 API
+│   ├── infrastructure/ # Schema Registry & MinIO
+│   └── interface/   # 스키마 API
+├── connect/         # Kafka Connect 관리
+│   ├── domain/      # Connector 도메인 모델
+│   ├── application/ # Connector 생성/제어 유즈케이스
+│   ├── infrastructure/ # Connect REST API 클라이언트
+│   └── interface/   # Connect API 엔드포인트
 ├── container.py     # Root DI Container (Dependency Injector)
 └── main.py          # FastAPI 애플리케이션 진입점
 ```
@@ -550,13 +575,13 @@ frontend/src/
 **Backend:**
 - **Clean Architecture**: Domain → Application → Infrastructure → Interface
 - **Event-Driven**: Domain events for cross-context communication (topic-schema sync)
-- **Type Safety**: Python 3.12+ with strict typing (`str | None`, `list[T]`)
-- **Dual Validation**: Pydantic v2 (I/O boundary) + msgspec (domain models)
+- **Type Safety**: Python 3.12+ with strict typing (`str | None`, `list[T]`, no `Any`)
+- **Validation**: Pydantic v2 for I/O boundary with strict mode
 - **DI Container**: Hierarchical dependency injection with `dependency-injector`
 - **High Performance**: Async/await throughout with connection pooling and batch operations
-- **Observability**: Structured JSON logging, detailed validation errors, and health checks
-- **Data-Oriented**: Immutable domain models with msgspec (frozen structs)
-- **Error Resilience**: Circuit breakers, retry policies, and graceful degradation
+- **Observability**: Structured logging, detailed validation errors, and health checks
+- **Data-Oriented**: Immutable domain models with `@dataclass(frozen=True)`
+- **Error Resilience**: Graceful error handling, retry policies, and detailed error messages
 
 **Frontend:**
 - **Component-Driven**: Atomic design pattern with reusable components
@@ -569,7 +594,7 @@ frontend/src/
 
 ## 📦 Module Overview
 
-Kafka-Gov is organized into 6 bounded contexts, each following Clean Architecture principles:
+Kafka-Gov is organized into 5 bounded contexts, each following Clean Architecture principles:
 
 | Module | Purpose | Key Features | Documentation |
 |--------|---------|--------------|---------------|
@@ -577,7 +602,6 @@ Kafka-Gov is organized into 6 bounded contexts, each following Clean Architectur
 | 🔌 **`cluster/`** | Multi-Cluster Management | Register clusters, Dynamic switching, Health checks | [View Details](./app/cluster/README.md) |
 | 🎯 **`topic/`** | Topic Governance (Core) | CRUD + Batch operations, Policy enforcement, Versioning | [View Details](./app/topic/README.md) |
 | 📦 **`schema/`** | Schema Registry | Upload schemas, Compatibility modes, MinIO storage | [View Details](./app/schema/README.md) |
-| 🔗 **`analysis/`** | Topic-Schema Correlation | Auto-linking, Impact analysis, Event-driven | [View Details](./app/analysis/README.md) |
 | 🔌 **`connect/`** | Kafka Connect | Connector CRUD, Control, Plugin management | [View Details](./app/connect/README.md) |
 
 **Each module contains:**
@@ -594,8 +618,8 @@ Kafka-Gov is organized into 6 bounded contexts, each following Clean Architectur
 **Event-Driven Integration:**
 
 ```
-topic.created event → analysis module → auto-link to schemas
-schema.registered event → analysis module → auto-link to topics
+topic.created event → topic-schema auto-correlation
+schema.registered event → topic-schema auto-correlation
 ```
 
 **Dependency Flow:**
@@ -605,7 +629,7 @@ shared (foundation)
   ↑
 cluster (connection manager)
   ↑
-topic, schema, connect, analysis (business domains)
+topic, schema, connect (business domains)
 ```
 
 **Data Flow Example (Batch Topic Creation):**
@@ -617,7 +641,7 @@ topic, schema, connect, analysis (business domains)
 5. User clicks "Apply"
 6. `topic` module executes batch operations
 7. `topic` module emits `topic.created` events
-8. `analysis` module listens and auto-links topics to schemas
+8. Topic-schema correlation updated automatically
 9. `shared` module persists audit logs
 
 ### 📚 API Reference
@@ -635,9 +659,9 @@ For detailed API endpoints and request/response schemas, refer to:
 
 | Category | Technology | Purpose |
 |----------|------------|---------|
-| **Language** | Python 3.12+ | Native union types (`str \| None`), pattern matching |
+| **Language** | Python 3.12+ | Modern type hints (`str \| None`), pattern matching |
 | **Framework** | FastAPI 0.117+ | High-performance async web framework |
-| **Validation** | Pydantic v2 + msgspec | I/O boundary (Pydantic) + Domain models (msgspec) |
+| **Validation** | Pydantic v2 | I/O validation with strict mode |
 | **Database** | MySQL 8.0+ | Metadata storage (clusters, policies, audit logs) |
 | **ORM** | SQLAlchemy 2.0 (Async) | Async database operations |
 | **Message Broker** | Apache Kafka | Topic management via Admin API |
@@ -645,7 +669,7 @@ For detailed API endpoints and request/response schemas, refer to:
 | **Object Storage** | MinIO (S3-compatible) | Schema artifact permanent storage |
 | **DI Container** | dependency-injector | Hierarchical dependency injection |
 | **Event Bus** | In-memory async event bus | Cross-domain communication |
-| **Testing** | pytest + pytest-asyncio | 85%+ test coverage |
+| **Testing** | pytest + pytest-asyncio | 64% test coverage (growing) |
 | **Package Manager** | uv | Ultra-fast dependency resolution (Rust-based) |
 | **Key Libraries** | confluent-kafka, aiomysql, httpx, orjson, aiofiles | Async clients & serialization |
 
@@ -679,48 +703,97 @@ For detailed API endpoints and request/response schemas, refer to:
 
 ## ⚙️ Configuration
 
+### Environment Variables
+
 Key environment variables (`.env`):
 
 ```bash
 # Database (for storing connection metadata)
 DATABASE_URL=mysql+aiomysql://user:pass@localhost/kafka_gov
 
-# Default Kafka Cluster (for initial registration - optional)
-KAFKA_BOOTSTRAP_SERVERS=localhost:9092
-KAFKA_SECURITY_PROTOCOL=PLAINTEXT
+# Encryption (REQUIRED - for sensitive credentials)
+ENCRYPTION_KEY=<generate using generate_encryption_key.py>
 
-# Default Schema Registry (for initial registration - optional)
+# Application Settings
+ENVIRONMENT=development  # development, staging, production
+LOG_LEVEL=INFO           # DEBUG, INFO, WARNING, ERROR
+CORS_ORIGINS=http://localhost:5173,http://localhost:8000
+
+# Optional: Default Kafka Cluster (for initial registration)
+KAFKA_BOOTSTRAP_SERVERS=localhost:9092
+KAFKA_SECURITY_PROTOCOL=PLAINTEXT  # PLAINTEXT, SSL, SASL_SSL, SASL_PLAINTEXT
+
+# Optional: Default Schema Registry (for initial registration)
 SCHEMA_REGISTRY_URL=http://localhost:8081
 
-# Default Object Storage (for initial registration - optional)
+# Optional: Default Object Storage (for initial registration)
 MINIO_ENDPOINT=localhost:9000
 MINIO_ACCESS_KEY=minioadmin
 MINIO_SECRET_KEY=minioadmin
 MINIO_BUCKET=kafka-gov
+MINIO_SECURE=false  # true for HTTPS
 
-# Default Kafka Connect (for initial registration - optional)
+# Optional: Default Kafka Connect (for initial registration)
 KAFKA_CONNECT_URL=http://localhost:8083
-
-# Encryption (for sensitive credentials)
-ENCRYPTION_KEY=<generate using generate_encryption_key.py>
 ```
 
-See [`.env.example`](.env.example) for all options.
+### Generate Encryption Key
+
+```bash
+python generate_encryption_key.py
+# Copy the generated key to .env as ENCRYPTION_KEY
+```
+
+See [`.env.example`](.env.example) for all options and detailed descriptions.
 
 ---
 
 ## 🚀 Deployment
 
-**Docker Compose (Recommended)**
+### Development
+
+**Docker Compose (Recommended):**
 ```bash
 docker-compose up -d
 ```
 
-**Production**
+### Production
+
+**1. Build Docker Image:**
 ```bash
 docker build -t kafka-gov:latest .
-docker run -d -p 8000:8000 --env-file .env.prod kafka-gov:latest
 ```
+
+**2. Run with Production Config:**
+```bash
+docker run -d \
+  --name kafka-gov \
+  -p 8000:8000 \
+  --env-file .env.production \
+  --restart unless-stopped \
+  kafka-gov:latest
+```
+
+**3. Using Docker Compose (Production):**
+```bash
+docker-compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+```
+
+### Health Check
+
+```bash
+# Check if service is running
+curl http://localhost:8000/health
+
+# Expected response:
+# {"status": "healthy", "database": "connected", "version": "1.0.0"}
+```
+
+### Monitoring
+
+- **Logs**: `docker logs -f kafka-gov`
+- **Metrics**: Available at `/metrics` (Prometheus format)
+- **API Docs**: http://your-domain/docs
 
 ---
 
@@ -734,7 +807,27 @@ Contributions welcome! Please:
 4. Commit: `git commit -m 'feat: Add feature'`
 5. Push and create Pull Request
 
-**Standards**: Python 3.12+, 80%+ test coverage, Clean Architecture, Ruff linting
+**Development Standards:**
+- **Code Style**: Ruff formatting and linting
+- **Type Safety**: Strict type hints, no `Any` types
+- **Testing**: pytest with async support, aim for 80%+ coverage
+- **Architecture**: Clean Architecture with DDD principles
+- **Commits**: Conventional commits (feat/fix/docs/refactor)
+- **Documentation**: Docstrings for public APIs
+
+**Before submitting:**
+```bash
+# Run tests
+uv run pytest --cov=app
+
+# Lint code
+uv run ruff check app/
+
+# Format code
+uv run ruff format app/
+```
+
+See [CONTRIBUTING.md](./CONTRIBUTING.md) for detailed guidelines.
 
 ---
 
@@ -747,39 +840,68 @@ MIT License - see [LICENSE](./LICENSE) file for details.
 ## 🗺️ Roadmap
 
 ### ✅ Completed (v1.0)
-- ✅ Multi-cluster connection management
+
+**Backend Core:**
+- ✅ Multi-cluster connection management with encryption
 - ✅ Topic CRUD with rich metadata (owner, tags, docs)
 - ✅ YAML-based batch operations with dry-run
 - ✅ Environment-specific policy enforcement
 - ✅ Policy version management (draft/active/archived)
 - ✅ Schema Registry integration with MinIO storage
-- ✅ Kafka Connect connector management
-- ✅ Topic-Schema correlation and impact analysis
-- ✅ Complete audit trail
+- ✅ Kafka Connect connector management (backend API)
+- ✅ Complete audit trail with event sourcing
+- ✅ 64%+ test coverage with pytest
+
+**Frontend Core:**
 - ✅ React 19 frontend with TailwindCSS
-- ✅ Advanced topic filtering (owner, tags, environment)
-- ✅ Preset-based topic creation (dev/stg/prod/custom)
-- ✅ Batch vs single creation mode toggle
+- ✅ Dashboard with cluster health monitoring
+- ✅ Topic list with search functionality
+- ✅ Create Topic modal (single vs batch toggle)
+- ✅ YAML batch upload interface
+- ✅ Policy version management UI
+- ✅ Team Analytics page
 
 ### 🚧 In Progress (v1.1)
-- 🔄 Kafka Connect tab in Connections page (frontend UI)
+
+**Frontend Enhancements:**
+- 🔄 Topics page: Owner/Team filtering UI
+- 🔄 Topics page: Tags filtering UI  
+- 🔄 Topics page: Doc field display
+- 🔄 Topics page: Environment filter implementation
+- 🔄 Create Topic modal: Dry-run button
+- 🔄 Create Topic modal: Preset selection (dev/stg/prod/custom)
+- 🔄 Dashboard: Topic/Schema sync functionality
+- 🔄 Dashboard: Manual sync button
+- 🔄 Policy page: Frontend integration with preset_spec.py
+- 🔄 Connections page: Kafka Connect tab UI
+- 🔄 Policy Versions: Enhanced version management features
 
 ### 🔮 Planned (v2.0)
+
+**Monitoring & Observability:**
 - 📅 Consumer group monitoring & lag tracking
 - 📅 Topic retention policy recommendations
-- 📅 Schema migration wizard
-- 📅 Slack/Discord notifications for policy violations
-- 📅 GitOps integration (sync with Git repository)
-- 📅 Role-based access control (RBAC)
-- 📅 Multi-tenancy support
 - 📅 Prometheus metrics export
 - 📅 Grafana dashboard templates
+- 📅 Real-time cluster metrics (throughput, latency)
+
+**Governance & Security:**
+- 📅 Role-based access control (RBAC)
+- 📅 Multi-tenancy support
+- 📅 Approval workflows for production changes
+- 📅 Slack/Discord notifications for policy violations
+
+**Advanced Features:**
+- 📅 Schema migration wizard
+- 📅 GitOps integration (sync with Git repository)
+- 📅 Cross-cluster topic migration tool
+- 📅 Topic usage analytics (hot partitions, consumer lag)
 
 ### 💡 Ideas (Future)
-- Advanced analytics (topic usage patterns, hot partitions)
-- Cost estimation for topic configurations
-- AI-powered topic naming suggestions
-- Cross-cluster topic migration tool
+- 🤖 AI-powered topic naming suggestions
+- 💰 Cost estimation for topic configurations
+- 📈 Advanced analytics dashboard (usage patterns, trends)
+- 🔄 Automated schema evolution recommendations
 
 ---
 
@@ -789,9 +911,11 @@ Explore the key features through visual examples:
 
 | Feature | Screenshot |
 |---------|------------|
+| **Dashboard** | ![Dashboard](./image/dashboard.png) |
 | **Topic List** | ![Topic List](./image/topic_list.png) |
 | **Create Topic** | ![Create Topic](./image/create_topic.png) |
 | **Batch Result** | ![Batch Result](./image/batch_result.png) |
+| **Team Analytics** | ![Team Analytics](./image/analysis.png) |
 | **Policy Detail** | ![Policy](./image/policy.png) |
 | **Policy Versioning** | ![Policy Versioning](./image/policy_versing.png) |
 
@@ -799,12 +923,18 @@ Explore the key features through visual examples:
 
 ## 🙏 Acknowledgments
 
-Built with:
-- [FastAPI](https://fastapi.tiangolo.com/) - Async web framework
-- [Confluent Kafka](https://www.confluent.io/) - Python client
-- [SQLAlchemy](https://www.sqlalchemy.org/) - Async ORM
-- [msgspec](https://jcristharif.com/msgspec/) - High-performance serialization
-- [uv](https://github.com/astral-sh/uv) - Fast package manager
+**Core Technologies:**
+- [FastAPI](https://fastapi.tiangolo.com/) - Modern async web framework
+- [Confluent Kafka Python](https://github.com/confluentinc/confluent-kafka-python) - Official Kafka client
+- [SQLAlchemy 2.0](https://www.sqlalchemy.org/) - Async ORM with type safety
+- [Pydantic v2](https://docs.pydantic.dev/) - Data validation and settings
+- [React 19](https://react.dev/) - Modern UI library
+- [uv](https://github.com/astral-sh/uv) - Ultra-fast Python package manager
+
+**Special Thanks:**
+- Confluent team for excellent Kafka tools
+- FastAPI community for amazing framework
+- All open-source contributors
 
 ---
 

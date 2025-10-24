@@ -86,8 +86,37 @@ export default function Topics() {
       setTopics(response.data.topics || []);
     } catch (error) {
       console.error("Failed to load topics:", error);
+      toast.error('토픽 조회 실패', {
+        description: error instanceof Error ? error.message : '토픽 목록을 불러오는데 실패했습니다.'
+      });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleRefresh = async () => {
+    if (!selectedCluster) {
+      toast.error('클러스터 선택 필요', {
+        description: '토픽을 조회할 Kafka 클러스터를 선택하세요.'
+      });
+      return;
+    }
+
+    try {
+      toast.info('토픽 새로고침', {
+        description: 'Kafka 클러스터에서 토픽 목록을 가져오는 중...'
+      });
+      
+      await loadTopics();
+      
+      toast.success('새로고침 완료', {
+        description: `${topics.length}개의 토픽이 조회되었습니다.`
+      });
+    } catch (error) {
+      console.error("Failed to refresh topics:", error);
+      toast.error('새로고침 실패', {
+        description: error instanceof Error ? error.message : '토픽 새로고침에 실패했습니다.'
+      });
     }
   };
 
@@ -400,7 +429,7 @@ export default function Topics() {
           <p className="mt-2 text-gray-600">{t("topic.description")}</p>
         </div>
         <div className="flex gap-2">
-          <Button variant="secondary" onClick={loadTopics}>
+          <Button variant="secondary" onClick={handleRefresh}>
             <RefreshCw className="h-4 w-4" />
             Refresh
           </Button>

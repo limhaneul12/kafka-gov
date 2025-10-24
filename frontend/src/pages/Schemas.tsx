@@ -7,12 +7,13 @@ import Loading from "../components/ui/Loading";
 import UploadSchemaModal from "../components/schema/UploadSchemaModal";
 import { schemasAPI, clustersAPI } from "../services/api";
 import { Upload, RefreshCw, Trash2, Search, Database } from "lucide-react";
+import { toast } from "sonner";
 import type { SchemaArtifact } from "../types";
 
 export default function Schemas() {
   const { t } = useTranslation();
   const [schemas, setSchemas] = useState<SchemaArtifact[]>([]);
-  const [registries, setRegistries] = useState<Array<{ registry_id: string }>>([]);
+  const [registries, setRegistries] = useState<Array<{ registry_id: string; name?: string }>>([]);
   const [selectedRegistry, setSelectedRegistry] = useState<string>("");
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
@@ -39,6 +40,54 @@ export default function Schemas() {
       setSchemas(response.data);
     } catch (error) {
       console.error("Failed to load schemas:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleRefresh = async () => {
+    if (!selectedRegistry) {
+      toast.error('레지스트리 선택 필요', {
+        description: '동기화할 Schema Registry를 선택하세요.'
+      });
+      return;
+    }
+
+    try {
+      setLoading(true);
+      toast.info('동기화 시작', {
+        description: 'Schema Registry에서 스키마를 가져오는 중...'
+      });
+      
+      // Schema Registry와 동기화
+      const syncResult = await schemasAPI.sync(selectedRegistry);
+      
+      // 동기화 후 목록 다시 로드
+      await loadSchemas();
+      
+      toast.success('동기화 완료', {
+        description: `${syncResult.data.synced_count || syncResult.data.total || 0}개의 스키마가 동기화되었습니다.`
+      });
+    } catch (error: unknown) {
+      console.error("Failed to sync schemas:", error);
+      
+      // Axios 에러에서 상세 메시지 추출
+      let errorMessage = '스키마 동기화에 실패했습니다.';
+      if (error && typeof error === 'object' && 'response' in error) {
+        const axiosError = error as { response?: { data?: { detail?: string }; status?: number } };
+        if (axiosError.response?.data?.detail) {
+          errorMessage = axiosError.response.data.detail;
+        } else if (axiosError.response?.status === 422) {
+          errorMessage = `Schema Registry를 찾을 수 없습니다. Settings에서 "${selectedRegistry}" 연결을 확인하세요.`;
+        }
+      } else if (error instanceof Error) {
+        errorMessage = error.message;
+      }
+      
+      toast.error('동기화 실패', {
+        description: errorMessage,
+        duration: 7000,
+      });
     } finally {
       setLoading(false);
     }
@@ -101,7 +150,7 @@ export default function Schemas() {
           <p className="mt-2 text-gray-600">{t("schema.description")}</p>
         </div>
         <div className="flex gap-2">
-          <Button variant="secondary" onClick={loadSchemas}>
+          <Button variant="secondary" onClick={handleRefresh}>
             <RefreshCw className="h-4 w-4" />
             Refresh
           </Button>
@@ -120,18 +169,51 @@ export default function Schemas() {
         registryId={selectedRegistry}
       />
 
-      {/* Search */}
+      {/* Filters */}
       <Card>
         <CardContent className="pt-6">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search schemas..."
-              className="w-full rounded-lg border border-gray-300 pl-10 pr-3 py-2 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-            />
+          <div className="grid gap-4 md:grid-cols-2">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Schema Registry
+              </label>
+              <select
+                value={selectedRegistry}
+                onChange={(e) => setSelectedRegistry(e.target.value)}
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              >
+                {registries.length === 0 ? (
+                  <option value="">No registries available</option>
+                ) : (
+                  registries.map((registry) => (
+                    <option key={registry.registry_id} value={registry.registry_id}>
+                      {registry.name || registry.registry_id}
+                    </option>
+                  ))
+                )}
+              </select>
+              {registries.length === 0 && (
+                <p className="mt-1 text-xs text-orange-600">
+                  ⚠️ Settings에서 Schema Registry를 먼저 등록하세요.
+                </p>
+              )}
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Search
+              </label>
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Search schemas..."
+                  className="w-full rounded-lg border border-gray-300 pl-10 pr-3 py-2 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                />
+              </div>
+            </div>
           </div>
         </CardContent>
       </Card>

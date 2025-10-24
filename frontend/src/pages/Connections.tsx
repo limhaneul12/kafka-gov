@@ -21,6 +21,30 @@ export default function Connections() {
   const [editType, setEditType] = useState<"kafka" | "registry" | "storage" | "connect">("kafka");
   const [editId, setEditId] = useState<string>("");
   const [editData, setEditData] = useState<KafkaCluster | SchemaRegistry | ObjectStorage | KafkaConnect | null>(null);
+  const [deleteConfirm, setDeleteConfirm] = useState<{
+    isOpen: boolean;
+    type: "kafka" | "registry" | "storage" | "connect";
+    id: string;
+    name: string;
+  }>({ isOpen: false, type: "kafka", id: "", name: "" });
+
+  // 디버깅: editData와 showEditModal 변경 감지
+  useEffect(() => {
+    console.log('[Connections] Edit state changed:', {
+      showEditModal,
+      editType,
+      editId,
+      hasEditData: !!editData,
+    });
+  }, [showEditModal, editType, editId, editData]);
+
+  // 디버깅: registries state 변경 감지
+  useEffect(() => {
+    console.log('[Connections] Registries state updated:', {
+      count: registries.length,
+      registries: registries.map(r => ({ id: r.registry_id, name: r.name })),
+    });
+  }, [registries]);
 
   useEffect(() => {
     loadConnections();
@@ -29,18 +53,33 @@ export default function Connections() {
   const loadConnections = async () => {
     try {
       setLoading(true);
+      console.log('[Connections] Loading connections...');
       const [clustersRes, registriesRes, storagesRes, connectsRes] = await Promise.all([
         clustersAPI.listKafka(),
         clustersAPI.listRegistries(),
         clustersAPI.listStorages(),
         clustersAPI.listConnects(),
       ]);
+      
+      console.log('[Connections] API responses:', {
+        clusters: clustersRes.data.length,
+        registries: registriesRes.data.length,
+        storages: storagesRes.data.length,
+        connects: connectsRes.data.length,
+      });
+      console.log('[Connections] Registry list:', registriesRes.data);
+      
       setClusters(clustersRes.data);
       setRegistries(registriesRes.data);
       setStorages(storagesRes.data);
       setConnects(connectsRes.data);
+      
+      console.log('[Connections] State updated successfully');
     } catch (error) {
-      console.error("Failed to load connections:", error);
+      console.error("[Connections] Failed to load connections:", error);
+      toast.error('연결 목록 로딩 실패', {
+        description: error instanceof Error ? error.message : '연결 목록을 불러오는데 실패했습니다.'
+      });
     } finally {
       setLoading(false);
     }
@@ -70,18 +109,13 @@ export default function Connections() {
   };
 
   // Kafka Cluster handlers
-  const handleDeleteKafka = async (clusterId: string, name: string) => {
-    if (!confirm(`Delete Kafka Cluster "${name}"? This action cannot be undone.`)) {
-      return;
-    }
-    try {
-      await clustersAPI.deleteKafka(clusterId);
-      await loadConnections();
-      toast.success('삭제 완료', { description: 'Kafka 클러스터가 삭제되었습니다.' });
-    } catch (error) {
-      console.error("Failed to delete kafka:", error);
-      toast.error('삭제 실패', { description: 'Kafka 클러스터 삭제에 실패했습니다.' });
-    }
+  const handleDeleteKafka = (clusterId: string, name: string) => {
+    setDeleteConfirm({
+      isOpen: true,
+      type: "kafka",
+      id: clusterId,
+      name,
+    });
   };
 
   const handleTestKafka = async (clusterId: string, name: string) => {
@@ -102,17 +136,56 @@ export default function Connections() {
   };
 
   // Schema Registry handlers
-  const handleDeleteRegistry = async (registryId: string, name: string) => {
-    if (!confirm(`Delete Schema Registry "${name}"? This action cannot be undone.`)) {
-      return;
-    }
+  const handleDeleteRegistry = (registryId: string, name: string) => {
+    console.log('[Connections] Opening delete confirm for registry:', { registryId, name });
+    setDeleteConfirm({
+      isOpen: true,
+      type: "registry",
+      id: registryId,
+      name,
+    });
+  };
+
+  const confirmDelete = async () => {
+    const { type, id, name } = deleteConfirm;
+    console.log('[Connections] Confirming delete:', { type, id, name });
+    
     try {
-      await clustersAPI.deleteRegistry(registryId);
+      switch (type) {
+        case "kafka":
+          console.log('[Connections] Deleting Kafka cluster:', id);
+          await clustersAPI.deleteKafka(id);
+          toast.success('삭제 완료', { description: 'Kafka 클러스터가 삭제되었습니다.' });
+          break;
+        case "registry":
+          console.log('[Connections] Deleting Schema Registry:', id);
+          await clustersAPI.deleteRegistry(id);
+          console.log('[Connections] Schema Registry deleted successfully');
+          toast.success('삭제 완료', { description: 'Schema Registry가 삭제되었습니다.' });
+          break;
+        case "storage":
+          console.log('[Connections] Deleting Object Storage:', id);
+          await clustersAPI.deleteStorage(id);
+          toast.success('삭제 완료', { description: 'Object Storage가 삭제되었습니다.' });
+          break;
+        case "connect":
+          console.log('[Connections] Deleting Kafka Connect:', id);
+          await clustersAPI.deleteConnect(id);
+          toast.success('삭제 완료', { description: 'Kafka Connect가 삭제되었습니다.' });
+          break;
+      }
+      
+      console.log('[Connections] Reloading connections after delete...');
       await loadConnections();
-      toast.success('삭제 완료', { description: 'Schema Registry가 삭제되었습니다.' });
+      console.log('[Connections] Connections reloaded');
     } catch (error) {
-      console.error("Failed to delete registry:", error);
-      toast.error('삭제 실패', { description: 'Schema Registry 삭제에 실패했습니다.' });
+      console.error('[Connections] Failed to delete:', error);
+      toast.error('삭제 실패', { 
+        description: error instanceof Error ? error.message : '삭제에 실패했습니다.' 
+      });
+    } finally {
+      console.log('[Connections] Closing delete modal');
+      setDeleteConfirm({ isOpen: false, type: "kafka", id: "", name: "" });
     }
   };
 
@@ -127,25 +200,26 @@ export default function Connections() {
   };
 
   const handleEditRegistry = (registry: SchemaRegistry) => {
+    console.log('[Connections] Opening edit modal for registry:', registry);
     setEditType("registry");
     setEditId(registry.registry_id);
     setEditData(registry);
     setShowEditModal(true);
+    console.log('[Connections] Edit modal state updated:', {
+      editType: "registry",
+      editId: registry.registry_id,
+      showEditModal: true,
+    });
   };
 
   // Object Storage handlers
-  const handleDeleteStorage = async (storageId: string, name: string) => {
-    if (!confirm(`Delete Object Storage "${name}"? This action cannot be undone.`)) {
-      return;
-    }
-    try {
-      await clustersAPI.deleteStorage(storageId);
-      await loadConnections();
-      toast.success('삭제 완료', { description: 'Object Storage가 삭제되었습니다.' });
-    } catch (error) {
-      console.error("Failed to delete storage:", error);
-      toast.error('삭제 실패', { description: 'Object Storage 삭제에 실패했습니다.' });
-    }
+  const handleDeleteStorage = (storageId: string, name: string) => {
+    setDeleteConfirm({
+      isOpen: true,
+      type: "storage",
+      id: storageId,
+      name,
+    });
   };
 
   const handleTestStorage = async (storageId: string, name: string) => {
@@ -166,18 +240,13 @@ export default function Connections() {
   };
 
   // Kafka Connect handlers
-  const handleDeleteConnect = async (connectId: string, name: string) => {
-    if (!confirm(`Delete Kafka Connect "${name}"? This action cannot be undone.`)) {
-      return;
-    }
-    try {
-      await clustersAPI.deleteConnect(connectId);
-      await loadConnections();
-      toast.success('삭제 완룼', { description: 'Kafka Connect가 삭제되었습니다.' });
-    } catch (error) {
-      console.error("Failed to delete connect:", error);
-      toast.error('삭제 실패', { description: 'Kafka Connect 삭제에 실패했습니다.' });
-    }
+  const handleDeleteConnect = (connectId: string, name: string) => {
+    setDeleteConfirm({
+      isOpen: true,
+      type: "connect",
+      id: connectId,
+      name,
+    });
   };
 
   const handleTestConnect = async (connectId: string, name: string) => {
@@ -263,6 +332,37 @@ export default function Connections() {
           type={editType}
           initialData={editData}
         />
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {deleteConfirm.isOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+          <div className="w-full max-w-md m-4 rounded-lg bg-white shadow-xl p-6">
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">
+              삭제 확인
+            </h3>
+            <p className="text-sm text-gray-600 mb-4">
+              정말로 <span className="font-semibold text-red-600">"{deleteConfirm.name}"</span>을(를) 삭제하시겠습니까?
+              <br />
+              이 작업은 되돌릴 수 없습니다.
+            </p>
+            <div className="flex justify-end gap-3">
+              <Button
+                variant="secondary"
+                onClick={() => setDeleteConfirm({ isOpen: false, type: "kafka", id: "", name: "" })}
+              >
+                취소
+              </Button>
+              <Button
+                variant="primary"
+                onClick={confirmDelete}
+                className="bg-red-600 hover:bg-red-700"
+              >
+                삭제
+              </Button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Kafka Clusters */}

@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import Button from "../ui/Button";
 import { X } from "lucide-react";
+import { toast } from "sonner";
 
 interface EditConnectionModalProps {
   isOpen: boolean;
@@ -29,6 +30,10 @@ export default function EditConnectionModal({
 
   useEffect(() => {
     if (isOpen && initialData) {
+      console.log('[EditConnectionModal] Modal opened with initial data:', {
+        type,
+        initialData,
+      });
       setFormData({
         name: initialData.name || "",
         url: initialData.url || "",
@@ -38,20 +43,33 @@ export default function EditConnectionModal({
         description: initialData.description || "",
       });
     }
-  }, [isOpen, initialData]);
+  }, [isOpen, initialData, type]);
 
-  if (!isOpen) return null;
+  if (!isOpen) {
+    console.log('[EditConnectionModal] Modal is closed, not rendering');
+    return null;
+  }
+
+  console.log('[EditConnectionModal] Rendering modal for type:', type);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    console.log('[EditConnectionModal] Submitting connection update:', {
+      type,
+      formData,
+    });
+    
     try {
       setLoading(true);
       await onSubmit(formData);
+      console.log('[EditConnectionModal] Update successful');
       onClose();
     } catch (error) {
-      console.error("Failed to update connection:", error);
-      alert("Failed to update connection. Please check your inputs.");
+      console.error('[EditConnectionModal] Failed to update connection:', error);
+      toast.error('연결 수정 실패', {
+        description: error instanceof Error ? error.message : '연결 설정 업데이트에 실패했습니다. 입력값을 확인하세요.'
+      });
     } finally {
       setLoading(false);
     }

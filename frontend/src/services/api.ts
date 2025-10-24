@@ -50,16 +50,17 @@ export const testAPIConnection = async () => {
   try {
     const response = await api.get("");
     return { success: true, data: response.data };
-  } catch (error: any) {
-    console.error("❌ API Connection Failed:", error.message);
+  } catch (error: unknown) {
+    const err = error as { message?: string; response?: { data?: unknown }; config?: { url?: string; baseURL?: string }; request?: unknown };
+    console.error("❌ API Connection Failed:", err.message);
     return { 
       success: false, 
-      error: error.response?.data || error.message,
+      error: err.response?.data || err.message,
       details: {
-        url: error.config?.url,
-        baseURL: error.config?.baseURL,
-        hasResponse: !!error.response,
-        hasRequest: !!error.request,
+        url: err.config?.url,
+        baseURL: err.config?.baseURL,
+        hasResponse: !!err.response,
+        hasRequest: !!err.request,
       }
     };
   }
@@ -104,6 +105,8 @@ export const topicsAPI = {
 
 export const schemasAPI = {
   list: () => api.get("/v1/schemas/artifacts"),
+  sync: (registryId: string) =>
+    api.post(`/v1/schemas/sync?registry_id=${registryId}`),
   upload: (registryId: string, formData: FormData) =>
     api.post(`/v1/schemas/upload?registry_id=${registryId}`, formData, {
       headers: { "Content-Type": "multipart/form-data" },
@@ -247,7 +250,7 @@ export const policiesAPI = {
 
 export const auditAPI = {
   recent: (limit = 20) => api.get(`/v1/audit/recent?limit=${limit}`),
-  history: (params: any) => api.get("/v1/audit/history", { params }),
+  history: (params: Record<string, unknown>) => api.get("/v1/audit/history", { params }),
 };
 
 export const analysisAPI = {
