@@ -1,25 +1,25 @@
-# 🤝 기여 가이드 (Contributing Guide)
+# 🤝 Contributing Guide
 
-Kafka-Gov 프로젝트에 기여해주셔서 감사합니다! 이 문서는 프로젝트에 기여하는 방법과 코드 작성 규칙을 안내합니다.
-
----
-
-## 📋 목차
-
-- [시작하기](#-시작하기)
-- [개발 환경 설정](#-개발-환경-설정)
-- [코드 스타일 및 규칙](#-코드-스타일-및-규칙)
-- [커밋 컨벤션](#-커밋-컨벤션)
-- [테스트 작성](#-테스트-작성)
-- [Pull Request 프로세스](#-pull-request-프로세스)
-- [아키텍처 가이드](#-아키텍처-가이드)
-- [문의하기](#-문의하기)
+Thank you for contributing to the Kafka-Gov project! This document guides you on how to contribute and the coding standards to follow.
 
 ---
 
-## 🚀 시작하기
+## 📋 Table of Contents
 
-### 1. 저장소 Fork 및 Clone
+- [Getting Started](#-getting-started)
+- [Development Environment Setup](#-development-environment-setup)
+- [Code Style and Rules](#-code-style-and-rules)
+- [Commit Convention](#-commit-convention)
+- [Testing](#-testing)
+- [Pull Request Process](#-pull-request-process)
+- [Architecture Guide](#-architecture-guide)
+- [Contact Us](#-contact-us)
+
+---
+
+## 🚀 Getting Started
+
+### 1. Fork and Clone Repository
 
 ```bash
 # Fork the repository on GitHub
@@ -31,39 +31,39 @@ cd kafka-gov
 git remote add upstream https://github.com/limhaneul12/kafka-gov.git
 ```
 
-### 2. 브랜치 생성
+### 2. Create Branch
 
 ```bash
-# 최신 코드로 업데이트
+# Update to latest code
 git checkout main
 git pull upstream main
 
-# 기능 브랜치 생성
+# Create feature branch
 git checkout -b feature/your-feature-name
-# 또는 버그 수정 브랜치
+# Or bug fix branch
 git checkout -b fix/your-bugfix-name
 ```
 
-**브랜치 네이밍 컨벤션:**
-- `feature/` - 새로운 기능 추가
-- `fix/` - 버그 수정
-- `docs/` - 문서 수정
-- `refactor/` - 코드 리팩토링
-- `test/` - 테스트 추가/수정
-- `chore/` - 빌드 설정, 의존성 업데이트 등
+**Branch Naming Convention:**
+- `feature/` - Add new features
+- `fix/` - Bug fixes
+- `docs/` - Documentation changes
+- `refactor/` - Code refactoring
+- `test/` - Add/modify tests
+- `chore/` - Build settings, dependency updates, etc.
 
 ---
 
-## 🛠️ 개발 환경 설정
+## 🛠️ Development Environment Setup
 
-### 필수 요구사항
+### Prerequisites
 
-- **Python**: 3.12 이상
-- **uv**: Python 패키지 매니저 (초고속 의존성 해결)
-- **Docker & Docker Compose**: 로컬 Kafka/Schema Registry 실행용
-- **MySQL**: 8.0 이상 (또는 Docker Compose 사용)
+- **Python**: 3.12 or higher
+- **uv**: Python package manager (ultra-fast dependency resolution)
+- **Docker & Docker Compose**: For running local Kafka/Schema Registry
+- **MySQL**: 8.0 or higher (or use Docker Compose)
 
-### uv 설치
+### Install uv
 
 ```bash
 # macOS/Linux
@@ -73,136 +73,138 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 powershell -c "irm https://astral.sh/uv/install.ps1 | iex"
 ```
 
-### 개발 환경 구축
+### Development Environment Setup
 
 ```bash
-# 1. Python 가상환경 생성 및 의존성 설치
+# 1. Create Python virtual environment and install dependencies
 uv sync
 
-# 2. Pre-commit hooks 설치
+# 2. Install pre-commit hooks
 uv run pre-commit install
 
-# 3. 환경 변수 설정
+# 3. Set up environment variables
 cp .env.example .env
-# .env 파일을 열어 Kafka/DB 연결 정보 수정
+# Edit .env file with your Kafka/DB connection details
 
-# 4. 암호화 키 생성 (민감한 정보 암호화용)
+# 4. Generate encryption key (for encrypting sensitive information)
 uv run python generate_encryption_key.py
 
-# 5. Docker Compose로 Kafka/Schema Registry 실행
+# 5. Run Kafka/Schema Registry with Docker Compose
 docker-compose up -d
 
-# 6. 데이터베이스 마이그레이션
+# 6. Run database migrations
 uv run alembic upgrade head
 
-# 7. 애플리케이션 실행
+# 7. Start application
 uv run uvicorn app.main:app --reload
 ```
 
-**애플리케이션 접속:**
+**Application Access:**
 - Web UI: http://localhost:8000
 - API Docs: http://localhost:8000/swagger
 - Health Check: http://localhost:8000/health
 
 ---
 
-## 📏 코드 스타일 및 규칙
+## 📏 Code Style and Rules
 
-### 기본 원칙
+### Basic Principles
 
-프로젝트는 **Python 3.12+**를 기준으로 하며, 다음 원칙을 준수합니다:
+The project is based on **Python 3.12+** and follows these principles:
 
-1. **타입 안정성**: 모든 함수/클래스는 엄격한 타입 힌트 사용
-2. **경계 분리**: IO 경계(Pydantic)와 내부 도메인(msgspec) 명확히 구분
-3. **검증 최소화**: 입력 시 1회 검증만 수행, 내부에서 중복 검증 금지
-4. **테스트 우선**: pytest 기반 단위 테스트 우선 작성
-5. **의존성 관리**: uv로 관리하며 불필요한 라이브러리 추가 금지
+1. **Type Safety**: All functions/classes use strict type hints
+2. **Boundary Separation**: Clear separation between IO boundary (Pydantic) and internal domain (dataclasses)
+3. **Minimal Validation**: Validate once at input, avoid redundant validation internally
+4. **Test First**: Write pytest-based unit tests first
+5. **Dependency Management**: Manage with uv, avoid adding unnecessary libraries
 
-### 타입 힌트 규칙
+### Type Hint Rules
 
 ```python
-# ✅ 올바른 예시 (Python 3.12+ 네이티브 문법)
+# ✅ Correct example (Python 3.12+ native syntax)
 def process_data(items: list[str], config: dict[str, int]) -> str | None:
-    """데이터 처리 함수"""
+    """Data processing function"""
     ...
 
-# ❌ 잘못된 예시 (구식 문법)
+# ❌ Incorrect example (legacy syntax)
 from typing import Optional, List, Dict
 
 def process_data(items: List[str], config: Dict[str, int]) -> Optional[str]:
     ...
 ```
 
-**타입 힌트 표준:**
-- `list[T]` 사용 (❌ `List[T]`)
-- `dict[K, V]` 사용 (❌ `Dict[K, V]`)
-- `str | None` 사용 (❌ `Optional[str]`)
-- `tuple[T, ...]` 사용 (❌ `Tuple[T, ...]`)
+**Type Hint Standards:**
+- Use `list[T]` (❌ `List[T]`)
+- Use `dict[K, V]` (❌ `Dict[K, V]`)
+- Use `str | None` (❌ `Optional[str]`)
+- Use `tuple[T, ...]` (❌ `Tuple[T, ...]`)
 
-### 데이터 모델 규칙
+### Data Model Rules
 
-**IO 경계 (외부 입출력)**
+**IO Boundary (External Input/Output)**
 ```python
 from pydantic import BaseModel, Field
 
 class CreateTopicRequest(BaseModel):
-    """API 요청 모델 - 런타임 검증 필요"""
+    """API request model - requires runtime validation"""
     name: str = Field(..., pattern=r'^[a-z0-9\-\.]+$')
     partitions: int = Field(..., ge=1)
     replication_factor: int = Field(..., ge=1)
 ```
 
-**내부 도메인 (비즈니스 로직)**
+**Internal Domain (Business Logic)**
 ```python
-import msgspec
+from dataclasses import dataclass
+from datetime import datetime
 
-class Topic(msgspec.Struct, frozen=True):
-    """도메인 모델 - 불변 구조체"""
+@dataclass(frozen=True)
+class Topic:
+    """Domain model - immutable structure"""
     name: str
     partitions: int
     replication_factor: int
     created_at: datetime
 ```
 
-### 지연 로딩 금지
+### No Lazy Loading
 
 ```python
-# ❌ 절대 금지
+# ❌ Absolutely forbidden
 def process():
-    from app.shared.domain.events import DomainEvent  # 함수 내부 import 금지
+    from app.shared.domain.events import DomainEvent  # No imports inside functions
     ...
 
-# ✅ 올바른 방법
+# ✅ Correct way
 from app.shared.domain.events import DomainEvent
 
 def process():
     ...
 ```
 
-### 코드 포맷팅 및 린팅
+### Code Formatting and Linting
 
-프로젝트는 **Ruff**를 사용하여 자동 포맷팅 및 린팅을 수행합니다.
+The project uses **Ruff** for automatic formatting and linting.
 
 ```bash
-# 코드 포맷팅
+# Code formatting
 uv run ruff format .
 
-# 린팅 (자동 수정 가능한 항목)
+# Linting (auto-fixable items)
 uv run ruff check --fix .
 
-# 린팅 (수정 없이 검사만)
+# Linting (check only, no fixes)
 uv run ruff check .
 ```
 
-**Pre-commit hook이 자동으로 실행됩니다:**
-- 커밋 시 자동으로 Ruff 포맷팅 및 린팅 실행
-- 위반 사항이 있으면 커밋 실패 → 수정 후 재시도
+**Pre-commit hooks run automatically:**
+- Automatic Ruff formatting and linting on commit
+- Commit fails if violations exist → fix and retry
 
 ---
 
-## 📝 커밋 컨벤션
+## 📝 Commit Convention
 
-### Conventional Commits 형식
+### Conventional Commits Format
 
 ```
 <type>(<scope>): <subject>
@@ -213,68 +215,68 @@ uv run ruff check .
 ```
 
 **Type:**
-- `feat`: 새로운 기능 추가
-- `fix`: 버그 수정
-- `docs`: 문서 수정
-- `style`: 코드 포맷팅 (기능 변경 없음)
-- `refactor`: 코드 리팩토링
-- `test`: 테스트 추가/수정
-- `chore`: 빌드 설정, 의존성 업데이트 등
-- `perf`: 성능 개선
+- `feat`: Add new features
+- `fix`: Bug fixes
+- `docs`: Documentation changes
+- `style`: Code formatting (no functional changes)
+- `refactor`: Code refactoring
+- `test`: Add/modify tests
+- `chore`: Build settings, dependency updates, etc.
+- `perf`: Performance improvements
 
-**Scope (선택사항):**
-- `topic`, `schema`, `connect`, `cluster`, `analysis`, `shared`
+**Scope (Optional):**
+- `topic`, `schema`, `connect`, `cluster`, `shared`
 
-### 예시
+### Examples
 
 ```bash
-# 기능 추가
+# Add feature
 git commit -m "feat(connect): Add connector pause/resume endpoints"
 
-# 버그 수정
+# Bug fix
 git commit -m "fix(schema): Fix compatibility check validation"
 
-# 문서 업데이트
+# Documentation update
 git commit -m "docs: Update API reference for Connect endpoints"
 
-# 리팩토링
+# Refactoring
 git commit -m "refactor(topic): Extract validation logic to domain service"
 ```
 
 ---
 
-## 🧪 테스트 작성
+## 🧪 Testing
 
-### 테스트 원칙
+### Testing Principles
 
-1. **단위 테스트 우선**: 도메인 로직은 반드시 단위 테스트 작성
-2. **80% 이상 커버리지**: 새로운 코드는 최소 80% 테스트 커버리지 유지
-3. **Fixture 활용**: pytest fixture로 테스트 데이터 재사용
-4. **비동기 테스트**: `pytest-asyncio` 사용
+1. **Unit Test First**: Domain logic must have unit tests
+2. **80%+ Coverage**: New code must maintain minimum 80% test coverage
+3. **Fixture Usage**: Use pytest fixtures for test data reuse
+4. **Async Testing**: Use `pytest-asyncio`
 
-### 테스트 실행
+### Running Tests
 
 ```bash
-# 전체 테스트 실행
+# Run all tests
 uv run pytest
 
-# 커버리지 포함
+# With coverage
 uv run pytest --cov=app --cov-report=html
 
-# 특정 모듈만 테스트
+# Test specific module
 uv run pytest tests/connect/
 
-# 특정 테스트 파일만
+# Test specific file
 uv run pytest tests/connect/test_connector_service.py
 
-# 실패한 테스트만 재실행
+# Re-run failed tests only
 uv run pytest --lf
 
-# 병렬 실행 (속도 향상)
+# Parallel execution (faster)
 uv run pytest -n auto
 ```
 
-### 테스트 작성 예시
+### Test Writing Example
 
 ```python
 # tests/connect/test_connector_service.py
@@ -284,7 +286,7 @@ from app.connect.domain.models import ConnectorInfo, ConnectorType, ConnectorSta
 
 @pytest.fixture
 def mock_connector_info():
-    """테스트용 커넥터 정보 fixture"""
+    """Test connector info fixture"""
     return ConnectorInfo(
         name="test-connector",
         type=ConnectorType.SOURCE,
@@ -297,7 +299,7 @@ def mock_connector_info():
 
 @pytest.mark.asyncio
 async def test_get_connector_info(connector_service: ConnectorService, mock_connector_info):
-    """커넥터 정보 조회 테스트"""
+    """Test connector info retrieval"""
     # Given
     connector_name = "test-connector"
     
@@ -312,150 +314,152 @@ async def test_get_connector_info(connector_service: ConnectorService, mock_conn
 
 ---
 
-## 🔄 Pull Request 프로세스
+## 🔄 Pull Request Process
 
-### 1. PR 생성 전 체크리스트
+### 1. Pre-PR Checklist
 
-- [ ] 모든 테스트 통과 (`uv run pytest`)
-- [ ] 코드 커버리지 80% 이상 유지
-- [ ] Ruff 포맷팅 및 린팅 통과
-- [ ] 타입 힌트 누락 없음
-- [ ] 문서 업데이트 (API 변경 시)
-- [ ] 커밋 메시지가 컨벤션 준수
+- [ ] All tests pass (`uv run pytest`)
+- [ ] Code coverage 80%+ maintained
+- [ ] Ruff formatting and linting pass
+- [ ] No missing type hints
+- [ ] Documentation updated (if API changed)
+- [ ] Commit messages follow convention
 
-### 2. PR 생성
+### 2. Create PR
 
 ```bash
-# 브랜치 푸시
+# Push branch
 git push origin feature/your-feature-name
 
-# GitHub에서 Pull Request 생성
+# Create Pull Request on GitHub
 ```
 
-### 3. PR 설명 템플릿
+### 3. PR Description Template
 
 ```markdown
-## 📋 변경 사항
+## 📋 Changes
 
-<!-- 무엇을 변경했는지 간략히 설명 -->
+<!-- Brief description of what was changed -->
 
-## 🎯 변경 이유
+## 🎯 Reason for Change
 
-<!-- 왜 이 변경이 필요한지 설명 -->
+<!-- Explain why this change was needed -->
 
-## 🧪 테스트 방법
+## 🧪 Testing
 
-<!-- 어떻게 테스트했는지 설명 -->
+<!-- Explain how you tested this -->
 
-## 📸 스크린샷 (선택사항)
+## 📸 Screenshots (Optional)
 
-<!-- UI 변경이 있다면 스크린샷 첨부 -->
+<!-- Attach screenshots if there are UI changes -->
 
-## ✅ 체크리스트
+## ✅ Checklist
 
-- [ ] 테스트 작성 완료
-- [ ] 문서 업데이트 완료
-- [ ] 코드 리뷰 준비 완료
+- [ ] Tests written
+- [ ] Documentation updated
+- [ ] Ready for code review
 ```
 
-### 4. 코드 리뷰 대응
+### 4. Code Review Response
 
-- 리뷰어의 피드백에 정중하게 응답
-- 요청된 변경사항을 반영하고 커밋 추가
-- 토론이 필요한 부분은 PR 코멘트로 논의
+- Respond politely to reviewer feedback
+- Implement requested changes and add commits
+- Discuss items needing debate in PR comments
 
-### 5. Merge 조건
+### 5. Merge Conditions
 
-- **최소 1명의 Approve** 필요
-- **모든 CI 테스트 통과**
-- **Conflict 없음**
+- **Minimum 1 Approval** required
+- **All CI tests pass**
+- **No conflicts**
 
 ---
 
-## 🏗️ 아키텍처 가이드
+## 🏗️ Architecture Guide
 
-### Clean Architecture 레이어
+### Clean Architecture Layers
 
-프로젝트는 Clean Architecture 원칙을 따릅니다:
+The project follows Clean Architecture principles:
 
 ```
 app/
 ├── [domain]/
-│   ├── domain/              # 도메인 모델 (비즈니스 규칙)
-│   │   ├── models.py       # msgspec 불변 구조체
-│   │   ├── repositories.py # 저장소 인터페이스 (ABC)
-│   │   ├── services.py     # 도메인 서비스
-│   │   └── events.py       # 도메인 이벤트
+│   ├── domain/              # Domain models (business rules)
+│   │   ├── models.py       # dataclass immutable structures
+│   │   ├── repositories.py # Repository interfaces (ABC)
+│   │   ├── services.py     # Domain services
+│   │   └── events.py       # Domain events
 │   │
-│   ├── application/         # 유스케이스 (애플리케이션 로직)
-│   │   ├── use_cases.py    # 유스케이스 구현
-│   │   ├── dtos.py         # DTO (Pydantic)
-│   │   └── mappers.py      # DTO ↔ Domain 변환
+│   ├── application/         # Use cases (application logic)
+│   │   ├── use_cases.py    # Use case implementations
+│   │   ├── dtos.py         # DTOs (Pydantic)
+│   │   └── mappers.py      # DTO ↔ Domain conversion
 │   │
-│   ├── infrastructure/      # 외부 어댑터 (DB, API 클라이언트)
-│   │   ├── models.py       # SQLAlchemy 모델
-│   │   ├── repositories.py # 저장소 구현체
-│   │   └── client.py       # 외부 API 클라이언트
+│   ├── infrastructure/      # External adapters (DB, API clients)
+│   │   ├── models.py       # SQLAlchemy models
+│   │   ├── repositories.py # Repository implementations
+│   │   └── client.py       # External API clients
 │   │
-│   └── interface/           # 인터페이스 어댑터 (API 라우터)
-│       └── router.py        # FastAPI 라우터
+│   └── interface/           # Interface adapters (API routers)
+│       └── router.py        # FastAPI routers
 ```
 
-### 의존성 방향
+### Dependency Direction
 
 ```
 Interface → Application → Domain ← Infrastructure
 ```
 
-- **Domain**: 의존성 없음 (순수 비즈니스 로직)
-- **Application**: Domain에만 의존
-- **Infrastructure**: Domain 인터페이스 구현
-- **Interface**: Application 호출
+- **Domain**: No dependencies (pure business logic)
+- **Application**: Depends only on Domain
+- **Infrastructure**: Implements Domain interfaces
+- **Interface**: Calls Application
 
-### 새로운 기능 추가 예시
+### New Feature Addition Example
 
-**1. Domain 모델 정의**
+**1. Define Domain Model**
 ```python
 # app/connect/domain/models.py
-import msgspec
+from dataclasses import dataclass
+from enum import Enum
 
-class Connector(msgspec.Struct, frozen=True):
-    """커넥터 도메인 모델"""
+@dataclass(frozen=True)
+class Connector:
+    """Connector domain model"""
     name: str
     type: ConnectorType
     state: ConnectorState
     config: dict[str, str]
 ```
 
-**2. Repository 인터페이스**
+**2. Repository Interface**
 ```python
 # app/connect/domain/repositories.py
 from abc import ABC, abstractmethod
 
 class ConnectorRepository(ABC):
-    """커넥터 저장소 인터페이스"""
+    """Connector repository interface"""
     
     @abstractmethod
     async def find_by_name(self, name: str) -> Connector | None:
         ...
 ```
 
-**3. Repository 구현**
+**3. Repository Implementation**
 ```python
 # app/connect/infrastructure/repositories.py
 class ConnectorRepositoryImpl(ConnectorRepository):
-    """커넥터 저장소 구현체"""
+    """Connector repository implementation"""
     
     async def find_by_name(self, name: str) -> Connector | None:
-        # SQLAlchemy로 DB 조회
+        # Query DB with SQLAlchemy
         ...
 ```
 
-**4. UseCase 작성**
+**4. Write UseCase**
 ```python
 # app/connect/application/use_cases.py
 class GetConnectorUseCase:
-    """커넥터 조회 유스케이스"""
+    """Connector retrieval use case"""
     
     def __init__(self, repository: ConnectorRepository):
         self.repository = repository
@@ -467,7 +471,7 @@ class GetConnectorUseCase:
         return ConnectorMapper.to_dto(connector)
 ```
 
-**5. API 라우터 추가**
+**5. Add API Router**
 ```python
 # app/connect/interface/router.py
 @router.get("/connectors/{name}")
@@ -480,17 +484,17 @@ async def get_connector(
 
 ---
 
-## 🎨 도메인 이벤트 사용
+## 🎨 Using Domain Events
 
-### 이벤트 발행
+### Event Publishing
 
 ```python
-# 도메인 이벤트 정의
+# Define domain event
 class ConnectorCreatedEvent(DomainEvent):
     connector_name: str
     connector_type: ConnectorType
 
-# 이벤트 발행
+# Publish event
 from app.shared.domain.event_bus import EventBus
 
 await event_bus.publish(ConnectorCreatedEvent(
@@ -499,41 +503,41 @@ await event_bus.publish(ConnectorCreatedEvent(
 ))
 ```
 
-### 이벤트 구독
+### Event Subscription
 
 ```python
-# 이벤트 핸들러 등록
+# Register event handler
 @event_bus.subscribe(ConnectorCreatedEvent)
 async def on_connector_created(event: ConnectorCreatedEvent):
     logger.info(f"Connector created: {event.connector_name}")
-    # 후속 작업 (예: 토픽 자동 생성)
+    # Follow-up actions (e.g., auto-create topics)
 ```
 
 ---
 
-## 📚 참고 자료
+## 📚 References
 
 - [Clean Architecture](https://blog.cleancoder.com/uncle-bob/2012/08/13/the-clean-architecture.html)
-- [Python 3.12 문서](https://docs.python.org/3.12/)
-- [FastAPI 문서](https://fastapi.tiangolo.com/)
+- [Python 3.12 Documentation](https://docs.python.org/3.12/)
+- [FastAPI Documentation](https://fastapi.tiangolo.com/)
 - [Confluent Kafka Python](https://docs.confluent.io/kafka-clients/python/current/overview.html)
-- [pytest 문서](https://docs.pytest.org/)
+- [pytest Documentation](https://docs.pytest.org/)
 - [Conventional Commits](https://www.conventionalcommits.org/)
 
 ---
 
-## 💬 문의하기
+## 💬 Contact Us
 
-질문이나 제안사항이 있다면:
+If you have questions or suggestions:
 
-1. **GitHub Issues**: 버그 리포트, 기능 제안
-2. **GitHub Discussions**: 일반적인 질문, 아이디어 공유
-3. **Pull Request**: 직접 기여
+1. **GitHub Issues**: Bug reports, feature requests
+2. **GitHub Discussions**: General questions, idea sharing
+3. **Pull Request**: Direct contributions
 
 ---
 
-## 🙏 감사합니다!
+## 🙏 Thank You!
 
-여러분의 기여가 Kafka-Gov를 더 나은 프로젝트로 만듭니다. 🎉
+Your contributions make Kafka-Gov a better project. 🎉
 
 **Happy coding!** 🚀
