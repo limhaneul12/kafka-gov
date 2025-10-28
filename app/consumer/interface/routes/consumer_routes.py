@@ -29,6 +29,9 @@ from app.consumer.application.use_cases import (
     GetGroupTopicStatsUseCase,
     GetTopicConsumersUseCase,
 )
+from app.consumer.application.use_cases.topic_detail import (
+    GetTopicDetailWithConsumerHealthUseCase,
+)
 from app.consumer.domain.services.collector import ConsumerDataCollector
 from app.consumer.infrastructure.kafka_consumer_adapter import KafkaConsumerAdapter
 from app.consumer.interface.schema import (
@@ -45,6 +48,9 @@ from app.consumer.interface.schema.detail_schema import (
     RebalanceEventResponse,
     TopicConsumerMappingResponse,
 )
+from app.consumer.interface.schema.topic_detail_schema import (
+    TopicDetailWithConsumerHealthResponse,
+)
 from app.consumer.interface.schema.topic_stats_schema import GroupTopicStatsResponse
 from app.container import AppContainer
 from app.shared.error_handlers import handle_server_errors
@@ -60,6 +66,9 @@ RebalanceDep = Depends(Provide[AppContainer.consumer_container.get_rebalance_use
 AdviceDep = Depends(Provide[AppContainer.consumer_container.get_advice_use_case])
 TopicStatsDep = Depends(Provide[AppContainer.consumer_container.get_group_topic_stats_use_case])
 TopicConsumersDep = Depends(Provide[AppContainer.consumer_container.get_topic_consumers_use_case])
+TopicDetailDep = Depends(
+    Provide[AppContainer.consumer_container.get_topic_detail_with_consumer_health_use_case]
+)
 ConnectionManagerDep = Depends(Provide[AppContainer.cluster_container.connection_manager])
 
 
@@ -296,6 +305,40 @@ async def get_group_topic_stats(
 # ============================================================================
 
 topic_router = APIRouter(prefix="/api/v1/topics", tags=["Topics"])
+
+
+@topic_router.get(
+    "/{topic}/detail",
+    response_model=TopicDetailWithConsumerHealthResponse,
+    status_code=status.HTTP_200_OK,
+    summary="토픽 상세 + Consumer Health (거버넌스)",
+    description="토픽 정보와 해당 토픽을 소비하는 Consumer Group들의 Health를 통합 조회합니다. "
+    "Consumer 운영 지표를 Topic Governance에 활용할 수 있습니다.",
+)
+@inject
+@handle_server_errors(error_message="Failed to get topic detail with consumer health")
+async def get_topic_detail_with_consumer_health(
+    topic: Annotated[str, Path(description="토픽 이름")],
+    cluster_id: str = Query(..., description="클러스터 ID"),
+    use_case: GetTopicDetailWithConsumerHealthUseCase = TopicDetailDep,
+) -> TopicDetailWithConsumerHealthResponse:
+    """토픽 상세 + Consumer Health (거버넌스 지표)
+
+    토픽 기본 정보(partition, replication, retention)와
+    해당 토픽을 소비하는 Consumer Group들의 Health를 통합 조회합니다.
+
+    **Consumer Health 포함:**
+    - SLO Compliance (P95 Lag 기준)
+    - Stuck Partition 감지
+    - Rebalance Stability Score
+    - Fairness Gini Coefficient
+
+    **거버넌스 활용:**
+    - Topic 삭제 전 Consumer 의존성 체크
+    - Topic 변경 전 Consumer 영향도 분석
+    - Consumer 운영 상태 기반 Policy 검증
+    """
+    return await use_case.execute(cluster_id, topic)
 
 
 @topic_router.get(

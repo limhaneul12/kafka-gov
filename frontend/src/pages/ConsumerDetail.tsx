@@ -256,7 +256,9 @@ export default function ConsumerDetail() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-gray-900">
-              {summary.rebalance_score.toFixed(1)}
+              {summary.rebalance_score !== null 
+                ? summary.rebalance_score.toFixed(1) 
+                : 'N/A'}
             </div>
             <p className="text-xs text-gray-500 mt-1">
               {metrics.rebalance_score

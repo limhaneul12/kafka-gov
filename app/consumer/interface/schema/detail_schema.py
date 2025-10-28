@@ -18,13 +18,15 @@ class ConsumerGroupSummaryResponse(BaseModel):
                 "group_id": "order-processor",
                 "cluster_id": "prod-cluster-01",
                 "state": "Stable",
+                "member_count": 3,
+                "topic_count": 5,
                 "lag": {
                     "p50": 450,
                     "p95": 1200,
                     "max": 2500,
                     "total": 15234,
                 },
-                "rebalance_score": 85.0,
+                "rebalance_score": None,
                 "fairness_gini": 0.15,
                 "stuck": [],
             }
@@ -34,8 +36,12 @@ class ConsumerGroupSummaryResponse(BaseModel):
     group_id: str = Field(description="Consumer Group ID")
     cluster_id: str = Field(description="클러스터 ID")
     state: str = Field(description="그룹 상태")
+    member_count: int = Field(description="멤버 수", ge=0)
+    topic_count: int = Field(description="구독 중인 토픽 수", ge=0)
     lag: dict[str, int] = Field(description="Lag 통계 (p50, p95, max, total)")
-    rebalance_score: float = Field(description="리밸런스 안정성 점수")
+    rebalance_score: float | None = Field(
+        None, description="리밸런스 안정성 점수 (0-100, 이력 데이터 없으면 null)"
+    )
     fairness_gini: float = Field(description="Fairness Gini 계수")
     stuck: list[dict] = Field(description="멈춘 파티션 목록")
 

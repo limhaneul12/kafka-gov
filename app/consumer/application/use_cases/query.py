@@ -11,6 +11,7 @@ Consumer Group 조회 관련 Use Case들을 통합
 - GetTopicConsumersUseCase: 토픽별 컨슈머 매핑
 """
 
+import logging
 from collections.abc import Awaitable, Callable
 from contextlib import AbstractAsyncContextManager
 from datetime import timedelta
@@ -162,7 +163,8 @@ class GetConsumerGroupSummaryUseCase:
         fairness = self._calculator.calculate_fairness(members, partitions)
 
         # 4. 리밸런스 점수 및 Stuck 파티션 (Delta 조회, optional)
-        rebalance_score: float = 0.0
+        # 기본값: None (데이터 없으면 "알 수 없음")
+        rebalance_score: float | None = None
         stuck_partitions: list[dict[str, object]] = []
         if self._session_factory is not None:
             async with self._session_factory() as session:
@@ -500,36 +502,63 @@ class GetTopicConsumersUseCase:
                 await collector.collect_group(group_info.group_id) for group_info in group_infos
             ]
 
-        except Exception:
-            # 조회 실패 시 빈 리스트 반환
+        except Exception as e:
+            # 조회 실패 시 에러 로깅 후 빈 리스트 반환
+            logging.error(f"Failed to collect consumer groups for topic {topic}: {e}")
             return TopicConsumerMappingResponse(topic=topic, consumer_groups=[])
 
         # 3. 해당 토픽을 구독하는 그룹 필터링
         consumer_groups: list[dict] = []
 
+        logging.warning(f"🔍 Filtering topic '{topic}' from {len(all_groups)} consumer groups")
+
         for group in all_groups:
-            # 각 그룹의 파티션 조회
-            partitions = await collector.collect_partitions(group.group_id)
-
-            # 해당 토픽의 파티션만 필터링
-            topic_partitions = [p for p in partitions if p.topic == topic]
-
-            if topic_partitions:
-                consumer_groups.append(
-                    {
-                        "group_id": group.group_id,
-                        "state": group.state.value,
-                        "member_count": group.member_count,
-                        "partitions": [
-                            {
-                                "partition": p.partition,
-                                "assigned_member_id": p.assigned_member_id,
-                                "lag": p.lag,
-                            }
-                            for p in topic_partitions
-                        ],
-                    }
+            try:
+                # 각 그룹의 파티션 조회
+                partitions = await collector.collect_partitions(group.group_id)
+                logging.warning(
+                    f"📊 Group '{group.group_id}' has {len(partitions)} partitions: "
+                    f"{[(p.topic, p.partition) for p in partitions]}"
                 )
+
+                # 해당 토픽의 파티션만 필터링
+                topic_partitions = [p for p in partitions if p.topic == topic]
+
+                if topic_partitions:
+                    logging.warning(
+                        f"✅ Group '{group.group_id}' consumes topic '{topic}' "
+                        f"({len(topic_partitions)} partitions)"
+                    )
+
+                    # Frontend가 필요로 하는 모든 필드 포함
+                    consumer_groups.append(
+                        {
+                            "group_id": group.group_id,
+                            "state": group.state.value,
+                            "member_count": group.member_count,
+                            # Frontend가 기대하는 추가 필드들 (기본값 설정)
+                            "slo_compliance": getattr(group, "slo_compliance", 0.0),
+                            "lag_p50": getattr(group, "lag_p50", 0),
+                            "lag_p95": getattr(group, "lag_p95", 0),
+                            "lag_max": max((p.lag for p in topic_partitions), default=0),
+                            "stuck_count": getattr(group, "stuck_count", 0),
+                            "rebalance_score": getattr(group, "rebalance_score", 0.0),
+                            "fairness_gini": getattr(group, "fairness_gini", 0.0),
+                            "recommendation": getattr(group, "recommendation", None),
+                            "partitions": [
+                                {
+                                    "partition": p.partition,
+                                    "assigned_member_id": p.assigned_member_id,
+                                    "lag": p.lag,
+                                }
+                                for p in topic_partitions
+                            ],
+                        }
+                    )
+            except Exception as e:
+                # 개별 그룹 조회 실패 시 로깅하고 건너뜀
+                logging.warning(f"Failed to collect partitions for group {group.group_id}: {e}")
+                continue
 
         return TopicConsumerMappingResponse(
             topic=topic,

@@ -101,6 +101,8 @@ export const topicsAPI = {
     api.delete(`/v1/topics/${name}?cluster_id=${clusterId}`),
   bulkDelete: (clusterId: string, names: string[]) =>
     api.post(`/v1/topics/bulk-delete?cluster_id=${clusterId}`, names),
+  getDetail: (clusterId: string, topicName: string) =>
+    api.get(`/v1/topics/${topicName}/detail?cluster_id=${clusterId}`),
 };
 
 export const schemasAPI = {

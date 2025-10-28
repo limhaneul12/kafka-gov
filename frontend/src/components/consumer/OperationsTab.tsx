@@ -149,9 +149,13 @@ export default function OperationsTab({
                 <p className="text-sm text-gray-600">Stability Score</p>
                 <div className="mt-2 flex items-baseline gap-2">
                   <p className="text-3xl font-bold text-gray-900">
-                    {summary.rebalance_score.toFixed(1)}
+                    {summary.rebalance_score !== null 
+                      ? summary.rebalance_score.toFixed(1) 
+                      : 'N/A'}
                   </p>
-                  <span className="text-sm text-gray-500">/ 100</span>
+                  {summary.rebalance_score !== null && (
+                    <span className="text-sm text-gray-500">/ 100</span>
+                  )}
                 </div>
               </div>
               {metrics.rebalance_score && (

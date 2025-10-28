@@ -14,6 +14,9 @@ from app.consumer.application.use_cases.query import (
     GetTopicConsumersUseCase,
     ListConsumerGroupsUseCase,
 )
+from app.consumer.application.use_cases.topic_detail import (
+    GetTopicDetailWithConsumerHealthUseCase,
+)
 from app.consumer.application.use_cases.topic_stats import GetGroupTopicStatsUseCase
 
 
@@ -72,4 +75,13 @@ class ConsumerContainer(containers.DeclarativeContainer):
             GetGroupTopicStatsUseCase,
             admin_client_getter=cluster.connection_manager.provided.get_kafka_admin_client,
         )
+    )
+
+    get_topic_detail_with_consumer_health_use_case: providers.Provider[
+        GetTopicDetailWithConsumerHealthUseCase
+    ] = providers.Factory(
+        GetTopicDetailWithConsumerHealthUseCase,
+        admin_client_getter=cluster.connection_manager.provided.get_kafka_admin_client,
+        get_topic_consumers_use_case=get_topic_consumers_use_case,
+        get_summary_use_case=get_summary_use_case,
     )

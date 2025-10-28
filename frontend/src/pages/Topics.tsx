@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { Link } from "react-router-dom";
 import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/Card";
 import Button from "../components/ui/Button";
@@ -643,8 +644,13 @@ export default function Topics() {
                           className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                         />
                       </td>
-                      <td className="px-4 py-3 text-sm font-medium text-gray-900">
-                        {topic.name}
+                      <td className="px-4 py-3 text-sm font-medium">
+                        <Link
+                          to={`/topics/${encodeURIComponent(topic.name)}?cluster_id=${selectedCluster}`}
+                          className="text-blue-600 hover:text-blue-800 hover:underline"
+                        >
+                          {topic.name}
+                        </Link>
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex flex-wrap gap-1">

@@ -3,6 +3,7 @@ import { Toaster } from "sonner";
 import Layout from "./components/layout/Layout";
 import Dashboard from "./pages/Dashboard";
 import Topics from "./pages/Topics";
+import TopicDetail from "./pages/TopicDetail";
 import Schemas from "./pages/Schemas";
 import Connect from "./pages/Connect/index";
 import Connections from "./pages/Connections/index";
@@ -28,6 +29,7 @@ function App() {
           <Route path="/" element={<Layout />}>
             <Route index element={<Dashboard />} />
             <Route path="topics" element={<Topics />} />
+            <Route path="topics/:topicName" element={<TopicDetail />} />
             <Route path="schemas" element={<Schemas />} />
             <Route path="connect" element={<Connect />} />
             <Route path="connections" element={<Connections />} />

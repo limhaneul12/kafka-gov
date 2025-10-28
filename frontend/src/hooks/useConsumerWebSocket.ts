@@ -76,9 +76,19 @@ export function useConsumerWebSocket({
       return `${wsBaseUrl}/ws/consumers/groups/${groupId}/live?cluster_id=${clusterId}&interval=${interval}`;
     }
     
-    // Fallback: 자동 감지 (개발 환경)
+    // Fallback: 자동 감지
     const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-    const host = window.location.host.replace(":5173", ":8000"); // Vite dev → Backend
+    let host = window.location.host;
+    
+    // Vite dev server (포트 5173) → Backend (포트 8000)
+    if (host.includes(":5173")) {
+      host = host.replace(":5173", ":8000");
+    }
+    // Nginx 등 프록시를 통한 접속 (포트 없음) → Backend 포트 추가
+    else if (!host.includes(":")) {
+      host = `${host}:8000`;
+    }
+    
     return `${protocol}//${host}/ws/consumers/groups/${groupId}/live?cluster_id=${clusterId}&interval=${interval}`;
   }, [clusterId, groupId, interval]);
 
