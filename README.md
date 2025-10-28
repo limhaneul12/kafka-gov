@@ -360,16 +360,31 @@ Apply different policies per environment to ensure operational stability.
 
 ---
 
-### 📊 Consumer Group Monitoring
+### 📊 실시간 모니터링 (Real-time Monitoring)
 
-**Real-time monitoring and analysis of Kafka consumer groups with advanced metrics:**
+**Comprehensive monitoring for Kafka topics and consumer groups:**
 
 <div align="center">
   <img src="./image/consumer_list.png" alt="Consumer Group List" width="800"/>
   <p><em>Monitor all consumer groups with lag statistics, state, and partition assignments</em></p>
 </div>
 
-**Consumer Group Metrics:**
+#### 📋 Topic Detail Monitoring
+
+<div align="center">
+  <img src="./image/topic_detail.png" alt="Topic Detail View" width="800"/>
+  <p><em>Topic-level monitoring with consumer health insights and governance recommendations</em></p>
+</div>
+
+**Topic Monitoring Features:**
+- 📊 **Topic Overview**: Partitions, replicas, retention policy, and configuration
+- 👥 **Consumer Health**: Track all consumer groups consuming the topic
+- ⚠️ **Governance Alerts**: Real-time alerts for stuck partitions, rebalance issues, and SLO violations
+- 📈 **Health Metrics**: SLO compliance, fairness index, rebalance stability for each consumer
+- 💡 **Recommendations**: Intelligent suggestions for improving consumer group performance
+
+#### 👥 Consumer Group Metrics
+
 - 📊 **Lag Statistics**: Real-time lag monitoring (p50, p95, max, total)
 - 🔄 **Group State**: Monitor consumer group state (Stable, Rebalancing, Empty, Dead)
 - 👥 **Member Tracking**: Track consumer members and their partition assignments
@@ -654,7 +669,7 @@ Kafka-Gov is organized into 6 bounded contexts, each following Clean Architectur
 | 🎯 **`topic/`** | Topic Governance (Core) | CRUD + Batch operations, Policy enforcement, Versioning | [View Details](./app/topic/README.md) |
 | 📦 **`schema/`** | Schema Registry | Upload schemas, Compatibility modes, MinIO storage | [View Details](./app/schema/README.md) |
 | 🔌 **`connect/`** | Kafka Connect | Connector CRUD, Control, Plugin management | [View Details](./app/connect/README.md) |
-| 📊 **`consumer/`** | Consumer Group Monitoring | Lag tracking, Fairness analysis, Stuck detection, Rebalance scoring | [View Details](./app/consumer/README.md) |
+| 📊 **`consumer/`** | 실시간 모니터링 (Real-time Monitoring) | Topic & Consumer monitoring, Lag tracking, Fairness analysis, Stuck detection | [View Details](./app/consumer/README.md) |
 
 **Each module contains:**
 - `domain/` - Entities, value objects, domain services
@@ -750,6 +765,29 @@ For detailed API endpoints and request/response schemas, refer to:
 | **CQRS** | Separate read/write operations (batch vs single topic) |
 | **Repository Pattern** | Abstract data access layer |
 | **Dependency Injection** | Hierarchical DI containers per domain |
+
+### 🌍 Internationalization (i18n)
+
+**Multi-language Support:**
+- 🇰🇷 **Korean (한국어)**: Native support for Korean UI and logging
+- 🇺🇸 **English**: Full English support for international users
+- 🔄 **Seamless Switching**: Dynamic language switching without reload
+
+**Backend i18n:**
+- Structured logging with language keys (`app/shared/i18n/`)
+- JSON-based translation files (`ko.json`, `en.json`)
+- Context-aware translations for domain-specific terms
+
+**Frontend i18n:**
+- React-based i18n integration (planned)
+- Locale-specific date/time formatting
+- Right-to-left (RTL) support ready
+
+**Translation Coverage:**
+- ✅ Backend logging messages
+- ✅ API error messages
+- ✅ Validation messages
+- 🔜 Frontend UI components (in progress)
 
 ---
 
@@ -904,10 +942,12 @@ MIT License - see [LICENSE](./LICENSE) file for details.
 - ✅ Complete audit trail with event sourcing
 - ✅ 64%+ test coverage with pytest
 
-**Consumer Group Monitoring (🔥 New in v1.0):**
+**실시간 모니터링 (Real-time Monitoring) (🔥 New in v1.0):**
+- ✅ Topic detail view with consumer health insights
 - ✅ Real-time consumer group list with lag statistics
 - ✅ Lag metrics calculation (p50, p95, max, total)
 - ✅ Group state tracking (Stable, Rebalancing, Empty, Dead)
+- ✅ Governance alerts and recommendations per topic
 - ✅ Member-level partition assignments
 - ✅ Fairness index (Gini coefficient) calculation
 - ✅ Rebalance stability scoring with time windows

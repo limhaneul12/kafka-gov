@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useParams, useSearchParams, Link } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { topicsAPI } from "../services/api";
 import { ArrowLeft, AlertCircle, CheckCircle, Info } from "lucide-react";
 
@@ -48,6 +49,7 @@ interface TopicDetailData {
 }
 
 export default function TopicDetail() {
+  const { t } = useTranslation();
   const { topicName } = useParams<{ topicName: string }>();
   const [searchParams] = useSearchParams();
   const clusterId = searchParams.get("cluster_id");
@@ -123,7 +125,7 @@ export default function TopicDetail() {
       <div className="flex items-center justify-center h-screen">
         <div className="text-center">
           <div className="w-16 h-16 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading topic detail...</p>
+          <p className="text-gray-600">{t('topic.detail.loading')}</p>
         </div>
       </div>
     );
@@ -133,7 +135,7 @@ export default function TopicDetail() {
     return (
       <div className="p-6">
         <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-          <p className="text-red-600">❌ {error || "Failed to load topic detail"}</p>
+          <p className="text-red-600">❌ {error || t('topic.detail.error')}</p>
         </div>
       </div>
     );
@@ -159,7 +161,7 @@ export default function TopicDetail() {
 
       {/* Topic Info Card */}
       <div className="bg-white rounded-lg shadow p-6">
-        <h2 className="text-lg font-semibold mb-4">📦 Topic Information</h2>
+        <h2 className="text-lg font-semibold mb-4">📦 {t('topic.detail.overview')}</h2>
         <div className="grid grid-cols-3 gap-6">
           <div>
             <p className="text-sm text-gray-500">Partitions</p>
@@ -178,7 +180,7 @@ export default function TopicDetail() {
 
       {/* Consumer Insight Card */}
       <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-lg shadow p-6 border border-blue-200">
-        <h2 className="text-lg font-semibold mb-4">📊 Consumer Insight (거버넌스 지표)</h2>
+        <h2 className="text-lg font-semibold mb-4">📊 {t('topic.detail.governanceInsights')}</h2>
         
         <div className="mb-4 p-4 bg-white rounded-lg border border-blue-100">
           <p className="text-base font-medium text-gray-800">{data.insight.summary}</p>
@@ -225,7 +227,7 @@ export default function TopicDetail() {
       {/* Governance Alerts */}
       {data.governance_alerts.length > 0 && (
         <div className="bg-white rounded-lg shadow p-6">
-          <h2 className="text-lg font-semibold mb-4">🚨 Governance Alerts</h2>
+          <h2 className="text-lg font-semibold mb-4">🚨 {t('topic.detail.governanceAlerts')}</h2>
           <div className="space-y-2">
             {data.governance_alerts.map((alert, idx) => (
               <div
@@ -248,10 +250,10 @@ export default function TopicDetail() {
 
       {/* Consumer Groups Health */}
       <div className="bg-white rounded-lg shadow p-6">
-        <h2 className="text-lg font-semibold mb-4">👥 Consumer Groups Health</h2>
+        <h2 className="text-lg font-semibold mb-4">👥 {t('topic.detail.consumerGroupsHealth')}</h2>
         
         {data.consumer_groups.length === 0 ? (
-          <p className="text-gray-500 text-center py-8">이 토픽을 소비하는 Consumer Group이 없습니다</p>
+          <p className="text-gray-500 text-center py-8">{t('topic.detail.noConsumerGroups')}</p>
         ) : (
           <div className="space-y-4">
             {data.consumer_groups.map((consumer) => (

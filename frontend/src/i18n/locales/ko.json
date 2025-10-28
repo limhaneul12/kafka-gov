@@ -39,7 +39,14 @@
     "recentActivities": "최근 활동",
     "noActivities": "최근 활동이 없습니다.",
     "selectCluster": "Kafka 클러스터",
-    "testCluster": "test (test)"
+    "testCluster": "test (test)",
+    "consumerGroups": "컨슈머 그룹",
+    "totalLag": "전체 Lag",
+    "consumerGroupsByState": "컨슈머 그룹 상태",
+    "stable": "안정",
+    "rebalancing": "리밸런싱",
+    "other": "기타",
+    "topicsByCluster": "클러스터별 토픽"
   },
   "topic": {
     "list": "토픽 목록",
@@ -79,7 +86,26 @@
     "failed": "실패: {count}개",
     "noItems": "처리된 항목이 없습니다.",
     "createFailed": "토픽 생성 실패",
-    "unknownError": "알 수 없는 에러가 발생했습니다."
+    "unknownError": "알 수 없는 에러가 발생했습니다.",
+    "detail": {
+      "title": "토픽 상세",
+      "overview": "토픽 개요",
+      "configuration": "설정",
+      "governanceInsights": "거버넌스 인사이트",
+      "governanceAlerts": "거버넌스 알림",
+      "consumerGroupsHealth": "컨슈머 그룹 헬스",
+      "noConsumerGroups": "이 토픽을 소비하는 컨슈머 그룹이 없습니다",
+      "state": "상태",
+      "members": "멤버",
+      "sloCompliance": "SLO 준수율",
+      "fairnessIndex": "공정성 지수",
+      "stuckPartitions": "정체 파티션",
+      "rebalanceScore": "리밸런스 점수",
+      "recommendation": "권장 사항",
+      "loading": "토픽 정보를 불러오는 중...",
+      "error": "토픽 정보를 불러오는데 실패했습니다",
+      "noAlerts": "현재 알림이 없습니다"
+    }
   },
   "schema": {
     "list": "스키마 목록",
@@ -91,7 +117,19 @@
     "version": "버전",
     "compatibility": "호환성",
     "owner": "소유자",
-    "noSchemas": "스키마가 없습니다"
+    "noSchemas": "스키마가 없습니다",
+    "sync": {
+      "registrySelectionRequired": "레지스트리 선택 필요",
+      "pleaseSelectRegistry": "동기화할 Schema Registry를 선택하세요",
+      "started": "동기화 시작",
+      "fetching": "Schema Registry에서 스키마를 가져오는 중...",
+      "completed": "동기화 완료",
+      "schemasS Synchronized": "{{count}}개의 스키마가 동기화되었습니다",
+      "failed": "동기화 실패",
+      "syncFailed": "스키마 동기화에 실패했습니다",
+      "methodNotAllowed": "Method Not Allowed - API 엔드포인트 설정을 확인하세요",
+      "registryNotFound": "Schema Registry를 찾을 수 없습니다. Settings에서 \"{{registry}}\" 연결을 확인하세요"
+    }
   },
   "policy": {
     "list": "정책 목록",
@@ -189,6 +227,30 @@
     "doc": "문서",
     "slo": "SLO",
     "sla": "SLA"
+  },
+  "consumer": {
+    "list": "컨슈머 그룹 목록",
+    "description": "Kafka 컨슈머 그룹을 모니터링합니다",
+    "notConfigured": "Kafka 클러스터가 설정되지 않았습니다",
+    "pleaseConfigureFirst": "설정 페이지에서 Kafka 클러스터를 먼저 등록해주세요.",
+    "groupId": "그룹 ID",
+    "state": "상태",
+    "members": "멤버 수",
+    "topics": "토픽 수",
+    "totalLag": "전체 Lag",
+    "lagP50": "Lag P50",
+    "lagP95": "Lag P95",
+    "lagMax": "Lag Max",
+    "noConsumers": "컨슈머 그룹이 없습니다",
+    "detail": {
+      "title": "컨슈머 그룹 상세",
+      "overview": "그룹 개요",
+      "members": "멤버",
+      "partitions": "파티션 할당",
+      "lagMetrics": "Lag 메트릭",
+      "loading": "컨슈머 그룹 정보를 불러오는 중...",
+      "error": "컨슈머 그룹 정보를 불러오는데 실패했습니다"
+    }
   },
   "settings": {
     "title": "설정",

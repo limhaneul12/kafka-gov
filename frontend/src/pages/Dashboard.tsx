@@ -189,7 +189,7 @@ export default function Dashboard() {
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">Total Topics</p>
+                <p className="text-sm font-medium text-gray-600">{t('dashboard.totalTopics')}</p>
                 <p className="mt-2 text-3xl font-bold text-gray-900">
                   {selectedCluster ? topicCount : (stats?.topic_count || 0)}
                 </p>
@@ -211,7 +211,7 @@ export default function Dashboard() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-600">
-                  Registered Schemas
+                  {t('dashboard.registeredSchemas')}
                 </p>
                 <p className="mt-2 text-3xl font-bold text-gray-900">
                   {stats?.schema_count || 0}
@@ -228,7 +228,7 @@ export default function Dashboard() {
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">Consumer Groups</p>
+                <p className="text-sm font-medium text-gray-600">{t('dashboard.consumerGroups')}</p>
                 <p className="mt-2 text-3xl font-bold text-gray-900">
                   {consumerGroups.length}
                 </p>
@@ -249,7 +249,7 @@ export default function Dashboard() {
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">Total Lag</p>
+                <p className="text-sm font-medium text-gray-600">{t('dashboard.totalLag')}</p>
                 <p className="mt-2 text-3xl font-bold text-gray-900">
                   {consumerGroups.reduce((sum, g) => sum + g.lag_stats.total_lag, 0).toLocaleString()}
                 </p>
@@ -277,7 +277,7 @@ export default function Dashboard() {
             <div className="grid gap-4 md:grid-cols-3">
               <div className="flex items-center justify-between p-4 bg-emerald-50 rounded-lg">
                 <div>
-                  <p className="text-sm font-medium text-emerald-900">Stable</p>
+                  <p className="text-sm font-medium text-emerald-900">{t('dashboard.stable')}</p>
                   <p className="text-2xl font-bold text-emerald-700">
                     {consumerGroups.filter(g => g.state === 'Stable').length}
                   </p>
@@ -286,7 +286,7 @@ export default function Dashboard() {
               </div>
               <div className="flex items-center justify-between p-4 bg-yellow-50 rounded-lg">
                 <div>
-                  <p className="text-sm font-medium text-yellow-900">Rebalancing</p>
+                  <p className="text-sm font-medium text-yellow-900">{t('dashboard.rebalancing')}</p>
                   <p className="text-2xl font-bold text-yellow-700">
                     {consumerGroups.filter(g => g.state === 'Rebalancing').length}
                   </p>
@@ -295,7 +295,7 @@ export default function Dashboard() {
               </div>
               <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
                 <div>
-                  <p className="text-sm font-medium text-gray-900">Other</p>
+                  <p className="text-sm font-medium text-gray-900">{t('dashboard.other')}</p>
                   <p className="text-2xl font-bold text-gray-700">
                     {consumerGroups.filter(g => g.state !== 'Stable' && g.state !== 'Rebalancing').length}
                   </p>

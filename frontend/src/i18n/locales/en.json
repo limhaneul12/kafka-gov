@@ -29,7 +29,7 @@
   },
   "dashboard": {
     "title": "Dashboard",
-    "subtitle": "Monitor your Kafka cluster at a glance",
+    "subtitle": "Monitor your Kafka cluster status at a glance",
     "totalTopics": "Total Topics",
     "registeredSchemas": "Registered Schemas",
     "correlations": "Correlations",
@@ -39,7 +39,14 @@
     "recentActivities": "Recent Activities",
     "noActivities": "No recent activities",
     "selectCluster": "Kafka Cluster",
-    "testCluster": "test (test)"
+    "testCluster": "test (test)",
+    "consumerGroups": "Consumer Groups",
+    "totalLag": "Total Lag",
+    "consumerGroupsByState": "Consumer Groups by State",
+    "stable": "Stable",
+    "rebalancing": "Rebalancing",
+    "other": "Other",
+    "topicsByCluster": "Topics by Cluster"
   },
   "topic": {
     "list": "Topics",
@@ -79,7 +86,26 @@
     "failed": "Failed: {count} items",
     "noItems": "No items processed.",
     "createFailed": "Failed to create topic",
-    "unknownError": "An unknown error occurred."
+    "unknownError": "An unknown error occurred.",
+    "detail": {
+      "title": "Topic Detail",
+      "overview": "Topic Overview",
+      "configuration": "Configuration",
+      "governanceInsights": "Governance Insights",
+      "governanceAlerts": "Governance Alerts",
+      "consumerGroupsHealth": "Consumer Groups Health",
+      "noConsumerGroups": "No Consumer Group is consuming this topic",
+      "state": "State",
+      "members": "Members",
+      "sloCompliance": "SLO Compliance",
+      "fairnessIndex": "Fairness Index",
+      "stuckPartitions": "Stuck Partitions",
+      "rebalanceScore": "Rebalance Score",
+      "recommendation": "Recommendation",
+      "loading": "Loading topic information...",
+      "error": "Failed to load topic information",
+      "noAlerts": "No alerts at this time"
+    }
   },
   "schema": {
     "list": "Schemas",
@@ -91,7 +117,19 @@
     "version": "Version",
     "compatibility": "Compatibility",
     "owner": "Owner",
-    "noSchemas": "No schemas available"
+    "noSchemas": "No schemas available",
+    "sync": {
+      "registrySelectionRequired": "Registry Selection Required",
+      "pleaseSelectRegistry": "Please select a Schema Registry to sync",
+      "started": "Sync Started",
+      "fetching": "Fetching schemas from Schema Registry...",
+      "completed": "Sync Completed",
+      "schemasSynchronized": "{{count}} schemas synchronized",
+      "failed": "Sync Failed",
+      "syncFailed": "Schema synchronization failed",
+      "methodNotAllowed": "Method Not Allowed - Check API endpoint configuration",
+      "registryNotFound": "Schema Registry not found. Please check \"{{registry}}\" connection in Settings"
+    }
   },
   "policy": {
     "list": "Policies",
@@ -189,6 +227,30 @@
     "doc": "Doc",
     "slo": "SLO",
     "sla": "SLA"
+  },
+  "consumer": {
+    "list": "Consumer Groups",
+    "description": "Monitor Kafka consumer groups",
+    "notConfigured": "Kafka cluster is not configured",
+    "pleaseConfigureFirst": "Please register a Kafka cluster in the settings page first.",
+    "groupId": "Group ID",
+    "state": "State",
+    "members": "Members",
+    "topics": "Topics",
+    "totalLag": "Total Lag",
+    "lagP50": "Lag P50",
+    "lagP95": "Lag P95",
+    "lagMax": "Lag Max",
+    "noConsumers": "No consumer groups available",
+    "detail": {
+      "title": "Consumer Group Detail",
+      "overview": "Group Overview",
+      "members": "Members",
+      "partitions": "Partition Assignments",
+      "lagMetrics": "Lag Metrics",
+      "loading": "Loading consumer group information...",
+      "error": "Failed to load consumer group information"
+    }
   },
   "settings": {
     "title": "Settings",
