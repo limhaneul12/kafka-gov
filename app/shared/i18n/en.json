@@ -50,5 +50,18 @@
     "processing": "Processing...",
     "no_data": "No data available",
     "cluster_selected": "Cluster '{name}' selected"
+  },
+  "consumer": {
+    "log": {
+      "filtering_topic": "Filtering {count} consumer groups for topic '{topic}'",
+      "group_partitions": "Group '{group_id}' has {count} partitions: {partitions}",
+      "group_consumes_topic": "Group '{group_id}' consumes topic '{topic}' ({count} partitions)",
+      "found_consumer_groups": "Found {count} consumer groups for topic '{topic}'",
+      "processing_group": "Processing consumer group: {group_id}",
+      "got_summary": "Got summary for '{group_id}': state={state}, members={members}",
+      "added_health": "Added health for '{group_id}'",
+      "failed_health": "Failed to get health for group '{group_id}': {error}",
+      "total_health_list": "Total consumer health list size: {count}"
+    }
   }
 }

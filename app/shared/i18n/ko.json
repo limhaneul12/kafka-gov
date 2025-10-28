@@ -50,5 +50,18 @@
     "processing": "처리 중...",
     "no_data": "데이터가 없습니다",
     "cluster_selected": "클러스터 '{name}' 선택됨"
+  },
+  "consumer": {
+    "log": {
+      "filtering_topic": "토픽 '{topic}'에 대해 {count}개 컨슈머 그룹 필터링 중",
+      "group_partitions": "그룹 '{group_id}'에 {count}개 파티션: {partitions}",
+      "group_consumes_topic": "그룹 '{group_id}'가 토픽 '{topic}' 소비 ({count}개 파티션)",
+      "found_consumer_groups": "토픽 '{topic}'에 대해 {count}개 컨슈머 그룹 발견",
+      "processing_group": "컨슈머 그룹 처리 중: {group_id}",
+      "got_summary": "'{group_id}' 요약 조회 완료: state={state}, members={members}",
+      "added_health": "'{group_id}' 헬스 추가 완료",
+      "failed_health": "'{group_id}' 그룹 헬스 조회 실패: {error}",
+      "total_health_list": "전체 컨슈머 헬스 리스트 크기: {count}"
+    }
   }
 }

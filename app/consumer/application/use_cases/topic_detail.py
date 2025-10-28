@@ -75,18 +75,18 @@ class GetTopicDetailWithConsumerHealthUseCase:
         governance_alerts: list[GovernanceAlert] = []
 
         logging.warning(
-            f"🔍 Found {len(topic_consumers.consumer_groups)} consumer groups for topic '{topic}'"
+            f"🔍 [Consumer Groups] Found {len(topic_consumers.consumer_groups)} consumer groups for topic '{topic}'"
         )
 
         for consumer_group_info in topic_consumers.consumer_groups:
             group_id = consumer_group_info["group_id"]
-            logging.warning(f"📊 Processing consumer group: {group_id}")
+            logging.warning(f"📊 [Processing] Consumer group: {group_id}")
 
             try:
                 # Consumer Group Summary 조회
                 summary = await self._get_summary_use_case.execute(cluster_id, group_id)
                 logging.warning(
-                    f"✅ Got summary for {group_id}: state={summary.state}, members={summary.member_count}"
+                    f"✅ [Summary] Got summary for {group_id}: state={summary.state}, members={summary.member_count}"
                 )
 
                 # SLO Compliance 계산
@@ -109,7 +109,7 @@ class GetTopicDetailWithConsumerHealthUseCase:
                     ),
                 )
                 consumer_health_list.append(health)
-                logging.warning(f"✅ Added health for {group_id}")
+                logging.warning(f"✅ [Health] Added health for {group_id}")
 
                 # 거버넌스 경고 생성
                 alerts = self._generate_governance_alerts(group_id, health)
@@ -117,11 +117,13 @@ class GetTopicDetailWithConsumerHealthUseCase:
 
             except Exception as e:
                 # 개별 Consumer Group 조회 실패 시 로깅하고 건너뜀
-                logging.error(f"❌ Failed to get health for group {group_id}: {e}", exc_info=True)
+                logging.error(
+                    f"❌ [Error] Failed to get health for group {group_id}: {e}", exc_info=True
+                )
                 continue
 
         # 4. Consumer 전체 인사이트 생성
-        logging.warning(f"📊 Total consumer health list size: {len(consumer_health_list)}")
+        logging.warning(f"📊 [Total] Consumer health list size: {len(consumer_health_list)}")
         insight = self._generate_insight(
             consumer_health_list, topic_metadata["partitions"], topic_consumers
         )
@@ -241,7 +243,7 @@ class GetTopicDetailWithConsumerHealthUseCase:
                 GovernanceAlert(
                     severity="warning",
                     consumer_group=group_id,
-                    message=f"SLO 미달 (현재: {health.slo_compliance*100:.1f}%, 기준: {self.SLO_COMPLIANCE_MIN*100:.0f}%)",
+                    message=f"SLO 미달 (현재: {health.slo_compliance * 100:.1f}%, 기준: {self.SLO_COMPLIANCE_MIN * 100:.0f}%)",
                     metric="slo",
                 )
             )
@@ -307,7 +309,7 @@ class GetTopicDetailWithConsumerHealthUseCase:
                 total_stuck_partitions=0,
                 partitions_with_consumers=0,
                 total_partitions=total_partitions,
-                summary="이 토픽을 소비하는 Consumer Group이 없습니다",
+                summary="No Consumer Group is consuming this topic",
             )
 
         # 통계 계산
@@ -373,7 +375,7 @@ class GetTopicDetailWithConsumerHealthUseCase:
     ) -> str:
         """한 줄 요약 생성"""
         if unhealthy == 0 and stuck == 0:
-            return f"✅ {total}개 Consumer Group 모두 정상 운영 중 (평균 SLO: {avg_slo*100:.1f}%)"
+            return f"✅ {total}개 Consumer Group 모두 정상 운영 중 (평균 SLO: {avg_slo * 100:.1f}%)"
 
         issues = []
         if unhealthy > 0:

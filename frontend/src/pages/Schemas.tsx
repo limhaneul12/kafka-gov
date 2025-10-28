@@ -47,16 +47,16 @@ export default function Schemas() {
 
   const handleRefresh = async () => {
     if (!selectedRegistry) {
-      toast.error('레지스트리 선택 필요', {
-        description: '동기화할 Schema Registry를 선택하세요.'
+      toast.error('Registry Selection Required', {
+        description: 'Please select a Schema Registry to sync'
       });
       return;
     }
 
     try {
       setLoading(true);
-      toast.info('동기화 시작', {
-        description: 'Schema Registry에서 스키마를 가져오는 중...'
+      toast.info('Sync Started', {
+        description: 'Fetching schemas from Schema Registry...'
       });
       
       // Schema Registry와 동기화
@@ -65,26 +65,32 @@ export default function Schemas() {
       // 동기화 후 목록 다시 로드
       await loadSchemas();
       
-      toast.success('동기화 완료', {
-        description: `${syncResult.data.synced_count || syncResult.data.total || 0}개의 스키마가 동기화되었습니다.`
+      toast.success('Sync Completed', {
+        description: `${syncResult.data.synced_count || syncResult.data.total || 0} schemas synchronized`
       });
     } catch (error: unknown) {
       console.error("Failed to sync schemas:", error);
       
       // Axios 에러에서 상세 메시지 추출
-      let errorMessage = '스키마 동기화에 실패했습니다.';
+      let errorMessage = 'Schema synchronization failed';
       if (error && typeof error === 'object' && 'response' in error) {
         const axiosError = error as { response?: { data?: { detail?: string }; status?: number } };
+        console.error('Sync error details:', axiosError.response);
+        
         if (axiosError.response?.data?.detail) {
           errorMessage = axiosError.response.data.detail;
+        } else if (axiosError.response?.status === 405) {
+          errorMessage = `Method Not Allowed - Check API endpoint configuration`;
         } else if (axiosError.response?.status === 422) {
-          errorMessage = `Schema Registry를 찾을 수 없습니다. Settings에서 "${selectedRegistry}" 연결을 확인하세요.`;
+          errorMessage = `Schema Registry not found. Please check "${selectedRegistry}" connection in Settings`;
+        } else if (axiosError.response?.status) {
+          errorMessage = `HTTP ${axiosError.response.status}: ${JSON.stringify(axiosError.response.data)}`;
         }
       } else if (error instanceof Error) {
         errorMessage = error.message;
       }
       
-      toast.error('동기화 실패', {
+      toast.error('Sync Failed', {
         description: errorMessage,
         duration: 7000,
       });

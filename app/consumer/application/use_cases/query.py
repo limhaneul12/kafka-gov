@@ -2,13 +2,6 @@
 
 Consumer Group 조회 관련 Use Case들을 통합
 
-포함된 Use Cases:
-- ListConsumerGroupsUseCase: 그룹 목록 조회
-- GetConsumerGroupSummaryUseCase: 그룹 요약
-- GetGroupMembersUseCase: 그룹 멤버 목록
-- GetGroupPartitionsUseCase: 그룹 파티션 목록
-- GetGroupRebalanceUseCase: 리밸런스 이벤트 목록
-- GetTopicConsumersUseCase: 토픽별 컨슈머 매핑
 """
 
 import logging
@@ -510,14 +503,16 @@ class GetTopicConsumersUseCase:
         # 3. 해당 토픽을 구독하는 그룹 필터링
         consumer_groups: list[dict] = []
 
-        logging.warning(f"🔍 Filtering topic '{topic}' from {len(all_groups)} consumer groups")
+        logging.warning(
+            f"🔍 [Topic Filter] Filtering topic '{topic}' from {len(all_groups)} consumer groups"
+        )
 
         for group in all_groups:
             try:
                 # 각 그룹의 파티션 조회
                 partitions = await collector.collect_partitions(group.group_id)
                 logging.warning(
-                    f"📊 Group '{group.group_id}' has {len(partitions)} partitions: "
+                    f"📊 [Group Partitions] Group '{group.group_id}' has {len(partitions)} partitions: "
                     f"{[(p.topic, p.partition) for p in partitions]}"
                 )
 
@@ -526,7 +521,7 @@ class GetTopicConsumersUseCase:
 
                 if topic_partitions:
                     logging.warning(
-                        f"✅ Group '{group.group_id}' consumes topic '{topic}' "
+                        f"✅ [Match Found] Group '{group.group_id}' consumes topic '{topic}' "
                         f"({len(topic_partitions)} partitions)"
                     )
 

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import uuid
 
 from app.cluster.domain.services import IConnectionManager
@@ -13,6 +14,8 @@ from ...domain.repositories.interfaces import (
     ISchemaAuditRepository,
     ISchemaMetadataRepository,
 )
+
+logger = logging.getLogger(__name__)
 
 
 class SchemaSyncUseCase:
@@ -34,6 +37,7 @@ class SchemaSyncUseCase:
         Returns:
             동기화 결과 (총 subject 수, 새로 추가된 수, 업데이트된 수)
         """
+        logger.info(f"[Schema Sync] Starting synchronization for registry_id: {registry_id}")
         change_id = f"sync_{uuid.uuid4().hex[:8]}"
 
         await self.audit_repository.log_operation(
@@ -47,11 +51,15 @@ class SchemaSyncUseCase:
 
         try:
             # 1. ConnectionManager로 Schema Registry Client 획득
+            logger.warning("[Schema Sync] Getting Schema Registry client for: %s", registry_id)
             registry_client = await self.connection_manager.get_schema_registry_client(registry_id)
+            logger.warning("[Schema Sync] Schema Registry client obtained successfully")
             registry_repository = ConfluentSchemaRegistryAdapter(registry_client)
 
             # 2. Schema Registry에서 모든 subject 조회
+            logger.warning("[Schema Sync] Listing all subjects from Schema Registry")
             all_subjects = await registry_repository.list_all_subjects()
+            logger.warning(f"[Schema Sync] Found {len(all_subjects)} subjects")
 
             if not all_subjects:
                 await self.audit_repository.log_operation(
@@ -105,6 +113,7 @@ class SchemaSyncUseCase:
             return result
 
         except Exception as exc:
+            logger.warning(f"[Schema Sync] ERROR: {type(exc).__name__}: {exc!s}", exc_info=True)
             await self.audit_repository.log_operation(
                 change_id=change_id,
                 action=AuditAction.SYNC,
