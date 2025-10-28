@@ -78,14 +78,9 @@ class ListConsumerGroupsUseCase:
         # 2. 모든 Consumer Group 목록 조회
         try:
             group_infos = await adapter.list_consumer_groups()
-            all_groups = []
-            for group_info in group_infos:
-                try:
-                    group = await collector.collect_group(group_info.group_id)
-                    all_groups.append(group)
-                except Exception:
-                    # 개별 그룹 조회 실패 시 건너뜀
-                    continue
+            all_groups = [
+                await collector.collect_group(group_info.group_id) for group_info in group_infos
+            ]
         except Exception:
             # 조회 실패 시 빈 리스트 반환
             return ConsumerGroupListResponse(groups=[], total=0)
