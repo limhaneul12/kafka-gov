@@ -1,20 +1,23 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Plus, RefreshCw, Server, Package } from "lucide-react";
+import { RefreshCw, Server, LayoutDashboard, Cable, ListTodo, Package } from "lucide-react";
 import { Card } from "../../components/ui/Card";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "../../components/ui/Tabs";
 import Button from "../../components/ui/Button";
 import Loading from "../../components/ui/Loading";
 import CreateConnectorModal from "../../components/connect/CreateConnectorModal";
 import ConnectorDetailModal from "../../components/connect/ConnectorDetailModal";
-import PluginsModal from "../../components/connect/PluginsModal";
 import { useConnectors } from "./hooks/useConnectors";
-import { ConnectorCard } from "./components/ConnectorCard";
+import { OverviewTab } from "./tabs/OverviewTab";
+import { ConnectorsTab } from "./tabs/ConnectorsTab";
+import { TasksTab } from "./tabs/TasksTab";
+import { PluginsTab } from "./tabs/PluginsTab";
 
 export default function Connect() {
   const { t } = useTranslation();
+  const [activeTab, setActiveTab] = useState("overview");
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showDetailModal, setShowDetailModal] = useState(false);
-  const [showPluginsModal, setShowPluginsModal] = useState(false);
   const [selectedConnectorName, setSelectedConnectorName] = useState("");
   const [selectedPluginClass, setSelectedPluginClass] = useState<string | undefined>(undefined);
 
@@ -35,6 +38,11 @@ export default function Connect() {
   const handleViewDetails = (name: string) => {
     setSelectedConnectorName(name);
     setShowDetailModal(true);
+  };
+
+  const handleSelectPlugin = (pluginClass: string) => {
+    setSelectedPluginClass(pluginClass);
+    setShowCreateModal(true);
   };
 
   // Kafka Connect 연결 없음
@@ -67,21 +75,15 @@ export default function Connect() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">{t("connect.list")}</h1>
+          <h1 className="text-3xl font-bold text-gray-900">Kafka Connect</h1>
           <p className="mt-2 text-gray-600">
             Manage Kafka Connect connectors and monitor their status
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          <Button variant="secondary" onClick={() => setShowPluginsModal(true)}>
-            <Package className="h-4 w-4" />
-            Plugins
-          </Button>
-          <Button onClick={() => setShowCreateModal(true)}>
-            <Plus className="h-4 w-4" />
-            {t("connect.create")}
-          </Button>
-        </div>
+        <Button variant="secondary" size="sm" onClick={loadConnectors}>
+          <RefreshCw className={`h-4 w-4 ${metricsLoading ? "animate-spin" : ""}`} />
+          Refresh
+        </Button>
       </div>
 
       {/* Connect Cluster Selector */}
@@ -95,7 +97,7 @@ export default function Connect() {
             <select
               value={selectedConnect}
               onChange={(e) => setSelectedConnect(e.target.value)}
-              className="rounded-lg border border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              className="flex-1 max-w-md rounded-lg border border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
             >
               {connects.map((connect) => (
                 <option key={connect.connect_id} value={connect.connect_id}>
@@ -103,39 +105,63 @@ export default function Connect() {
                 </option>
               ))}
             </select>
-            <Button variant="secondary" size="sm" onClick={loadConnectors}>
-              <RefreshCw className={`h-4 w-4 ${metricsLoading ? "animate-spin" : ""}`} />
-            </Button>
           </div>
         </Card>
       )}
 
-      {/* Connectors List */}
-      <Card className="p-6">
-        {metricsLoading ? (
-          <div className="flex items-center justify-center h-64">
-            <Loading size="lg" />
-          </div>
-        ) : connectors.length === 0 ? (
-          <div className="text-center py-12 text-gray-500">
-            <p>{t("connect.noConnectors")}</p>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {connectors.map((connector) => (
-              <ConnectorCard
-                key={connector.name}
-                connector={connector}
-                onPause={() => pauseConnector(connector.name)}
-                onResume={() => resumeConnector(connector.name)}
-                onRestart={() => restartConnector(connector.name)}
-                onDelete={() => deleteConnector(connector.name)}
-                onViewDetails={() => handleViewDetails(connector.name)}
-              />
-            ))}
-          </div>
-        )}
-      </Card>
+      {/* Tabs */}
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
+        <TabsList>
+          <TabsTrigger value="overview">
+            <LayoutDashboard className="h-4 w-4 mr-2" />
+            Overview
+          </TabsTrigger>
+          <TabsTrigger value="connectors">
+            <Cable className="h-4 w-4 mr-2" />
+            Connectors
+          </TabsTrigger>
+          <TabsTrigger value="tasks">
+            <ListTodo className="h-4 w-4 mr-2" />
+            Tasks
+          </TabsTrigger>
+          <TabsTrigger value="plugins">
+            <Package className="h-4 w-4 mr-2" />
+            Plugins
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="overview">
+          <OverviewTab connectors={connectors} loading={metricsLoading} />
+        </TabsContent>
+
+        <TabsContent value="connectors">
+          <ConnectorsTab
+            connectors={connectors}
+            loading={metricsLoading}
+            onPause={pauseConnector}
+            onResume={resumeConnector}
+            onRestart={restartConnector}
+            onDelete={deleteConnector}
+            onViewDetails={handleViewDetails}
+            onCreateClick={() => setShowCreateModal(true)}
+          />
+        </TabsContent>
+
+        <TabsContent value="tasks">
+          <TasksTab
+            connectors={connectors}
+            connectId={selectedConnect}
+            loading={metricsLoading}
+          />
+        </TabsContent>
+
+        <TabsContent value="plugins">
+          <PluginsTab
+            connectId={selectedConnect}
+            onSelectPlugin={handleSelectPlugin}
+          />
+        </TabsContent>
+      </Tabs>
 
       {/* Modals */}
       <CreateConnectorModal
@@ -159,17 +185,6 @@ export default function Connect() {
           connectorName={selectedConnectorName}
         />
       )}
-
-      <PluginsModal
-        isOpen={showPluginsModal}
-        onClose={() => setShowPluginsModal(false)}
-        connectId={selectedConnect}
-        onSelectPlugin={(pluginClass) => {
-          setSelectedPluginClass(pluginClass);
-          setShowPluginsModal(false);
-          setShowCreateModal(true);
-        }}
-      />
     </div>
   );
 }

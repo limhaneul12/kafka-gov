@@ -212,3 +212,4 @@ __marimo__/
 alembic
 alembic.ini
 cluster.md
+promt/

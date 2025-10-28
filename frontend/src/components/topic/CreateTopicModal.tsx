@@ -44,6 +44,39 @@ export default function CreateTopicModal({
   }>({ naming: null, guardrail: null });
   const [policiesLoading, setPoliciesLoading] = useState(false);
 
+  // Config Preset 정의
+  const configPresets = {
+    dev: {
+      partitions: "1",
+      replicationFactor: "1",
+      retentionMs: "86400000", // 1일
+      description: "개발 환경 (작은 리소스)"
+    },
+    stg: {
+      partitions: "3",
+      replicationFactor: "2",
+      retentionMs: "604800000", // 7일
+      description: "스테이징 환경 (중간 리소스)"
+    },
+    prod: {
+      partitions: "6",
+      replicationFactor: "3",
+      retentionMs: "2592000000", // 30일
+      description: "프로덕션 환경 (큰 리소스)"
+    }
+  };
+
+  // Preset 적용 함수
+  const applyPreset = (env: "dev" | "stg" | "prod") => {
+    const preset = configPresets[env];
+    setPartitions(preset.partitions);
+    setReplicationFactor(preset.replicationFactor);
+    setRetentionMs(preset.retentionMs);
+    toast.success(`${env.toUpperCase()} Preset 적용`, {
+      description: preset.description
+    });
+  };
+
   // 환경 변경 시 정책 로드
   useEffect(() => {
     if (isOpen) {
@@ -521,6 +554,53 @@ items:
 
               {mode === "single" ? (
                 <div className="space-y-4">
+                  {/* Config Preset 선택 */}
+                  <div className="p-4 rounded-lg bg-purple-50 border border-purple-200">
+                    <div className="flex items-start gap-2 mb-3">
+                      <Info className="w-4 h-4 text-purple-600 mt-0.5 flex-shrink-0" />
+                      <div className="flex-1">
+                        <h3 className="text-sm font-semibold text-purple-900 mb-1">
+                          Config Preset
+                        </h3>
+                        <p className="text-xs text-purple-700">
+                          환경에 맞는 설정값을 자동으로 적용합니다
+                        </p>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-3 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => applyPreset("dev")}
+                        className="px-3 py-2 rounded-lg bg-white border-2 border-purple-300 hover:border-purple-500 transition-colors text-left"
+                      >
+                        <div className="text-xs font-semibold text-purple-900">DEV</div>
+                        <div className="text-xs text-purple-700 mt-1">
+                          P:1 / R:1 / 1일
+                        </div>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => applyPreset("stg")}
+                        className="px-3 py-2 rounded-lg bg-white border-2 border-purple-300 hover:border-purple-500 transition-colors text-left"
+                      >
+                        <div className="text-xs font-semibold text-purple-900">STG</div>
+                        <div className="text-xs text-purple-700 mt-1">
+                          P:3 / R:2 / 7일
+                        </div>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => applyPreset("prod")}
+                        className="px-3 py-2 rounded-lg bg-white border-2 border-purple-300 hover:border-purple-500 transition-colors text-left"
+                      >
+                        <div className="text-xs font-semibold text-purple-900">PROD</div>
+                        <div className="text-xs text-purple-700 mt-1">
+                          P:6 / R:3 / 30일
+                        </div>
+                      </button>
+                    </div>
+                  </div>
+
                   {/* Topic Name */}
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">

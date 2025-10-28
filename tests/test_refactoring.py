@@ -14,32 +14,6 @@ def test_container_import():
 
 
 @pytest.mark.unit
-def test_authorization_function():
-    """Authorization 단순화 검증 - 함수 기반"""
-    from app.analysis.domain.authorization import validate_action
-    from app.shared.roles import UserRole
-
-    # ADMIN은 모든 권한 보유
-    validate_action(UserRole.ADMIN, "view")
-    validate_action(UserRole.ADMIN, "analyze")
-    validate_action(UserRole.ADMIN, "link")
-    validate_action(UserRole.ADMIN, "delete")
-
-    # VIEWER는 읽기만 가능
-    validate_action(UserRole.VIEWER, "view")
-    validate_action(UserRole.VIEWER, "analyze")
-
-    with pytest.raises(PermissionError):
-        validate_action(UserRole.VIEWER, "link")
-
-    with pytest.raises(PermissionError):
-        validate_action(UserRole.VIEWER, "delete")
-
-
-# Policy 모듈 제거로 인해 extract_resource_name 테스트 제거됨
-
-
-@pytest.mark.unit
 def test_subject_utils():
     """토픽 추출 로직 공통화 검증"""
     from app.shared.domain.subject_utils import SubjectStrategy, extract_topics_from_subject
@@ -69,10 +43,8 @@ def test_subject_utils():
 @pytest.mark.unit
 def test_constants():
     """Magic number 상수화 검증"""
-    from app.analysis.domain.services import HIGH_RISK_TOPIC_THRESHOLD
     from app.schema.domain.services import HIGH_VERSION_COUNT_THRESHOLD
 
-    assert HIGH_RISK_TOPIC_THRESHOLD == 5
     assert HIGH_VERSION_COUNT_THRESHOLD == 10
 
 

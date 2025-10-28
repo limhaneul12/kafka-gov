@@ -261,3 +261,37 @@ export const analysisAPI = {
   schemaImpact: (subject: string) =>
     api.get(`/v1/analysis/impact/schema/${subject}`),
 };
+
+export const consumerAPI = {
+  // Consumer Groups 목록
+  listGroups: (clusterId: string) =>
+    api.get(`/v1/consumers/groups?cluster_id=${clusterId}`),
+  
+  // Consumer Group 메트릭
+  getMetrics: (clusterId: string, groupId: string) =>
+    api.get(`/v1/consumers/groups/${groupId}/metrics?cluster_id=${clusterId}`),
+  
+  // Consumer Group 상세 요약
+  getSummary: (clusterId: string, groupId: string) =>
+    api.get(`/v1/consumers/groups/${groupId}/summary?cluster_id=${clusterId}`),
+  
+  // 멤버 목록
+  getMembers: (clusterId: string, groupId: string) =>
+    api.get(`/v1/consumers/groups/${groupId}/members?cluster_id=${clusterId}`),
+  
+  // 파티션 목록
+  getPartitions: (clusterId: string, groupId: string) =>
+    api.get(`/v1/consumers/groups/${groupId}/partitions?cluster_id=${clusterId}`),
+  
+  // 리밸런스 이벤트
+  getRebalanceEvents: (clusterId: string, groupId: string, limit = 10) =>
+    api.get(`/v1/consumers/groups/${groupId}/rebalance?cluster_id=${clusterId}&limit=${limit}`),
+  
+  // 정책 어드바이저
+  getAdvice: (clusterId: string, groupId: string) =>
+    api.get(`/v1/consumers/groups/${groupId}/advice?cluster_id=${clusterId}`),
+  
+  // 토픽별 컨슈머 매핑
+  getTopicConsumers: (clusterId: string, topic: string) =>
+    api.get(`/v1/topics/${topic}/consumers?cluster_id=${clusterId}`),
+};

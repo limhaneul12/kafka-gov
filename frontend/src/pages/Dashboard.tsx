@@ -4,9 +4,10 @@ import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/Card";
 import Button from "../components/ui/Button";
 import Loading from "../components/ui/Loading";
-import { analysisAPI, testAPIConnection, topicsAPI, clustersAPI } from "../services/api";
-import { Activity, Database, FileCode, List, Wifi, RefreshCw } from "lucide-react";
-import type { Statistics, KafkaCluster } from "../types";
+import Badge from "../components/ui/Badge";
+import { analysisAPI, testAPIConnection, topicsAPI, clustersAPI, consumerAPI } from "../services/api";
+import { FileCode, List, Wifi, RefreshCw, Users, TrendingUp } from "lucide-react";
+import type { Statistics, KafkaCluster, ConsumerGroup } from "../types";
 
 export default function Dashboard() {
   const { t } = useTranslation();
@@ -14,6 +15,7 @@ export default function Dashboard() {
   const [clusters, setClusters] = useState<KafkaCluster[]>([]);
   const [selectedCluster, setSelectedCluster] = useState<string>("");
   const [topicCount, setTopicCount] = useState<number>(0);
+  const [consumerGroups, setConsumerGroups] = useState<ConsumerGroup[]>([]);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState<string>("");
@@ -22,12 +24,15 @@ export default function Dashboard() {
     loadClusters();
     loadStatistics();
     checkConnection();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
     if (selectedCluster) {
       loadTopicCount();
+      loadConsumerGroups();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedCluster]);
 
   const loadClusters = async () => {
@@ -54,6 +59,17 @@ export default function Dashboard() {
     } catch (error) {
       console.error("Failed to load topic count:", error);
       setTopicCount(0);
+    }
+  };
+
+  const loadConsumerGroups = async () => {
+    if (!selectedCluster) return;
+    try {
+      const response = await consumerAPI.listGroups(selectedCluster);
+      setConsumerGroups(response.data.groups || []);
+    } catch (error) {
+      console.error("Failed to load consumer groups:", error);
+      setConsumerGroups([]);
     }
   };
 
@@ -88,7 +104,7 @@ export default function Dashboard() {
   const handleSync = async () => {
     try {
       setSyncing(true);
-      await Promise.all([loadStatistics(), loadTopicCount()]);
+      await Promise.all([loadStatistics(), loadTopicCount(), loadConsumerGroups()]);
       toast.success(t('common.success'), {
         description: t('dashboard.subtitle')
       });
@@ -212,13 +228,18 @@ export default function Dashboard() {
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">Correlations</p>
+                <p className="text-sm font-medium text-gray-600">Consumer Groups</p>
                 <p className="mt-2 text-3xl font-bold text-gray-900">
-                  {stats?.correlation_count || 0}
+                  {consumerGroups.length}
                 </p>
+                {selectedCluster && consumerGroups.length > 0 && (
+                  <p className="text-xs text-gray-500 mt-1">
+                    {consumerGroups.filter(g => g.state === 'Stable').length} stable
+                  </p>
+                )}
               </div>
               <div className="rounded-full bg-purple-100 p-3">
-                <Activity className="h-6 w-6 text-purple-600" />
+                <Users className="h-6 w-6 text-purple-600" />
               </div>
             </div>
           </CardContent>
@@ -228,16 +249,63 @@ export default function Dashboard() {
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">Health Status</p>
-                <p className="mt-2 text-3xl font-bold text-green-600">Healthy</p>
+                <p className="text-sm font-medium text-gray-600">Total Lag</p>
+                <p className="mt-2 text-3xl font-bold text-gray-900">
+                  {consumerGroups.reduce((sum, g) => sum + g.lag_stats.total_lag, 0).toLocaleString()}
+                </p>
+                {consumerGroups.length > 0 && (
+                  <p className="text-xs text-gray-500 mt-1">
+                    Across all groups
+                  </p>
+                )}
               </div>
-              <div className="rounded-full bg-green-100 p-3">
-                <Database className="h-6 w-6 text-green-600" />
+              <div className="rounded-full bg-orange-100 p-3">
+                <TrendingUp className="h-6 w-6 text-orange-600" />
               </div>
             </div>
           </CardContent>
         </Card>
       </div>
+
+      {/* Consumer Groups 상태 */}
+      {selectedCluster && consumerGroups.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Consumer Groups Status</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid gap-4 md:grid-cols-3">
+              <div className="flex items-center justify-between p-4 bg-emerald-50 rounded-lg">
+                <div>
+                  <p className="text-sm font-medium text-emerald-900">Stable</p>
+                  <p className="text-2xl font-bold text-emerald-700">
+                    {consumerGroups.filter(g => g.state === 'Stable').length}
+                  </p>
+                </div>
+                <Badge color="emerald">Healthy</Badge>
+              </div>
+              <div className="flex items-center justify-between p-4 bg-yellow-50 rounded-lg">
+                <div>
+                  <p className="text-sm font-medium text-yellow-900">Rebalancing</p>
+                  <p className="text-2xl font-bold text-yellow-700">
+                    {consumerGroups.filter(g => g.state === 'Rebalancing').length}
+                  </p>
+                </div>
+                <Badge color="yellow">Active</Badge>
+              </div>
+              <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                <div>
+                  <p className="text-sm font-medium text-gray-900">Other</p>
+                  <p className="text-2xl font-bold text-gray-700">
+                    {consumerGroups.filter(g => g.state !== 'Stable' && g.state !== 'Rebalancing').length}
+                  </p>
+                </div>
+                <Badge color="gray">Idle</Badge>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* 최근 활동 */}
       <Card>

@@ -13,6 +13,11 @@ from fastapi.responses import ORJSONResponse
 
 from .cluster.interface.router import router as cluster_router
 from .connect.interface.router import router as connect_router
+from .consumer.interface.routes import (
+    router as consumer_router,
+    topic_router as consumer_topic_router,
+)
+from .consumer.interface.routes.websocket_routes import router as consumer_websocket_router
 from .container import AppContainer
 from .schema.interface.router import router as schema_router
 from .shared.error_handlers import format_validation_error
@@ -78,6 +83,7 @@ def create_app() -> FastAPI:
     app.state.infrastructure_container = container.infrastructure_container()
     app.state.cluster_container = container.cluster_container()
     app.state.topic_container = container.topic_container()
+    app.state.consumer_container = container.consumer_container()
     app.state.schema_container = container.schema_container()
     app.state.connect_container = container.connect_container()
 
@@ -87,10 +93,12 @@ def create_app() -> FastAPI:
         packages=[
             # 라우터/핸들러 패키지들
             "app.cluster.interface",  # Cluster API (ConnectionManager 제공)
-            "app.connect.interface",  # Connect API
             "app.topic.interface",
+            "app.consumer.interface",
             "app.schema.interface",
             "app.shared.interface",
+            "app.cluster.interface",
+            "app.connect.interface",
         ]
     )
 
@@ -101,6 +109,11 @@ def create_app() -> FastAPI:
     app.include_router(topic_router, prefix="/api")
     app.include_router(policy_router, prefix="/api")  # Policy API
     app.include_router(schema_router, prefix="/api")
+    # Consumer REST routes (already prefixed with /api)
+    app.include_router(consumer_router)
+    app.include_router(consumer_topic_router)
+    # Consumer WebSocket routes
+    app.include_router(consumer_websocket_router)
 
     @app.get("/api")
     @app.get("/api/")

@@ -6,6 +6,8 @@ import Topics from "./pages/Topics";
 import Schemas from "./pages/Schemas";
 import Connect from "./pages/Connect/index";
 import Connections from "./pages/Connections/index";
+import Consumers from "./pages/Consumers";
+import ConsumerDetail from "./pages/ConsumerDetail";
 import Policies from "./pages/Policies";
 import Analysis from "./pages/Analysis";
 import Settings from "./pages/Settings";
@@ -29,6 +31,8 @@ function App() {
             <Route path="schemas" element={<Schemas />} />
             <Route path="connect" element={<Connect />} />
             <Route path="connections" element={<Connections />} />
+            <Route path="consumers" element={<Consumers />} />
+            <Route path="consumers/:groupId" element={<ConsumerDetail />} />
             <Route path="policies" element={<Policies />} />
             <Route path="analysis" element={<Analysis />} />
             <Route path="team-analytics" element={<TeamAnalytics />} />

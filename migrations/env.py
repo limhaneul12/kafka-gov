@@ -16,10 +16,6 @@ from app.topic.infrastructure.models import (
     TopicApplyResultModel,
     AuditLogModel,
 )
-from app.analysis.infrastructure.models import (
-    TopicSchemaCorrelationModel,
-    SchemaImpactAnalysisModel,
-)
 from app.schema.infrastructure.models import (
     SchemaApplyResultModel,
     SchemaMetadataModel,
@@ -35,6 +31,13 @@ from app.cluster.infrastructure.models import (
     ObjectStorageModel,
 )
 from app.connect.infrastructure.models import ConnectorMetadataModel
+from app.consumer.infrastructure.models import (
+    ConsumerGroupSnapshotModel,
+    ConsumerMemberSnapshotModel,
+    ConsumerPartitionSnapshotModel,
+    ConsumerGroupRebalanceDeltaModel,
+    ConsumerGroupRebalanceRollupModel,
+)
 
 # Alembic Config
 config = context.config

@@ -22,6 +22,7 @@ export default function Sidebar() {
     { name: t("nav.schemas"), to: "/schemas", icon: FileCode },
     { name: t("nav.kafkaConnect"), to: "/connect", icon: Plug },
     { name: t("nav.connections"), to: "/connections", icon: Server },
+    { name: "Consumer Groups", to: "/consumers", icon: Users },
     { name: t("nav.policies"), to: "/policies", icon: Shield },
     { name: t("nav.analysis"), to: "/analysis", icon: Activity },
     { name: "Team Analytics", to: "/team-analytics", icon: Users },

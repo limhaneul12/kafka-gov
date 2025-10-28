@@ -2,6 +2,7 @@ from dependency_injector import containers, providers
 
 from app.cluster.container import ClusterContainer
 from app.connect.container import ConnectContainer
+from app.consumer.container import ConsumerContainer
 from app.schema.container import SchemaContainer
 from app.shared.container import InfrastructureContainer
 from app.topic.container import TopicContainer
@@ -17,6 +18,7 @@ class AppContainer(containers.DeclarativeContainer):
             "app.shared.interface",
             "app.cluster.interface",
             "app.connect.interface",
+            "app.consumer.interface",
         ]
     )
 
@@ -41,6 +43,13 @@ class AppContainer(containers.DeclarativeContainer):
         TopicContainer,
         infrastructure=infrastructure_container,
         cluster=cluster_container,  # ConnectionManager 전달
+    )
+
+    # ConsumerContainer - DB 세션 및 ConnectionManager 주입
+    consumer_container = providers.Container(
+        ConsumerContainer,
+        infrastructure=infrastructure_container,
+        cluster=cluster_container,
     )
 
     # SchemaContainer - ConnectionManager 주입

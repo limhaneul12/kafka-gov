@@ -158,3 +158,129 @@ export interface SchemaImpactAnalysis {
   risk_level: string;
   warnings: string[];
 }
+
+// Consumer Types
+export interface ConsumerGroup {
+  group_id: string;
+  cluster_id: string;
+  ts: string;
+  state: string;
+  partition_assignor: string | null;
+  member_count: number;
+  topic_count: number;
+  lag_stats: {
+    total_lag: number;
+    mean_lag: number;
+    p50_lag: number;
+    p95_lag: number;
+    max_lag: number;
+    partition_count: number;
+  };
+}
+
+export interface ConsumerGroupSummary {
+  group_id: string;
+  cluster_id: string;
+  state: string;
+  lag: {
+    p50: number;
+    p95: number;
+    max: number;
+    total: number;
+  };
+  rebalance_score: number;
+  fairness_gini: number;
+  stuck: Array<{
+    topic: string;
+    partition: number;
+    lag: number;
+  }>;
+}
+
+export interface ConsumerGroupMetrics {
+  cluster_id: string;
+  group_id: string;
+  fairness: {
+    gini_coefficient: number;
+    level: string;
+    member_count: number;
+    avg_tp_per_member: number;
+    max_tp_per_member: number;
+    min_tp_per_member: number;
+  };
+  rebalance_score: {
+    score: number;
+    rebalances_per_hour: number;
+    stable_ratio: number | null;
+    window: string;
+  } | null;
+  advice: {
+    assignor_recommendation: string | null;
+    assignor_reason: string | null;
+    static_membership_recommended: boolean;
+    static_membership_reason: string | null;
+    scale_recommendation: string | null;
+    scale_reason: string | null;
+    slo_compliance_rate: number;
+    risk_eta: string | null;
+  };
+}
+
+export interface ConsumerMember {
+  member_id: string;
+  client_id: string | null;
+  client_host: string | null;
+  assigned_partitions: Array<{
+    topic: string;
+    partition: number;
+  }>;
+}
+
+export interface ConsumerPartition {
+  topic: string;
+  partition: number;
+  committed_offset: number | null;
+  latest_offset: number | null;
+  lag: number | null;
+  assigned_member_id: string | null;
+}
+
+export interface RebalanceEvent {
+  ts: string;
+  moved_partitions: number;
+  join_count: number;
+  leave_count: number;
+  elapsed_since_prev_s: number | null;
+  state: string;
+}
+
+export interface PolicyAdvice {
+  assignor: {
+    recommendation: string | null;
+    reason: string | null;
+  };
+  static_membership: {
+    recommended: boolean;
+    reason: string | null;
+  };
+  scale: {
+    recommendation: string | null;
+    reason: string | null;
+  };
+  slo_compliance: number;
+  risk_eta: string | null;
+}
+
+export interface TopicConsumerMapping {
+  topic: string;
+  consumer_groups: Array<{
+    group_id: string;
+    state: string;
+    member_count: number;
+    partitions: Array<{
+      partition: number;
+      assigned_member_id: string | null;
+      lag: number | null;
+    }>;
+  }>;
+}

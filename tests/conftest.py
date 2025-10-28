@@ -55,6 +55,11 @@ async def test_engine() -> AsyncGenerator[AsyncEngine, None]:
 @pytest_asyncio.fixture(scope="function")
 async def db_session(test_engine: AsyncEngine) -> AsyncGenerator[AsyncSession, None]:
     """테스트용 데이터베이스 세션 (함수 스코프)"""
+    # 테스트 전: 모든 테이블 데이터 삭제
+    async with test_engine.begin() as conn:
+        for table in reversed(Base.metadata.sorted_tables):
+            await conn.execute(table.delete())
+
     session_factory = async_sessionmaker(
         bind=test_engine,
         class_=AsyncSession,
@@ -63,7 +68,12 @@ async def db_session(test_engine: AsyncEngine) -> AsyncGenerator[AsyncSession, N
 
     async with session_factory() as session:
         yield session
-        await session.rollback()  # 각 테스트 후 롤백
+        # 각 테스트는 자체적으로 commit하므로 여기서는 아무것도 하지 않음
+
+    # 테스트 후: 모든 테이블 데이터 삭제
+    async with test_engine.begin() as conn:
+        for table in reversed(Base.metadata.sorted_tables):
+            await conn.execute(table.delete())
 
 
 @pytest_asyncio.fixture(scope="function")
