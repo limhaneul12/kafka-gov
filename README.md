@@ -360,6 +360,52 @@ Apply different policies per environment to ensure operational stability.
 
 ---
 
+### 📊 Consumer Group Monitoring
+
+**Real-time monitoring and analysis of Kafka consumer groups with advanced metrics:**
+
+<div align="center">
+  <img src="./image/consumer_list.png" alt="Consumer Group List" width="800"/>
+  <p><em>Monitor all consumer groups with lag statistics, state, and partition assignments</em></p>
+</div>
+
+**Consumer Group Metrics:**
+- 📊 **Lag Statistics**: Real-time lag monitoring (p50, p95, max, total)
+- 🔄 **Group State**: Monitor consumer group state (Stable, Rebalancing, Empty, Dead)
+- 👥 **Member Tracking**: Track consumer members and their partition assignments
+- 📈 **Topic Coverage**: View number of topics consumed per group
+- 🎯 **Partition Assignor**: Identify assignor strategy (Range, RoundRobin, Sticky, CooperativeSticky)
+
+<div align="center">
+  <img src="./image/consumer_heatmap.png" alt="Consumer Group Analysis" width="800"/>
+  <p><em>Advanced consumer group analytics with fairness, rebalance stability, and stuck partition detection</em></p>
+</div>
+
+**Advanced Analytics:**
+- 🎯 **Fairness Index (Gini Coefficient)**: Measure partition distribution balance across members
+- 🔄 **Rebalance Score**: Track rebalance stability over time windows (1h, 24h)
+- 🚨 **Stuck Partition Detection**: Identify partitions with stalled commits but growing lag
+- 📊 **Live Lag Tracking**: WebSocket-based real-time lag updates
+- ⚠️ **Threshold Alerts**: Configurable thresholds for lag spikes and stuck detection
+
+**Governance Metrics (🔥 New):**
+- **SLO Compliance**: Consumer group SLO adherence tracking
+- **Policy Advice**: Intelligent recommendations for assignor, static membership, and scaling
+- **Risk ETA**: Predict when consumer groups will violate SLO thresholds
+
+**Key Features:**
+- ✅ Real-time lag monitoring with WebSocket streaming
+- ✅ Historical lag trends and rebalance events tracking
+- ✅ Fairness analysis with Gini coefficient calculation
+- ✅ Stuck partition detection with configurable thresholds
+- ✅ Rebalance stability scoring (moving avg, stability ratio)
+- ✅ Member-level partition assignments and lag breakdown
+- ✅ Policy recommendations based on group behavior
+
+📖 **Detailed Calculations**: See [Consumer Group Metrics Guide](./docs/CONSUMER_METRICS.md) for formulas and algorithms.
+
+---
+
 ## 🚀 Quick Start
 
 ### Option 1: Docker Compose (Recommended)
@@ -538,6 +584,11 @@ app/
 │   ├── application/ # Connector 생성/제어 유즈케이스
 │   ├── infrastructure/ # Connect REST API 클라이언트
 │   └── interface/   # Connect API 엔드포인트
+├── consumer/        # Consumer Group 모니터링 & 분석
+│   ├── domain/      # ConsumerGroup, Partition, Metrics 모델
+│   ├── application/ # Lag 추적, Fairness, Stuck 감지 유즈케이스
+│   ├── infrastructure/ # Kafka Admin API, DB 스냅샷 저장소
+│   └── interface/   # Consumer API & WebSocket 엔드포인트
 ├── container.py     # Root DI Container (Dependency Injector)
 └── main.py          # FastAPI 애플리케이션 진입점
 ```
@@ -594,7 +645,7 @@ frontend/src/
 
 ## 📦 Module Overview
 
-Kafka-Gov is organized into 5 bounded contexts, each following Clean Architecture principles:
+Kafka-Gov is organized into 6 bounded contexts, each following Clean Architecture principles:
 
 | Module | Purpose | Key Features | Documentation |
 |--------|---------|--------------|---------------|
@@ -603,6 +654,7 @@ Kafka-Gov is organized into 5 bounded contexts, each following Clean Architectur
 | 🎯 **`topic/`** | Topic Governance (Core) | CRUD + Batch operations, Policy enforcement, Versioning | [View Details](./app/topic/README.md) |
 | 📦 **`schema/`** | Schema Registry | Upload schemas, Compatibility modes, MinIO storage | [View Details](./app/schema/README.md) |
 | 🔌 **`connect/`** | Kafka Connect | Connector CRUD, Control, Plugin management | [View Details](./app/connect/README.md) |
+| 📊 **`consumer/`** | Consumer Group Monitoring | Lag tracking, Fairness analysis, Stuck detection, Rebalance scoring | [View Details](./app/consumer/README.md) |
 
 **Each module contains:**
 - `domain/` - Entities, value objects, domain services
@@ -852,6 +904,18 @@ MIT License - see [LICENSE](./LICENSE) file for details.
 - ✅ Complete audit trail with event sourcing
 - ✅ 64%+ test coverage with pytest
 
+**Consumer Group Monitoring (🔥 New in v1.0):**
+- ✅ Real-time consumer group list with lag statistics
+- ✅ Lag metrics calculation (p50, p95, max, total)
+- ✅ Group state tracking (Stable, Rebalancing, Empty, Dead)
+- ✅ Member-level partition assignments
+- ✅ Fairness index (Gini coefficient) calculation
+- ✅ Rebalance stability scoring with time windows
+- ✅ Stuck partition detection with configurable thresholds
+- ✅ Historical lag tracking via DB snapshots
+- ✅ WebSocket-based live lag streaming
+- ✅ Policy advisor for assignor & scaling recommendations
+
 **Frontend Core:**
 - ✅ React 19 frontend with TailwindCSS
 - ✅ Dashboard with cluster health monitoring
@@ -860,6 +924,8 @@ MIT License - see [LICENSE](./LICENSE) file for details.
 - ✅ YAML batch upload interface
 - ✅ Policy version management UI
 - ✅ Team Analytics page
+- ✅ Consumer Group list page with metrics
+- ✅ Consumer Group detail page with live lag charts
 
 ### 🚧 In Progress (v1.1)
 
@@ -879,11 +945,12 @@ MIT License - see [LICENSE](./LICENSE) file for details.
 ### 🔮 Planned (v2.0)
 
 **Monitoring & Observability:**
-- 📅 Consumer group monitoring & lag tracking
 - 📅 Topic retention policy recommendations
 - 📅 Prometheus metrics export
 - 📅 Grafana dashboard templates
 - 📅 Real-time cluster metrics (throughput, latency)
+- 📅 Consumer group SLO compliance monitoring
+- 📅 Predictive lag alerting with ML models
 
 **Governance & Security:**
 - 📅 Role-based access control (RBAC)
@@ -915,6 +982,8 @@ Explore the key features through visual examples:
 | **Topic List** | ![Topic List](./image/topic_list.png) |
 | **Create Topic** | ![Create Topic](./image/create_topic.png) |
 | **Batch Result** | ![Batch Result](./image/batch_result.png) |
+| **Consumer Group List** | ![Consumer List](./image/consumer_list.png) |
+| **Consumer Analysis** | ![Consumer Heatmap](./image/consumer_heatmap.png) |
 | **Team Analytics** | ![Team Analytics](./image/analysis.png) |
 | **Policy Detail** | ![Policy](./image/policy.png) |
 | **Policy Versioning** | ![Policy Versioning](./image/policy_versing.png) |

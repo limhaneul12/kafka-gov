@@ -13,9 +13,10 @@ Consumer Group 조회 관련 Use Case들을 통합
 
 from collections.abc import Awaitable, Callable
 from contextlib import AbstractAsyncContextManager
+from datetime import timedelta
 
 from confluent_kafka.admin import AdminClient
-from sqlalchemy import desc, select
+from sqlalchemy import desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.consumer.domain.models import ConsumerPartition, RebalanceRollup
@@ -223,31 +224,44 @@ class GetConsumerGroupSummaryUseCase:
         if not current_models:
             return []
 
-        stmt = (
-            select(ConsumerPartitionSnapshotModel.ts)
+        thresholds = DEFAULT_THRESHOLDS.stuck
+        threshold_ts = latest_snapshot.ts - timedelta(seconds=thresholds.duration_s_ge)
+
+        previous_subquery = (
+            select(
+                ConsumerPartitionSnapshotModel.topic.label("topic"),
+                ConsumerPartitionSnapshotModel.partition.label("partition"),
+                func.max(ConsumerPartitionSnapshotModel.ts).label("ts"),
+            )
             .where(
                 ConsumerPartitionSnapshotModel.cluster_id == cluster_id,
                 ConsumerPartitionSnapshotModel.group_id == group_id,
-                ConsumerPartitionSnapshotModel.ts < latest_snapshot.ts,
+                ConsumerPartitionSnapshotModel.ts <= threshold_ts,
             )
-            .order_by(desc(ConsumerPartitionSnapshotModel.ts))
-            .limit(1)
+            .group_by(
+                ConsumerPartitionSnapshotModel.topic,
+                ConsumerPartitionSnapshotModel.partition,
+            )
+            .subquery()
         )
-        result = await session.execute(stmt)
-        previous_ts = result.scalar_one_or_none()
-        if previous_ts is None:
-            return []
 
-        previous_models = await repo.get_partition_snapshots(
-            cluster_id=cluster_id, group_id=group_id, ts=previous_ts
+        previous_result = await session.execute(
+            select(ConsumerPartitionSnapshotModel).join(
+                previous_subquery,
+                (
+                    (ConsumerPartitionSnapshotModel.topic == previous_subquery.c.topic)
+                    & (ConsumerPartitionSnapshotModel.partition == previous_subquery.c.partition)
+                    & (ConsumerPartitionSnapshotModel.ts == previous_subquery.c.ts)
+                ),
+            )
         )
+        previous_models = list(previous_result.scalars().all())
         if not previous_models:
             return []
 
         current_partitions = [self._snapshot_to_partition(model) for model in current_models]
         previous_partitions = [self._snapshot_to_partition(model) for model in previous_models]
 
-        thresholds = DEFAULT_THRESHOLDS.stuck
         detector = StuckPartitionDetector(
             epsilon=thresholds.delta_committed_le,
             theta=thresholds.delta_lag_ge,
@@ -265,15 +279,13 @@ class GetConsumerGroupSummaryUseCase:
             if previous is None:
                 continue
 
+            if current.ts - previous.ts < timedelta(seconds=thresholds.duration_s_ge):
+                continue
+
             if not detector.is_stuck(current, previous):
                 continue
 
-            since_ts = previous.ts
-            duration = (current.ts - since_ts).total_seconds()
-            if duration < thresholds.duration_s_ge:
-                continue
-
-            stuck_partition = detector.create_stuck_partition(current, previous, since_ts)
+            stuck_partition = detector.create_stuck_partition(current, previous, previous.ts)
             stuck.append(
                 {
                     "topic": stuck_partition.topic,
