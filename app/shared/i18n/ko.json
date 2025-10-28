@@ -62,6 +62,17 @@
       "added_health": "'{group_id}' 헬스 추가 완료",
       "failed_health": "'{group_id}' 그룹 헬스 조회 실패: {error}",
       "total_health_list": "전체 컨슈머 헬스 리스트 크기: {count}"
+    },
+    "governance": {
+      "slo_violation": "SLO 미달 (현재: {current}%, 기준: {threshold}%)",
+      "stuck_partitions": "Stuck Partition 감지 ({count}개)",
+      "rebalance_instability": "리밸런스 불안정 (점수: {score}/100)",
+      "unfair_distribution": "파티션 분배 불공정 (Gini: {gini})",
+      "summary_slo_violation": "{count}개 Consumer Group이 SLO 미달",
+      "summary_stuck_partitions": "{count}개 Stuck Partition 감지",
+      "summary_unconsumed_partitions": "{count}개 파티션이 소비되지 않음",
+      "summary_all_healthy": "모든 Consumer Group이 정상 작동 중",
+      "summary_partial_consumption": "총 {total}개 파티션 중 {consumed}개만 소비됨"
     }
   }
 }

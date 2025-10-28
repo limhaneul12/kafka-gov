@@ -62,6 +62,17 @@
       "added_health": "Added health for '{group_id}'",
       "failed_health": "Failed to get health for group '{group_id}': {error}",
       "total_health_list": "Total consumer health list size: {count}"
+    },
+    "governance": {
+      "slo_violation": "SLO violation (current: {current}%, threshold: {threshold}%)",
+      "stuck_partitions": "Stuck partitions detected ({count} partitions)",
+      "rebalance_instability": "Rebalance instability (score: {score}/100)",
+      "unfair_distribution": "Unfair partition distribution (Gini: {gini})",
+      "summary_slo_violation": "{count} Consumer Group(s) violating SLO",
+      "summary_stuck_partitions": "{count} Stuck Partition(s) detected",
+      "summary_unconsumed_partitions": "{count} partition(s) not consumed",
+      "summary_all_healthy": "All Consumer Groups are healthy",
+      "summary_partial_consumption": "Only {consumed} out of {total} partitions consumed"
     }
   }
 }

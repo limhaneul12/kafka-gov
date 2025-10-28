@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/Card"
 import Button from "../components/ui/Button";
 import Loading from "../components/ui/Loading";
 import Badge from "../components/ui/Badge";
-import { analysisAPI, testAPIConnection, topicsAPI, clustersAPI, consumerAPI } from "../services/api";
+import { analysisAPI, testAPIConnection, topicsAPI, clustersAPI, consumerAPI, schemasAPI } from "../services/api";
 import { FileCode, List, Wifi, RefreshCw, Users, TrendingUp } from "lucide-react";
 import type { Statistics, KafkaCluster, ConsumerGroup } from "../types";
 
@@ -15,6 +15,7 @@ export default function Dashboard() {
   const [clusters, setClusters] = useState<KafkaCluster[]>([]);
   const [selectedCluster, setSelectedCluster] = useState<string>("");
   const [topicCount, setTopicCount] = useState<number>(0);
+  const [schemaCount, setSchemaCount] = useState<number>(0);
   const [consumerGroups, setConsumerGroups] = useState<ConsumerGroup[]>([]);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
@@ -23,6 +24,7 @@ export default function Dashboard() {
   useEffect(() => {
     loadClusters();
     loadStatistics();
+    loadSchemas();
     checkConnection();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -101,10 +103,20 @@ export default function Dashboard() {
     }
   };
 
+  const loadSchemas = async () => {
+    try {
+      const response = await schemasAPI.list();
+      setSchemaCount(response.data.length);
+    } catch (error) {
+      console.error("Failed to load schemas:", error);
+      setSchemaCount(0);
+    }
+  };
+
   const handleSync = async () => {
     try {
       setSyncing(true);
-      await Promise.all([loadStatistics(), loadTopicCount(), loadConsumerGroups()]);
+      await Promise.all([loadStatistics(), loadTopicCount(), loadConsumerGroups(), loadSchemas()]);
       toast.success(t('common.success'), {
         description: t('dashboard.subtitle')
       });
@@ -214,7 +226,7 @@ export default function Dashboard() {
                   {t('dashboard.registeredSchemas')}
                 </p>
                 <p className="mt-2 text-3xl font-bold text-gray-900">
-                  {stats?.schema_count || 0}
+                  {schemaCount}
                 </p>
               </div>
               <div className="rounded-full bg-green-100 p-3">

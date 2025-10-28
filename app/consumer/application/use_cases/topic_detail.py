@@ -19,6 +19,7 @@ from app.consumer.interface.schema.topic_detail_schema import (
     TopicConsumerInsight,
     TopicDetailWithConsumerHealthResponse,
 )
+from app.shared.i18n.translator import t
 
 
 class GetTopicDetailWithConsumerHealthUseCase:
@@ -243,7 +244,11 @@ class GetTopicDetailWithConsumerHealthUseCase:
                 GovernanceAlert(
                     severity="warning",
                     consumer_group=group_id,
-                    message=f"SLO 미달 (현재: {health.slo_compliance * 100:.1f}%, 기준: {self.SLO_COMPLIANCE_MIN * 100:.0f}%)",
+                    message=t(
+                        "consumer.governance.slo_violation",
+                        current=f"{health.slo_compliance * 100:.1f}",
+                        threshold=f"{self.SLO_COMPLIANCE_MIN * 100:.0f}",
+                    ),
                     metric="slo",
                 )
             )
@@ -254,7 +259,7 @@ class GetTopicDetailWithConsumerHealthUseCase:
                 GovernanceAlert(
                     severity="error",
                     consumer_group=group_id,
-                    message=f"Stuck partition 감지 ({health.stuck_count}개)",
+                    message=t("consumer.governance.stuck_partitions", count=health.stuck_count),
                     metric="stuck",
                 )
             )
@@ -265,7 +270,10 @@ class GetTopicDetailWithConsumerHealthUseCase:
                 GovernanceAlert(
                     severity="warning",
                     consumer_group=group_id,
-                    message=f"Rebalance 불안정 (점수: {health.rebalance_score:.1f}/100)",
+                    message=t(
+                        "consumer.governance.rebalance_instability",
+                        score=f"{health.rebalance_score:.1f}",
+                    ),
                     metric="rebalance",
                 )
             )
@@ -276,7 +284,10 @@ class GetTopicDetailWithConsumerHealthUseCase:
                 GovernanceAlert(
                     severity="info",
                     consumer_group=group_id,
-                    message=f"파티션 분배 불균형 (Gini: {health.fairness_gini:.2f})",
+                    message=t(
+                        "consumer.governance.unfair_distribution",
+                        gini=f"{health.fairness_gini:.2f}",
+                    ),
                     metric="fairness",
                 )
             )
@@ -375,14 +386,19 @@ class GetTopicDetailWithConsumerHealthUseCase:
     ) -> str:
         """한 줄 요약 생성"""
         if unhealthy == 0 and stuck == 0:
-            return f"✅ {total}개 Consumer Group 모두 정상 운영 중 (평균 SLO: {avg_slo * 100:.1f}%)"
+            return f"✅ {t('consumer.governance.summary_all_healthy')}"
 
         issues = []
         if unhealthy > 0:
-            issues.append(f"{unhealthy}개 Consumer Group이 SLO 미달")
+            issues.append(t("consumer.governance.summary_slo_violation", count=unhealthy))
         if stuck > 0:
-            issues.append(f"{stuck}개 Stuck Partition 감지")
+            issues.append(t("consumer.governance.summary_stuck_partitions", count=stuck))
         if consumed_partitions < total_partitions:
-            issues.append(f"{total_partitions - consumed_partitions}개 파티션이 소비되지 않음")
+            issues.append(
+                t(
+                    "consumer.governance.summary_unconsumed_partitions",
+                    count=total_partitions - consumed_partitions,
+                )
+            )
 
         return f"⚠️ {', '.join(issues)}"
