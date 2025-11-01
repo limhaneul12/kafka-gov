@@ -17,7 +17,7 @@ from .models import (
     SchemaVersionInfo,
     SubjectName,
 )
-from .policies import SchemaPolicyEngine
+from .policy_engine import SchemaPolicyEngine
 from .repositories.interfaces import ISchemaRegistryRepository
 
 # 스키마 버전 임계값

@@ -19,10 +19,16 @@
   "nav": {
     "dashboard": "Dashboard",
     "topics": "Topics",
+    "teamAnalysis": "Team Analysis",
+    "consumerGroups": "Consumer Groups",
     "schemas": "Schemas",
+    "schemaAnalysis": "Schema Analysis",
     "kafkaConnect": "Kafka Connect",
     "connections": "Connections",
     "policies": "Policies",
+    "policyTopic": "Topic Policies",
+    "policySchema": "Schema Policies",
+    "policyIncident": "Incident Partition Policy",
     "analysis": "Analysis",
     "history": "History",
     "settings": "Settings"
@@ -104,7 +110,21 @@
       "recommendation": "Recommendation",
       "loading": "Loading topic information...",
       "error": "Failed to load topic information",
-      "noAlerts": "No alerts at this time"
+      "noAlerts": "No alerts at this time",
+      "metricsHint": "Metrics are based on the latest snapshot saved in the system.",
+      "refreshMetrics": "Refresh Snapshot",
+      "syncMetrics": "Sync to Database",
+      "refreshing": "Refreshing...",
+      "syncing": "Syncing...",
+      "metricsLoadFailed": "Failed to load topic metrics.",
+      "metricsRefreshStarted": "Metric snapshot refresh started.",
+      "metricsRefreshTriggered": "Metric snapshot refresh has been triggered.",
+      "metricsRefreshFailed": "Failed to refresh metric snapshot.",
+      "metricsSyncStarted": "Metric synchronization started.",
+      "metricsSyncTriggered": "Metric synchronization has been triggered.",
+      "metricsSyncFailed": "Failed to synchronize metrics.",
+      "noMetricsTitle": "No metric snapshot available.",
+      "noMetricsDescription": "Run a sync to collect the latest metrics for this topic."
     }
   },
   "schema": {
@@ -148,6 +168,22 @@
     "archive": "Archive",
     "versions": "Versions",
     "noPolicies": "No policies available"
+  },
+  "incidentPolicy": {
+    "title": "Incident Partition Policies",
+    "description": "Toggle incident response rules for Kafka partitions.",
+    "toggleOn": "Active",
+    "toggleOff": "Inactive",
+    "actions": "Actions",
+    "addPolicy": "Add Policy",
+    "columns": {
+      "enabled": "Status",
+      "id": "Policy ID",
+      "name": "Policy Name",
+      "duration": "Duration",
+      "createdAt": "Created At",
+      "updatedAt": "Updated At"
+    }
   },
   "connection": {
     "list": "Connections",

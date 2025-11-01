@@ -106,7 +106,9 @@ class SchemaArtifactModel(Base):
     version: Mapped[int] = mapped_column(primary_key=True, comment="스키마 버전")
 
     # 아티팩트 정보
-    storage_url: Mapped[str] = mapped_column(Text, comment="저장소 URL")
+    storage_url: Mapped[str | None] = mapped_column(
+        Text, nullable=True, comment="저장소 URL (optional)"
+    )
     checksum: Mapped[str | None] = mapped_column(String(64), comment="체크섬")
     change_id: Mapped[str] = mapped_column(String(100), comment="변경 ID")  # 36 → 100
 

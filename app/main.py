@@ -11,21 +11,42 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import ORJSONResponse
 
+from .celery_app import celery_app
 from .cluster.interface.router import router as cluster_router
 from .connect.interface.router import router as connect_router
-from .consumer.interface.routes import (
+from .consumer.interface.routers import (
     router as consumer_router,
     topic_router as consumer_topic_router,
 )
-from .consumer.interface.routes.websocket_routes import router as consumer_websocket_router
+from .consumer.interface.routers.websocket_routes import router as consumer_websocket_router
 from .container import AppContainer
 from .schema.interface.router import router as schema_router
 from .shared.error_handlers import format_validation_error
 from .shared.interface.router import router as shared_router
-from .topic.interface.policy_router import router as policy_router
-from .topic.interface.router import router as topic_router
+from .topic.interface.routers.metrics_router import router as metrics_router
+from .topic.interface.routers.policy_router import router as policy_router
+from .topic.interface.routers.topic_router import router as topic_router
 
 logger = logging.getLogger(__name__)
+
+
+async def _trigger_initial_metrics_sync(container: AppContainer) -> None:
+    """클러스터별 초기 메트릭 스냅샷을 확보합니다."""
+    try:
+        list_clusters_use_case = container.cluster_container.list_kafka_clusters_use_case()
+        clusters = await list_clusters_use_case.execute(active_only=True)
+
+        metrics_repository = container.topic_container.metrics_repository()
+
+        for cluster in clusters:
+            snapshot = await metrics_repository.get_latest_snapshot(cluster.cluster_id)
+            if snapshot is None:
+                logger.info("Triggering initial metrics sync for cluster %s", cluster.cluster_id)
+                celery_app.send_task(
+                    "app.tasks.metrics_tasks.manual_sync_metrics", args=[cluster.cluster_id]
+                )
+    except Exception:
+        logger.exception("Failed to trigger initial metrics sync")
 
 
 @asynccontextmanager
@@ -35,6 +56,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
     try:
         container.init_resources()
+        await _trigger_initial_metrics_sync(container)
 
         logger.info("컨테이너 초기화 완료")
         yield
@@ -107,6 +129,7 @@ def create_app() -> FastAPI:
     app.include_router(cluster_router, prefix="/api")  # Cluster API
     app.include_router(connect_router, prefix="/api")  # Connect API
     app.include_router(topic_router, prefix="/api")
+    app.include_router(metrics_router, prefix="/api")
     app.include_router(policy_router, prefix="/api")  # Policy API
     app.include_router(schema_router, prefix="/api")
     # Consumer REST routes (already prefixed with /api)

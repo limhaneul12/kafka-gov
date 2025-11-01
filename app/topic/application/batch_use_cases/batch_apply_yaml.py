@@ -5,10 +5,11 @@ from __future__ import annotations
 import yaml as pyyaml
 from pydantic import ValidationError
 
-from ...domain.models import DomainTopicApplyResult
-from ...interface.adapters import safe_convert_request_to_batch
-from ...interface.helpers import translate_usecase_failure, translate_validation_error
-from ...interface.schemas import FailureDetail, TopicBatchApplyResponse, TopicBatchRequest
+from app.topic.domain.models import DomainTopicApplyResult
+from app.topic.interface.adapters import safe_convert_request_to_batch
+from app.topic.interface.helpers import translate_usecase_failure, translate_validation_error
+from app.topic.interface.schemas import FailureDetail, TopicBatchApplyResponse, TopicBatchRequest
+
 from .batch_apply import TopicBatchApplyUseCase
 
 

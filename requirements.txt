@@ -45,4 +45,9 @@ argon2-cffi
 orjson
 dependency-injector
 
+# Task Queue & Caching
+celery
+redis
+flower
+
 pre-commit

@@ -313,3 +313,66 @@ class IPolicyRepository(ABC):
             ValueError: If target version not found
         """
         ...
+
+
+class IMetricsRepository(ABC):
+    """메트릭 스냅샷 리포지토리 인터페이스"""
+
+    @abstractmethod
+    async def save_snapshot(
+        self,
+        cluster_id: str,
+        metrics: Any,
+        leader_distribution: dict[int, int],
+    ) -> int:
+        """메트릭 스냅샷 저장
+
+        Args:
+            cluster_id: 클러스터 ID
+            metrics: 수집된 메트릭 데이터
+            leader_distribution: 브로커별 리더 파티션 수
+
+        Returns:
+            생성된 스냅샷 ID
+        """
+        ...
+
+    @abstractmethod
+    async def get_latest_snapshot(self, cluster_id: str) -> Any:
+        """최신 스냅샷 조회
+
+        Args:
+            cluster_id: 클러스터 ID
+
+        Returns:
+            최신 스냅샷 (없으면 None)
+        """
+        ...
+
+    @abstractmethod
+    async def delete_old_snapshots(self, cluster_id: str, days: int = 7) -> int:
+        """오래된 스냅샷 삭제
+
+        Args:
+            cluster_id: 클러스터 ID
+            days: 보관 기간 (일)
+
+        Returns:
+            삭제된 개수
+        """
+        ...
+
+    @abstractmethod
+    async def get_latest_cluster_summary(self, cluster_id: str) -> dict[str, Any]:
+        """최신 스냅샷 기반 클러스터 요약 조회"""
+        ...
+
+    @abstractmethod
+    async def get_latest_topic_distribution(self, cluster_id: str) -> dict[str, Any]:
+        """최신 스냅샷 기반 전체 토픽 분포 요약 조회"""
+        ...
+
+    @abstractmethod
+    async def get_latest_topic_metrics(self, cluster_id: str, topic_name: str) -> dict[str, Any]:
+        """최신 스냅샷 기반 특정 토픽 메트릭 조회"""
+        ...

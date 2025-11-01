@@ -19,13 +19,16 @@ export default function Sidebar() {
   const navigation = [
     { name: t("nav.dashboard"), to: "/", icon: LayoutDashboard },
     { name: t("nav.topics"), to: "/topics", icon: List },
+    { name: t("nav.teamAnalysis"), to: "/team-analytics", icon: Activity, indent: true },
+    { name: t("nav.consumerGroups"), to: "/consumers", icon: Users, indent: true },
     { name: t("nav.schemas"), to: "/schemas", icon: FileCode },
+    { name: t("nav.schemaAnalysis"), to: "/analysis", icon: Activity, indent: true },
     { name: t("nav.kafkaConnect"), to: "/connect", icon: Plug },
+    { name: t("nav.policies"), to: "/topics/policies", icon: Shield },
+    { name: t("nav.policyTopic"), to: "/topics/policies", icon: Shield, indent: true },
+    { name: t("nav.policySchema"), to: "/schemas/policies", icon: Shield, indent: true },
+    { name: t("nav.policyIncident"), to: "/policies/incidents", icon: Shield, indent: true },
     { name: t("nav.connections"), to: "/connections", icon: Server },
-    { name: "Consumer Groups", to: "/consumers", icon: Users },
-    { name: t("nav.policies"), to: "/policies", icon: Shield },
-    { name: t("nav.analysis"), to: "/analysis", icon: Activity },
-    { name: "Team Analytics", to: "/team-analytics", icon: Users },
     { name: t("nav.history"), to: "/history", icon: HistoryIcon },
   ];
   return (
@@ -44,19 +47,21 @@ export default function Sidebar() {
       <nav className="flex-1 space-y-1 p-4 overflow-y-auto">
         {navigation.map((item) => (
           <NavLink
-            key={item.name}
+            key={item.to}
             to={item.to}
             end={item.to === "/"}
             className={({ isActive }) =>
               cn(
                 "flex items-center gap-3 rounded-lg px-4 py-3 text-sm font-medium transition-colors",
+                item.indent && "pl-8 py-2 text-xs",
                 isActive
                   ? "bg-blue-600 text-white"
                   : "text-gray-300 hover:bg-gray-800 hover:text-white"
               )
             }
           >
-            <item.icon className="h-5 w-5" />
+            <item.icon className={item.indent ? "h-4 w-4" : "h-5 w-5"} />
+            {item.indent && <span className="mr-1">↳</span>}
             {item.name}
           </NavLink>
         ))}

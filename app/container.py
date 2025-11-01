@@ -13,12 +13,12 @@ class AppContainer(containers.DeclarativeContainer):
 
     wiring_config = containers.WiringConfiguration(
         packages=[
-            "app.topic.interface",
+            "app.topic.interface.routers",
             "app.schema.interface",
             "app.shared.interface",
-            "app.cluster.interface",
-            "app.connect.interface",
-            "app.consumer.interface",
+            "app.cluster.interface.routers",
+            "app.connect.interface.routers",
+            "app.consumer.interface.routers",
         ]
     )
 

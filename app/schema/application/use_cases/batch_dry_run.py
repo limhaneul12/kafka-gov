@@ -3,12 +3,12 @@
 from __future__ import annotations
 
 from app.cluster.domain.services import IConnectionManager
+from app.schema.domain.policy_engine import SchemaPolicyEngine
 from app.schema.infrastructure.schema_registry_adapter import ConfluentSchemaRegistryAdapter
 from app.shared.constants import AuditAction, AuditStatus, AuditTarget
 from app.shared.domain.policy_types import DomainPolicySeverity
 
 from ...domain.models import DomainSchemaBatch, DomainSchemaPlan
-from ...domain.policies import SchemaPolicyEngine
 from ...domain.repositories.interfaces import (
     ISchemaAuditRepository,
     ISchemaMetadataRepository,

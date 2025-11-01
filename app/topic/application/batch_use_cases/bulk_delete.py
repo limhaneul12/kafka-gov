@@ -8,15 +8,14 @@ from datetime import UTC, datetime
 from typing import Any
 
 from app.shared.constants import ActivityType, AuditAction, AuditStatus
-
-from ...domain.models import (
+from app.topic.domain.models import (
     DomainEnvironment,
     DomainTopicAction,
     DomainTopicBatch,
     DomainTopicSpec,
     TopicName,
 )
-from ...domain.repositories.interfaces import IAuditRepository, ITopicMetadataRepository
+from app.topic.domain.repositories.interfaces import IAuditRepository, ITopicMetadataRepository
 
 
 class TopicBulkDeleteUseCase:

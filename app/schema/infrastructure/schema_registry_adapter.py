@@ -54,10 +54,12 @@ class ConfluentSchemaRegistryAdapter(ISchemaRegistryRepository):  # type: ignore
                 latest_version = await self.client.get_latest_version(subject)
 
                 if latest_version and latest_version.schema:
+                    schema_str = latest_version.schema.schema_str or ""
+
                     result[subject] = SchemaVersionInfo(
                         version=latest_version.version,
                         schema_id=latest_version.schema_id,
-                        schema=latest_version.schema.schema_str,
+                        schema=schema_str,
                         schema_type=latest_version.schema.schema_type,
                         references=[
                             Reference(
@@ -67,7 +69,8 @@ class ConfluentSchemaRegistryAdapter(ISchemaRegistryRepository):  # type: ignore
                             )
                             for ref in (getattr(latest_version, "references", None) or [])
                         ],
-                        hash=self._calculate_schema_hash(latest_version.schema.schema_str or ""),
+                        hash=self._calculate_schema_hash(schema_str),
+                        canonical_hash=self._canonicalize_and_hash(schema_str),
                     )
             except SchemaRegistryError as e:
                 logger.warning(f"Failed to get schema for subject {subject}: {e}")
@@ -162,7 +165,8 @@ class ConfluentSchemaRegistryAdapter(ISchemaRegistryRepository):  # type: ignore
         return compatibility_result
 
     @handle_schema_registry_error(
-        "Schema registration", lambda self, spec, compatibility: spec.subject
+        "Schema registration",
+        lambda self, spec, compatibility: spec.subject,
     )
     async def register_schema(  # type: ignore[override]
         self, spec: DomainSchemaSpec, compatibility: bool = True
@@ -232,7 +236,8 @@ class ConfluentSchemaRegistryAdapter(ISchemaRegistryRepository):  # type: ignore
         return sorted(versions)
 
     @handle_schema_registry_error(
-        "Get schema by version", lambda self, subject, version: f"{subject} v{version}"
+        "Get schema by version",
+        lambda self, subject, version: f"{subject} v{version}",
     )
     async def get_schema_by_version(self, subject: SubjectName, version: int) -> SchemaVersionInfo:
         """특정 버전의 스키마 조회"""
@@ -298,8 +303,23 @@ class ConfluentSchemaRegistryAdapter(ISchemaRegistryRepository):  # type: ignore
         raise ValueError(f"No schema content found for subject {spec.subject}")
 
     def _calculate_schema_hash(self, schema_str: str) -> str:
-        """스키마 해시 계산"""
-        return hashlib.sha256(schema_str.encode()).hexdigest()[:16]
+        """스키마 해시 계산 (정규화 없음, 원본 기준)"""
+        return hashlib.sha256(schema_str.encode()).hexdigest()
+
+    def _canonicalize_and_hash(self, schema_str: str) -> str:
+        """스키마 정규화 후 SHA-256 해시
+
+        중복/변형 감지를 위해 공백·주석 제거 후 해싱
+        catalog_sync와 동일한 로직 사용
+        """
+        try:
+            # JSON 파싱 후 재직렬화 (공백 제거, 키 정렬)
+            schema_dict = orjson.loads(schema_str)
+            canonical = orjson.dumps(schema_dict, option=orjson.OPT_SORT_KEYS)
+            return hashlib.sha256(canonical).hexdigest()
+        except Exception:
+            # 파싱 실패 시 원본 해시
+            return hashlib.sha256(schema_str.encode()).hexdigest()
 
     def _normalize_schema_string(self, schema_str: str) -> str:
         """스키마 문자열 정규화

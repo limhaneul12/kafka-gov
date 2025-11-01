@@ -4,13 +4,15 @@ from __future__ import annotations
 
 from dependency_injector import containers, providers
 
-from app.topic.application.use_cases import (
-    TopicBatchApplyUseCase,
-    TopicBatchDryRunUseCase,
-    TopicBulkDeleteUseCase,
-    TopicListUseCase,
+from app.topic.application.batch_use_cases.batch_apply import TopicBatchApplyUseCase
+from app.topic.application.batch_use_cases.batch_dry_run import TopicBatchDryRunUseCase
+from app.topic.application.batch_use_cases.bulk_delete import TopicBulkDeleteUseCase
+from app.topic.application.topic_use_cases.get_topic_metrics import (
+    GetClusterMetricsUseCase,
+    GetTopicMetricsUseCase,
 )
-from app.topic.application.use_cases.policy_crud import (
+from app.topic.application.topic_use_cases.list_topics import TopicListUseCase
+from app.topic.application.topic_use_cases.policy_crud import (
     ActivatePolicyUseCase,
     ArchivePolicyUseCase,
     CreatePolicyUseCase,
@@ -24,10 +26,13 @@ from app.topic.application.use_cases.policy_crud import (
 )
 from app.topic.domain.repositories.interfaces import (
     IAuditRepository,
+    IMetricsRepository,
     IPolicyRepository,
     ITopicMetadataRepository,
 )
+from app.topic.infrastructure.adapter.metrics.collector import TopicMetricsCollector
 from app.topic.infrastructure.repository.audit_repository import MySQLAuditRepository
+from app.topic.infrastructure.repository.metrics_repository import MySQLMetricsRepository
 from app.topic.infrastructure.repository.mysql_repository import MySQLTopicMetadataRepository
 from app.topic.infrastructure.repository.policy_repository import PolicyRepository
 
@@ -60,6 +65,16 @@ class TopicContainer(containers.DeclarativeContainer):
     policy_repository: providers.Provider[IPolicyRepository] = providers.Factory(
         PolicyRepository,
         session_factory=infrastructure.database_manager.provided.get_db_session,
+    )
+
+    metrics_repository: providers.Provider[IMetricsRepository] = providers.Factory(
+        MySQLMetricsRepository,
+        session_factory=infrastructure.database_manager.provided.get_db_session,
+    )
+
+    # Metrics Collector (실시간 Kafka 메트릭 수집)
+    metrics_collector: providers.Provider[TopicMetricsCollector] = providers.Factory(
+        TopicMetricsCollector,
     )
 
     # Use Cases (ConnectionManager 주입)
@@ -143,6 +158,17 @@ class TopicContainer(containers.DeclarativeContainer):
     rollback_policy_use_case: providers.Provider[RollbackPolicyUseCase] = providers.Factory(
         RollbackPolicyUseCase,
         policy_repository=policy_repository,
+    )
+
+    # Metrics Use Cases
+    get_topic_metrics_use_case: providers.Provider[GetTopicMetricsUseCase] = providers.Factory(
+        GetTopicMetricsUseCase,
+        metrics_repository=metrics_repository,
+    )
+
+    get_cluster_metrics_use_case: providers.Provider[GetClusterMetricsUseCase] = providers.Factory(
+        GetClusterMetricsUseCase,
+        metrics_repository=metrics_repository,
     )
 
 

@@ -15,6 +15,10 @@ from app.topic.infrastructure.models import (
     TopicPlanModel,
     TopicApplyResultModel,
     AuditLogModel,
+    TopicPartitionMetrics,
+    LeaderDistribution,
+    MetricsSnapshot,
+    PolicyModel,
 )
 from app.schema.infrastructure.models import (
     SchemaApplyResultModel,

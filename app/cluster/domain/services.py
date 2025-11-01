@@ -8,6 +8,7 @@ from abc import ABC, abstractmethod
 
 from confluent_kafka.admin import AdminClient
 from confluent_kafka.schema_registry import AsyncSchemaRegistryClient
+from kafka import KafkaAdminClient
 from minio import Minio
 
 from .models import (
@@ -29,6 +30,10 @@ class IConnectionManager(ABC):
     @abstractmethod
     async def get_kafka_admin_client(self, cluster_id: str) -> AdminClient:
         """Kafka AdminClient 획득 (동적 생성/캐싱)"""
+
+    @abstractmethod
+    async def get_kafka_py_admin_client(self, cluster_id: str) -> KafkaAdminClient:
+        """kafka-python KafkaAdminClient 획득 (동적 생성/캐싱)"""
 
     @abstractmethod
     async def get_schema_registry_client(self, registry_id: str) -> AsyncSchemaRegistryClient:
@@ -110,11 +115,12 @@ class ConnectionManager(IConnectionManager):
 
         # 클라이언트 캐시 (resource_id -> client)
         self._kafka_clients: dict[str, AdminClient] = {}
+        self._kafka_py_clients: dict[str, KafkaAdminClient] = {}
         self._schema_registry_clients: dict[str, AsyncSchemaRegistryClient] = {}
         self._minio_clients: dict[str, tuple[Minio, str]] = {}  # (client, bucket_name)
 
-        # 캐시 락 (동시 생성 방지)
-        self._locks: dict[str, asyncio.Lock] = {}
+        # 캐시 락 (동시 생성 방지) - 이벤트 루프별로 관리
+        self._locks: dict[str, tuple[asyncio.AbstractEventLoop, asyncio.Lock]] = {}
 
     async def get_kafka_admin_client(self, cluster_id: str) -> AdminClient:
         """Kafka AdminClient 획득 (동적 생성/캐싱)
@@ -135,10 +141,9 @@ class ConnectionManager(IConnectionManager):
 
         # Lock 획득 (동시 생성 방지)
         lock_key = f"kafka_{cluster_id}"
-        if lock_key not in self._locks:
-            self._locks[lock_key] = asyncio.Lock()
+        lock = self._get_loop_scoped_lock(lock_key)
 
-        async with self._locks[lock_key]:
+        async with lock:
             # Double-check (Lock 대기 중에 다른 코루틴이 생성했을 수 있음)
             if cluster_id in self._kafka_clients:
                 return self._kafka_clients[cluster_id]
@@ -160,6 +165,70 @@ class ConnectionManager(IConnectionManager):
 
             return admin_client
 
+    async def get_kafka_py_admin_client(self, cluster_id: str) -> KafkaAdminClient:
+        """kafka-python KafkaAdminClient 획득 (동적 생성/캐싱)
+
+        Args:
+            cluster_id: 클러스터 ID
+
+        Returns:
+            KafkaAdminClient 인스턴스 (kafka-python)
+
+        Raises:
+            ValueError: 클러스터가 존재하지 않거나 비활성 상태
+        """
+        # 캐시 확인
+        if cluster_id in self._kafka_py_clients:
+            logger.debug(f"Kafka (py) AdminClient cache hit: {cluster_id}")
+            return self._kafka_py_clients[cluster_id]
+
+        # Lock 획득 (동시 생성 방지)
+        lock_key = f"kafka_py_{cluster_id}"
+        lock = self._get_loop_scoped_lock(lock_key)
+
+        async with lock:
+            # Double-check
+            if cluster_id in self._kafka_py_clients:
+                return self._kafka_py_clients[cluster_id]
+
+            # DB에서 클러스터 정보 조회
+            cluster = await self.kafka_cluster_repo.get_by_id(cluster_id)
+            if not cluster:
+                raise ValueError(f"Kafka cluster not found: {cluster_id}")
+            if not cluster.is_active:
+                raise ValueError(f"Kafka cluster is inactive: {cluster_id}")
+
+            # kafka-python AdminClient 설정 매핑
+            config: dict[str, str | int | bool] = {
+                "bootstrap_servers": cluster.bootstrap_servers,
+                "security_protocol": cluster.security_protocol.value,
+                "request_timeout_ms": cluster.request_timeout_ms,
+            }
+
+            # SASL 설정 (kafka-python 필드명과 매핑)
+            if cluster.sasl_mechanism:
+                config["sasl_mechanism"] = cluster.sasl_mechanism.value
+            if cluster.sasl_username:
+                config["sasl_plain_username"] = cluster.sasl_username
+            if cluster.sasl_password:
+                config["sasl_plain_password"] = cluster.sasl_password
+
+            # SSL 설정
+            if cluster.ssl_ca_location:
+                config["ssl_cafile"] = cluster.ssl_ca_location
+            if cluster.ssl_cert_location:
+                config["ssl_certfile"] = cluster.ssl_cert_location
+            if cluster.ssl_key_location:
+                config["ssl_keyfile"] = cluster.ssl_key_location
+
+            logger.info(f"Creating new Kafka (py) AdminClient: {cluster_id}")
+            client = KafkaAdminClient(**config)
+
+            # 캐시 저장
+            self._kafka_py_clients[cluster_id] = client
+
+            return client
+
     async def get_schema_registry_client(self, registry_id: str) -> AsyncSchemaRegistryClient:
         """Schema Registry Client 획득 (동적 생성/캐싱)
 
@@ -179,10 +248,9 @@ class ConnectionManager(IConnectionManager):
 
         # Lock 획득
         lock_key = f"schema_{registry_id}"
-        if lock_key not in self._locks:
-            self._locks[lock_key] = asyncio.Lock()
+        lock = self._get_loop_scoped_lock(lock_key)
 
-        async with self._locks[lock_key]:
+        async with lock:
             # Double-check
             if registry_id in self._schema_registry_clients:
                 return self._schema_registry_clients[registry_id]
@@ -223,10 +291,9 @@ class ConnectionManager(IConnectionManager):
 
         # Lock 획득
         lock_key = f"storage_{storage_id}"
-        if lock_key not in self._locks:
-            self._locks[lock_key] = asyncio.Lock()
+        lock = self._get_loop_scoped_lock(lock_key)
 
-        async with self._locks[lock_key]:
+        async with lock:
             # Double-check
             if storage_id in self._minio_clients:
                 return self._minio_clients[storage_id]
@@ -405,9 +472,13 @@ class ConnectionManager(IConnectionManager):
             resource_type: "kafka" | "schema_registry" | "storage"
             resource_id: 리소스 ID
         """
-        if resource_type == "kafka" and resource_id in self._kafka_clients:
-            del self._kafka_clients[resource_id]
-            logger.info(f"Kafka AdminClient cache invalidated: {resource_id}")
+        if resource_type == "kafka":
+            if resource_id in self._kafka_clients:
+                del self._kafka_clients[resource_id]
+                logger.info(f"Kafka AdminClient cache invalidated: {resource_id}")
+            if resource_id in self._kafka_py_clients:
+                del self._kafka_py_clients[resource_id]
+                logger.info(f"Kafka (py) AdminClient cache invalidated: {resource_id}")
 
         elif resource_type == "schema_registry" and resource_id in self._schema_registry_clients:
             del self._schema_registry_clients[resource_id]
@@ -425,7 +496,21 @@ class ConnectionManager(IConnectionManager):
     def clear_all_caches(self) -> None:
         """전체 캐시 초기화"""
         self._kafka_clients.clear()
+        self._kafka_py_clients.clear()
         self._schema_registry_clients.clear()
         self._minio_clients.clear()
         self._locks.clear()
-        logger.info("All connection caches cleared")
+        logger.info("All connection locks cleared")
+
+    def _get_loop_scoped_lock(self, key: str) -> asyncio.Lock:
+        """현재 이벤트 루프에 안전한 Lock 획득"""
+        loop = asyncio.get_running_loop()
+        entry = self._locks.get(key)
+        if entry is not None:
+            stored_loop, lock = entry
+            if stored_loop is loop:
+                return lock
+
+        lock = asyncio.Lock()
+        self._locks[key] = (loop, lock)
+        return lock

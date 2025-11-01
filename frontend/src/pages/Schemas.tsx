@@ -119,6 +119,47 @@ export default function Schemas() {
     }
   };
 
+  const handleDeleteSchema = async (subject: string) => {
+    if (!selectedRegistry) {
+      toast.error('Registry Selection Required', {
+        description: 'Please select a Schema Registry'
+      });
+      return;
+    }
+
+    if (!confirm(`Are you sure you want to delete schema "${subject}"?`)) {
+      return;
+    }
+
+    try {
+      setLoading(true);
+      await schemasAPI.delete(selectedRegistry, subject);
+      await loadSchemas();
+      toast.success('Schema Deleted', {
+        description: `Schema "${subject}" has been deleted successfully`
+      });
+    } catch (error: unknown) {
+      console.error("Failed to delete schema:", error);
+      
+      let errorMessage = 'Failed to delete schema';
+      if (error && typeof error === 'object' && 'response' in error) {
+        const axiosError = error as { response?: { data?: { detail?: string } } };
+        if (axiosError.response?.data?.detail) {
+          errorMessage = axiosError.response.data.detail;
+        }
+      } else if (error instanceof Error) {
+        errorMessage = error.message;
+      }
+      
+      toast.error('Delete Failed', {
+        description: errorMessage,
+        duration: 5000,
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const filteredSchemas = schemas.filter((schema) =>
     schema.subject.toLowerCase().includes(searchQuery.toLowerCase())
   );
@@ -280,7 +321,11 @@ export default function Schemas() {
                         {schema.owner || "-"}
                       </td>
                       <td className="px-4 py-3">
-                        <Button size="sm" variant="ghost">
+                        <Button 
+                          size="sm" 
+                          variant="ghost"
+                          onClick={() => handleDeleteSchema(schema.subject)}
+                        >
                           <Trash2 className="h-4 w-4 text-red-600" />
                         </Button>
                       </td>

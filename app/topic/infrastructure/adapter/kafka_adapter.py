@@ -10,8 +10,8 @@ from typing import Any
 
 from confluent_kafka.admin import AdminClient, ConfigResource, NewPartitions, NewTopic
 
-from ..domain.models import DomainTopicSpec, TopicName
-from ..domain.repositories.interfaces import ITopicRepository
+from ...domain.models import DomainTopicSpec, TopicName
+from ...domain.repositories.interfaces import ITopicRepository
 
 logger = logging.getLogger(__name__)
 TopicMetadata = dict[TopicName, Exception | None]

@@ -1,0 +1,75 @@
+# Custom Strategy Example - YAML Configuration
+#
+# This file demonstrates how to define a custom subject naming strategy
+# using YAML configuration. Users can create their own strategies by
+# following this template.
+#
+# The strategy is applied when uploading schemas to Schema Registry.
+
+# Unique strategy ID (must start with "custom:")
+strategy_id: custom:MyCompanyStrategy
+
+# Subject template using Python format string syntax
+# Available placeholders: {region}, {env}, {topic}, {record}
+template: "{region}.{env}.{topic}-{record}"
+
+# Field definitions with validation rules
+fields:
+  region:
+    type: string
+    description: "Geographic region"
+    pattern: "^(us|eu|asia)$"
+    required: true
+    examples:
+      - us
+      - eu
+      - asia
+
+  env:
+    type: string
+    description: "Environment"
+    pattern: "^(dev|stg|prod)$"
+    required: true
+    examples:
+      - dev
+      - stg
+      - prod
+
+  topic:
+    type: string
+    description: "Kafka topic name"
+    min_length: 1
+    max_length: 200
+    pattern: "^[a-z0-9._-]+$"
+    required: true
+    examples:
+      - orders
+      - user-events
+      - analytics.pageviews
+
+  record:
+    type: string
+    description: "Avro record name (Java-style)"
+    min_length: 1
+    max_length: 100
+    pattern: "^[A-Za-z][A-Za-z0-9._]*$"
+    required: true
+    examples:
+      - OrderCreated
+      - UserRegistered
+      - com.company.Order
+
+# Metadata
+metadata:
+  name: "My Company Strategy"
+  description: "Region-prefixed subject naming for multi-region deployment"
+  author: "Platform Team"
+  version: "1.0.0"
+  created_at: "2025-01-15"
+
+# Example outputs:
+# Input: {region: "us", env: "prod", topic: "orders", record: "OrderCreated"}
+# Output: "us.prod.orders-OrderCreated"
+#
+# Input: {region: "eu", env: "stg", topic: "user-events", record: "UserRegistered"}
+# Output: "eu.stg.user-events-UserRegistered"

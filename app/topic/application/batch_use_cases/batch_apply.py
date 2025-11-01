@@ -14,9 +14,7 @@ from app.shared.domain.policy_types import (
     DomainPolicyViolation,
     DomainResourceType,
 )
-from app.topic.infrastructure.kafka_adapter import KafkaTopicAdapter
-
-from ...domain.models import (
+from app.topic.domain.models import (
     ChangeId,
     DomainTopicApplyResult,
     DomainTopicBatch,
@@ -24,15 +22,16 @@ from ...domain.models import (
     DomainTopicSpec,
     TopicName,
 )
-from ...domain.policies.management import (
+from app.topic.domain.policies.management import (
     IPolicyRepository,
     PolicyReference,
     PolicyStatus,
     PolicyType,
 )
-from ...domain.policies.validation import PolicyResolver
-from ...domain.repositories.interfaces import IAuditRepository, ITopicMetadataRepository
-from ...domain.services import TopicPlannerService
+from app.topic.domain.policies.validation import PolicyResolver
+from app.topic.domain.repositories.interfaces import IAuditRepository, ITopicMetadataRepository
+from app.topic.domain.services import TopicPlannerService
+from app.topic.infrastructure.adapter.kafka_adapter import KafkaTopicAdapter
 
 
 def _translate_policy_error(error: Exception) -> str:
@@ -141,7 +140,10 @@ class TopicBatchApplyUseCase:
 
             # 토픽 적용 실행
             applied, skipped, failed = await self._apply_topics(
-                topic_repository, batch.specs, actor, batch.change_id
+                topic_repository=topic_repository,
+                specs=batch.specs,
+                actor=actor,
+                change_id=batch.change_id,
             )
 
             # 결과 생성
@@ -379,12 +381,12 @@ class TopicBatchApplyUseCase:
                 else:
                     failed.append({"name": name, "error": str(error), "action": "DELETE"})
                     await self._log_topic_operation(
-                        name,
-                        AuditAction.DELETE,
-                        actor,
-                        change_id,
-                        AuditStatus.FAILED,
-                        str(error),
+                        name=name,
+                        action=AuditAction.DELETE,
+                        actor=actor,
+                        change_id=change_id,
+                        status=AuditStatus.FAILED,
+                        message=str(error),
                         team=team,
                     )
 
@@ -428,12 +430,12 @@ class TopicBatchApplyUseCase:
                                 }
                             )
                             await self._log_topic_operation(
-                                spec.name,
-                                "ALTER_PARTITIONS",
-                                actor,
-                                change_id,
-                                "FAILED",
-                                str(error),
+                                name=spec.name,
+                                action="ALTER_PARTITIONS",
+                                actor=actor,
+                                change_id=change_id,
+                                status=AuditStatus.FAILED,
+                                message=str(error),
                                 team=team,
                             )
 
@@ -454,11 +456,11 @@ class TopicBatchApplyUseCase:
                             if spec.name not in applied:  # 중복 방지
                                 applied.append(spec.name)
                             await self._log_topic_operation(
-                                spec.name,
-                                "ALTER_CONFIG",
-                                actor,
-                                change_id,
-                                AuditStatus.COMPLETED,
+                                name=spec.name,
+                                action="ALTER_CONFIG",
+                                actor=actor,
+                                change_id=change_id,
+                                status=AuditStatus.COMPLETED,
                                 team=team,
                             )
                         else:
@@ -466,12 +468,12 @@ class TopicBatchApplyUseCase:
                                 {"name": spec.name, "error": str(error), "action": "ALTER_CONFIG"}
                             )
                             await self._log_topic_operation(
-                                spec.name,
-                                "ALTER_CONFIG",
-                                actor,
-                                change_id,
-                                AuditStatus.FAILED,
-                                str(error),
+                                name=spec.name,
+                                action="ALTER_CONFIG",
+                                actor=actor,
+                                change_id=change_id,
+                                status=AuditStatus.FAILED,
+                                message=str(error),
                                 team=team,
                             )
 

@@ -33,8 +33,8 @@ def sample_timestamp() -> datetime:
     return datetime(2025, 10, 28, 7, 10, 0, tzinfo=timezone.utc)
 
 
-@pytest_asyncio.fixture
-async def session_factory(test_engine):
+@pytest.fixture
+def session_factory(test_engine):
     """AsyncSession 팩토리 (Use Cases에서 사용)"""
     factory = async_sessionmaker(
         bind=test_engine,
@@ -47,6 +47,7 @@ async def session_factory(test_engine):
         async with factory() as session:
             yield session
 
+    # Return the decorated function directly (it's already a context manager factory)
     return get_session
 
 

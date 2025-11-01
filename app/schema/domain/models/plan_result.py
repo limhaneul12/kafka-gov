@@ -88,7 +88,7 @@ class DomainSchemaArtifact:
     """저장된 스키마 아티팩트 - Value Object"""
 
     subject: SubjectName
-    storage_url: str
+    storage_url: str | None  # Optional when no Object Storage
     version: int | None = None
     checksum: SchemaHash | None = None
     schema_type: DomainSchemaType | None = None
@@ -98,8 +98,6 @@ class DomainSchemaArtifact:
     def __post_init__(self) -> None:
         if self.version is not None and self.version < 1:
             raise ValueError("artifact version must be >= 1")
-        if not self.storage_url:
-            raise ValueError("storage_url is required")
 
 
 @dataclass(frozen=True, slots=True)

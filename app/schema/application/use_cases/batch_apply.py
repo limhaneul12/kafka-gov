@@ -6,6 +6,7 @@ import uuid
 from datetime import datetime
 
 from app.cluster.domain.services import IConnectionManager
+from app.schema.domain.policy_engine import SchemaPolicyEngine
 from app.schema.infrastructure.schema_registry_adapter import ConfluentSchemaRegistryAdapter
 from app.schema.infrastructure.storage.minio_adapter import MinIOObjectStorageAdapter
 from app.shared.constants import AuditAction, AuditStatus, AuditTarget
@@ -19,7 +20,6 @@ from ...domain.models import (
     DomainSchemaBatch,
     DomainSchemaSpec,
 )
-from ...domain.policies import SchemaPolicyEngine
 from ...domain.repositories.interfaces import (
     ISchemaAuditRepository,
     ISchemaMetadataRepository,

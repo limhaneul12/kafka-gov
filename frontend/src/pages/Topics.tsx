@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/Card"
 import Button from "../components/ui/Button";
 import Badge from "../components/ui/Badge";
 import Loading from "../components/ui/Loading";
+import Pagination from "../components/ui/Pagination";
 import { topicsAPI, clustersAPI } from "../services/api";
 import { Plus, RefreshCw, Trash2, Search, Edit, ExternalLink, Server } from "lucide-react";
 import type { Topic, KafkaCluster } from "../types";
@@ -32,6 +33,11 @@ export default function Topics() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showFailureReport, setShowFailureReport] = useState(false);
   const [showSuccessReport, setShowSuccessReport] = useState(false);
+  
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalItems, setTotalItems] = useState(0);
+  const [pageSize] = useState(20);
   const [failureResults, setFailureResults] = useState<Array<{
     success: boolean;
     doc: string;
@@ -61,10 +67,18 @@ export default function Topics() {
 
   useEffect(() => {
     if (selectedCluster) {
-      loadTopics();
+      setCurrentPage(1); // 클러스터 변경 시 1페이지로 리셋
+      loadTopics(1);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedCluster]);
+
+  useEffect(() => {
+    if (selectedCluster) {
+      loadTopics(currentPage);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentPage]);
 
   const loadClusters = async () => {
     try {
@@ -78,13 +92,15 @@ export default function Topics() {
     }
   };
 
-  const loadTopics = async () => {
+  const loadTopics = async (page: number = 1) => {
     if (!selectedCluster) return;
 
     try {
       setLoading(true);
-      const response = await topicsAPI.list(selectedCluster);
-      setTopics(response.data.topics || []);
+      const response = await topicsAPI.list(selectedCluster, page, pageSize);
+      // Backend는 pagination 응답을 반환 (items, total, page, size)
+      setTopics(response.data.items || []);
+      setTotalItems(response.data.total || 0);
     } catch (error) {
       console.error("Failed to load topics:", error);
       toast.error('토픽 조회 실패', {
@@ -759,6 +775,17 @@ export default function Topics() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Pagination */}
+      {filteredTopics.length > 0 && (
+        <Pagination
+          currentPage={currentPage}
+          totalPages={Math.ceil(totalItems / pageSize)}
+          totalItems={totalItems}
+          pageSize={pageSize}
+          onPageChange={setCurrentPage}
+        />
+      )}
 
       {/* Modals */}
       <CreateTopicModal

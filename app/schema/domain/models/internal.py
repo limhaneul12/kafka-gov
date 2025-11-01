@@ -23,7 +23,10 @@ class Reference:
 
 @dataclass(slots=True)
 class SchemaVersionInfo:
-    """스키마 버전 정보 - 내부 처리용"""
+    """스키마 버전 정보 - 내부 처리용
+
+    jobs.md 스펙 준수: rule_set, sr_metadata 누락 없이 수집
+    """
 
     version: int | None
     schema_id: int | None
@@ -31,3 +34,6 @@ class SchemaVersionInfo:
     schema_type: str | None
     references: list[Reference]
     hash: str
+
+    # ✨ NEW: OSS Governance 메타데이터
+    canonical_hash: str | None = None  # 정규화 후 해시 (중복 감지용)

@@ -2,14 +2,12 @@
 
 from __future__ import annotations
 
-import logging
 from typing import Any
 
 from app.cluster.domain.services import IConnectionManager
-from app.topic.infrastructure.kafka_adapter import KafkaTopicAdapter
-
-from ...domain.models import TopicName
-from ...domain.repositories.interfaces import ITopicMetadataRepository
+from app.topic.domain.models import TopicName
+from app.topic.domain.repositories.interfaces import ITopicMetadataRepository
+from app.topic.infrastructure.adapter.kafka_adapter import KafkaTopicAdapter
 
 KafkaMetaDescription = dict[TopicName, dict[str, Any]]
 TopicDescription = list[dict[str, Any]]
@@ -53,11 +51,6 @@ class TopicListUseCase:
             environment = metadata.get("environment") if metadata else None
             if not environment:
                 environment = self._infer_environment(topic_name)
-
-            logger = logging.getLogger(__name__)
-            logger.debug(
-                f"[{cluster_id}] Topic {topic_name}: owner={owner}, doc={doc}, tags={tags}, env={environment}"
-            )
 
             # retention.ms 추출 (Kafka config에서)
             config = kafka_info.get("config", {})

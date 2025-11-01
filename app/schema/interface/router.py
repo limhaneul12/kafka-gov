@@ -30,20 +30,11 @@ from app.shared.roles import DEFAULT_USER
 
 router = APIRouter(prefix="/v1/schemas", tags=["schemas"])
 
-# =============================================================================
-# Dependency Injection - @inject 데코레이터로 엔드포인트에 직접 주입
-# =============================================================================
-DryRunUseCase = Depends(Provide[AppContainer.schema_container.dry_run_use_case])
-ApplyUseCase = Depends(Provide[AppContainer.schema_container.apply_use_case])
-UploadUseCase = Depends(Provide[AppContainer.schema_container.upload_use_case])
-PlanUseCase = Depends(Provide[AppContainer.schema_container.plan_use_case])
-DeleteUseCase = Depends(Provide[AppContainer.schema_container.delete_use_case])
-SyncUseCase = Depends(Provide[AppContainer.schema_container.sync_use_case])
-MetadataRepository = Depends(Provide[AppContainer.schema_container.metadata_repository])
 
-
-def _extract_schema_type_from_url(storage_url: str) -> str:
+def _extract_schema_type_from_url(storage_url: str | None) -> str:
     """Storage URL에서 스키마 타입 추출"""
+    if not storage_url:
+        return "UNKNOWN"
     url_lower = storage_url.lower()
     if ".avsc" in url_lower or "/avro/" in url_lower:
         return "AVRO"
@@ -66,7 +57,7 @@ def _extract_schema_type_from_url(storage_url: str) -> str:
 async def schema_batch_dry_run(
     request: SchemaBatchRequest,
     registry_id: str = Query(..., description="Schema Registry ID"),
-    dry_run_use_case=DryRunUseCase,
+    dry_run_use_case=Depends(Provide[AppContainer.schema_container.dry_run_use_case]),
 ) -> SchemaBatchDryRunResponse:
     """스키마 배치 Dry-Run 실행"""
     batch = safe_convert_request_to_batch(request)
@@ -87,7 +78,7 @@ async def schema_batch_apply(
     request: SchemaBatchRequest,
     registry_id: str = Query(..., description="Schema Registry ID"),
     storage_id: str | None = Query(None, description="Object Storage ID (optional)"),
-    apply_use_case=ApplyUseCase,
+    apply_use_case=Depends(Provide[AppContainer.schema_container.apply_use_case]),
 ) -> SchemaBatchApplyResponse:
     """스키마 배치 Apply 실행"""
     batch = safe_convert_request_to_batch(request)
@@ -110,14 +101,17 @@ async def upload_schemas(
     owner: Annotated[str, Form(..., description="소유 팀")],
     files: Annotated[list[UploadFile], File(..., description="업로드할 스키마 파일 목록")],
     registry_id: Annotated[
-        str, Form(description="Schema Registry ID (기본값: default)")
+        str, Query(description="Schema Registry ID (기본값: default)")
     ] = "default",
-    storage_id: Annotated[str, Form(description="Object Storage ID (기본값: default)")] = "default",
+    storage_id: Annotated[str | None, Query(description="Object Storage ID (optional)")] = None,
     compatibility_mode: Annotated[
         CompatibilityMode | None,
         Form(description="호환성 모드 (기본값: BACKWARD)"),
     ] = None,
-    upload_use_case=UploadUseCase,
+    strategy_id: Annotated[
+        str, Form(description="Subject naming strategy (기본값: gov:EnvPrefixed)")
+    ] = "gov:EnvPrefixed",
+    upload_use_case=Depends(Provide[AppContainer.schema_container.upload_use_case]),
 ) -> SchemaUploadResponse:
     """스키마 파일 업로드"""
     if not files:
@@ -140,6 +134,7 @@ async def upload_schemas(
         files=files,
         actor=DEFAULT_USER,
         compatibility_mode=domain_compatibility,
+        strategy_id=strategy_id,
     )
 
     # 도메인 객체를 Pydantic 응답으로 변환
@@ -169,7 +164,7 @@ async def upload_schemas(
 @handle_server_errors(error_message="Failed to retrieve plan")
 async def get_schema_plan(
     change_id: ChangeId,
-    plan_use_case=PlanUseCase,
+    plan_use_case=Depends(Provide[AppContainer.schema_container.plan_use_case]),
 ) -> SchemaBatchDryRunResponse:
     """스키마 배치 계획 조회"""
     result = await plan_use_case.execute(change_id)
@@ -194,7 +189,7 @@ async def analyze_schema_delete_impact(
     subject: str,
     registry_id: str = Query(..., description="Schema Registry ID"),
     strategy: str = "TopicNameStrategy",
-    delete_use_case=DeleteUseCase,  # delete_analysis_use_case는 통합됨
+    delete_use_case=Depends(Provide[AppContainer.schema_container.delete_use_case]),
 ) -> SchemaDeleteImpactResponse:
     """스키마 삭제 영향도 분석"""
     # 영향도 분석 수행
@@ -234,7 +229,7 @@ async def delete_schema(
     registry_id: str = Query(..., description="Schema Registry ID"),
     strategy: str = "TopicNameStrategy",
     force: bool = False,
-    delete_use_case=DeleteUseCase,
+    delete_use_case=Depends(Provide[AppContainer.schema_container.delete_use_case]),
 ) -> SchemaDeleteImpactResponse:
     """스키마 삭제"""
     # 삭제 실행
@@ -267,7 +262,7 @@ async def delete_schema(
 @inject
 @handle_server_errors(error_message="Failed to list artifacts")
 async def list_schema_artifacts(
-    metadata_repository=MetadataRepository,
+    metadata_repository=Depends(Provide[AppContainer.schema_container.metadata_repository]),
 ) -> list[dict[str, str | int | None]]:
     """스키마 아티팩트 목록 조회"""
     # Repository에서 도메인 모델 조회 (호환성 모드 포함)
@@ -300,7 +295,7 @@ async def list_schema_artifacts(
 @handle_server_errors(error_message="Schema sync failed")
 async def sync_schemas(
     registry_id: str = Query(..., description="Schema Registry ID"),
-    sync_use_case=SyncUseCase,
+    sync_use_case=Depends(Provide[AppContainer.schema_container.sync_use_case]),
 ) -> dict[str, int]:
     """Schema Registry → DB 동기화"""
     result = await sync_use_case.execute(registry_id=registry_id, actor=DEFAULT_USER)

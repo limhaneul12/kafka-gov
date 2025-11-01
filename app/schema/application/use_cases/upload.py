@@ -33,6 +33,7 @@ from ...domain.models import (
     DomainSchemaUploadResult,
     DomainSubjectStrategy,
 )
+from ...domain.policies.naming import get_registry as get_naming_registry
 from ...domain.repositories.interfaces import (
     ISchemaAuditRepository,
     ISchemaMetadataRepository,
@@ -44,13 +45,14 @@ class UploadContext:
     """업로드 작업의 공통 컨텍스트 정보"""
 
     registry_repository: ConfluentSchemaRegistryAdapter
-    storage_repository: MinIOObjectStorageAdapter
+    storage_repository: MinIOObjectStorageAdapter | None
     env: DomainEnvironment
     change_id: ChangeId
     upload_id: str
     owner: str
     actor: str
     compatibility_mode: DomainCompatibilityMode | None
+    strategy_id: str = "gov:EnvPrefixed"  # Default naming strategy
 
 
 class SchemaUploadUseCase:
@@ -71,13 +73,14 @@ class SchemaUploadUseCase:
         self,
         *,
         registry_id: str,
-        storage_id: str,
+        storage_id: str | None,
         env: DomainEnvironment,
         change_id: ChangeId,
         owner: str,
         files: list[Any],  # FastAPI UploadFile 객체들
         actor: str,
         compatibility_mode: DomainCompatibilityMode | None = None,
+        strategy_id: str = "gov:EnvPrefixed",  # Naming strategy
     ) -> DomainSchemaUploadResult:
         """스키마 파일 업로드 처리"""
         upload_id = f"upload_{change_id}_{uuid.uuid4().hex[:8]}"
@@ -96,20 +99,25 @@ class SchemaUploadUseCase:
             registry_client = await self.connection_manager.get_schema_registry_client(registry_id)
             registry_repository = ConfluentSchemaRegistryAdapter(registry_client)
 
-            minio_client, bucket_name = await self.connection_manager.get_minio_client(storage_id)
-            # ObjectStorage 정보에서 base_url 가져오기
-            storage_info = await self.connection_manager.get_storage_info(storage_id)
-            base_url = (
-                storage_info.get_base_url()
-                if hasattr(storage_info, "get_base_url")
-                else f"http://{storage_info.endpoint_url}"
-            )
+            # Object Storage는 optional
+            storage_repository = None
+            if storage_id:
+                minio_client, bucket_name = await self.connection_manager.get_minio_client(
+                    storage_id
+                )
+                # ObjectStorage 정보에서 base_url 가져오기
+                storage_info = await self.connection_manager.get_storage_info(storage_id)
+                base_url = (
+                    storage_info.get_base_url()
+                    if hasattr(storage_info, "get_base_url")
+                    else f"http://{storage_info.endpoint_url}"
+                )
 
-            storage_repository = MinIOObjectStorageAdapter(
-                client=minio_client,
-                bucket_name=bucket_name,
-                base_url=base_url,
-            )
+                storage_repository = MinIOObjectStorageAdapter(
+                    client=minio_client,
+                    bucket_name=bucket_name,
+                    base_url=base_url,
+                )
 
             # 2. 파일 검증
             validated_files = await self._validate_files(files)
@@ -124,6 +132,7 @@ class SchemaUploadUseCase:
                 owner=owner,
                 actor=actor,
                 compatibility_mode=compatibility_mode,
+                strategy_id=strategy_id,
             )
 
             # 4. 파일 처리 및 업로드 (MinIO + Schema Registry)
@@ -254,19 +263,22 @@ class SchemaUploadUseCase:
                 if not schema_files:
                     raise ValueError(f"No schema files found in ZIP: {filename}")
 
-                key = f"{context.env.value}/uploads/{context.upload_id}/{filename}"
-                metadata = {
-                    "change_id": context.change_id,
-                    "upload_id": context.upload_id,
-                    "file_type": "zip_bundle",
-                    "schema_count": str(len(schema_files)),
-                }
+                # MinIO 저장 (optional)
+                storage_url = None
+                if context.storage_repository:
+                    key = f"{context.env.value}/uploads/{context.upload_id}/{filename}"
+                    metadata = {
+                        "change_id": context.change_id,
+                        "upload_id": context.upload_id,
+                        "file_type": "zip_bundle",
+                        "schema_count": str(len(schema_files)),
+                    }
 
-                storage_url = await context.storage_repository.put_object(
-                    key=key,
-                    data=content,
-                    metadata=metadata,
-                )
+                    storage_url = await context.storage_repository.put_object(
+                        key=key,
+                        data=content,
+                        metadata=metadata,
+                    )
 
                 artifact = DomainSchemaArtifact(
                     subject=f"bundle.{Path(filename).stem}",
@@ -299,22 +311,29 @@ class SchemaUploadUseCase:
         except (UnicodeDecodeError, orjson.JSONDecodeError) as e:
             raise ValueError(f"Invalid schema file {filename}: {e}") from e
 
-        # 1. MinIO 저장
-        key = f"{context.env.value}/uploads/{context.upload_id}/{filename}"
-        metadata = {
-            "change_id": context.change_id,
-            "upload_id": context.upload_id,
-            "file_type": "schema",
-            "schema_type": schema_type,
-        }
+        # 1. MinIO 저장 (optional)
+        storage_url = None
+        if context.storage_repository:
+            key = f"{context.env.value}/uploads/{context.upload_id}/{filename}"
+            metadata = {
+                "change_id": context.change_id,
+                "upload_id": context.upload_id,
+                "file_type": "schema",
+                "schema_type": schema_type,
+            }
 
-        storage_url = await context.storage_repository.put_object(
-            key=key,
-            data=content,
-            metadata=metadata,
+            storage_url = await context.storage_repository.put_object(
+                key=key,
+                data=content,
+                metadata=metadata,
+            )
+
+        # 1.5. Generate subject name using Naming Policy
+        subject_name = self._build_subject_name(
+            context=context,
+            filename=filename,
+            schema_content=content_str,
         )
-
-        subject_name = f"{context.env.value}.{Path(filename).stem}"
 
         # 2. Schema Registry 자동 등록
         # 호환성 모드 결정 (파라미터 우선, 없으면 기본값)
@@ -435,6 +454,108 @@ class SchemaUploadUseCase:
     def _calculate_checksum(self, content: bytes) -> str:
         """콘텐츠 체크섬 계산"""
         return hashlib.sha256(content).hexdigest()[:16]
+
+    def _build_subject_name(
+        self,
+        context: UploadContext,
+        filename: str,
+        schema_content: str,
+    ) -> str:
+        """Build subject name using Naming Policy
+
+        Args:
+            context: Upload context
+            filename: Schema file name
+            schema_content: Schema content (for extracting namespace/record)
+
+        Returns:
+            str: Generated subject name
+
+        Raises:
+            ValueError: If strategy not found or validation fails
+        """
+        registry = get_naming_registry()
+
+        # Get input class for strategy
+        input_class = registry.get_input_class(context.strategy_id)
+        if not input_class:
+            raise ValueError(f"Naming strategy '{context.strategy_id}' not found")
+
+        # Prepare input data (all possible fields)
+        input_data = self._prepare_strategy_input(
+            context=context,
+            filename=filename,
+            schema_content=schema_content,
+        )
+
+        # Validate and build subject using Pydantic
+        try:
+            inp = input_class(**input_data)
+            return inp.build_subject()
+        except ValueError as e:
+            raise ValueError(f"Subject validation failed: {e}") from e
+
+    def _prepare_strategy_input(
+        self,
+        context: UploadContext,
+        filename: str,
+        schema_content: str,
+    ) -> dict:
+        """Prepare input data for naming strategy
+
+        All possible fields are provided. Pydantic will validate and use only required ones.
+
+        Args:
+            context: Upload context
+            filename: Schema file name
+            schema_content: Schema content
+
+        Returns:
+            dict: Input data with all possible fields
+        """
+        base_name = Path(filename).stem
+        namespace, record = self._extract_namespace_record(schema_content)
+
+        # Provide all possible fields - Pydantic will pick what it needs
+        return {
+            # Common fields
+            "topic": base_name,
+            "key_or_value": "value",
+            # Schema-extracted fields
+            "namespace": namespace or "default",
+            "record": record or base_name,
+            # Context fields
+            "env": context.env.value,
+            "team": context.owner,
+        }
+
+    def _extract_namespace_record(self, schema_content: str) -> tuple[str | None, str | None]:
+        """Extract namespace and record name from schema content
+
+        Args:
+            schema_content: Schema content (JSON/Avro)
+
+        Returns:
+            tuple: (namespace, record_name)
+        """
+        try:
+            schema_dict = orjson.loads(schema_content)
+
+            # Avro schema
+            if isinstance(schema_dict, dict):
+                namespace = schema_dict.get("namespace")
+                record_name = schema_dict.get("name")
+
+                # Handle full name (namespace.record)
+                if record_name and "." in record_name:
+                    parts = record_name.rsplit(".", 1)
+                    return parts[0], parts[1]
+
+                return namespace, record_name
+
+            return None, None
+        except Exception:
+            return None, None
 
     async def _publish_schema_registered_event(
         self,

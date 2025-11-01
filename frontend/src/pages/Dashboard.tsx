@@ -57,7 +57,8 @@ export default function Dashboard() {
     if (!selectedCluster) return;
     try {
       const response = await topicsAPI.list(selectedCluster);
-      setTopicCount(response.data.topics?.length || 0);
+      // Backend는 pagination 응답을 반환 (total 필드 사용)
+      setTopicCount(response.data.total || 0);
     } catch (error) {
       console.error("Failed to load topic count:", error);
       setTopicCount(0);

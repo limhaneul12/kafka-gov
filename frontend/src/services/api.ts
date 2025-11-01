@@ -70,7 +70,8 @@ export default api;
 
 // API 엔드포인트 함수들
 export const topicsAPI = {
-  list: (clusterId: string) => api.get(`/v1/topics?cluster_id=${clusterId}`),
+  list: (clusterId: string, page: number = 1, size: number = 20) => 
+    api.get(`/v1/topics?cluster_id=${clusterId}&page=${page}&size=${size}`),
   uploadAndDryRun: (clusterId: string, file: File) => {
     const formData = new FormData();
     formData.append("file", file);
@@ -103,6 +104,21 @@ export const topicsAPI = {
     api.post(`/v1/topics/bulk-delete?cluster_id=${clusterId}`, names),
   getDetail: (clusterId: string, topicName: string) =>
     api.get(`/v1/topics/${topicName}/detail?cluster_id=${clusterId}`),
+};
+
+export const metricsAPI = {
+  getTopicMetrics: (clusterId: string, topicName: string) =>
+    api.get(`/metrics/topics/${topicName}?cluster_id=${clusterId}`),
+  getTopicMetricsLive: (clusterId: string, topicName: string) =>
+    api.get(`/metrics/topics/${topicName}/live?cluster_id=${clusterId}`),
+  getAllTopicsMetrics: (clusterId: string) =>
+    api.get(`/metrics/topics?cluster_id=${clusterId}`),
+  getClusterMetrics: (clusterId: string) =>
+    api.get(`/metrics/cluster?cluster_id=${clusterId}`),
+  refreshMetrics: (clusterId: string) =>
+    api.post(`/metrics/refresh?cluster_id=${clusterId}`),
+  syncMetrics: (clusterId: string) =>
+    api.post(`/metrics/sync?cluster_id=${clusterId}`),
 };
 
 export const schemasAPI = {

@@ -21,6 +21,7 @@ export default function UploadSchemaModal({
   const [environment, setEnvironment] = useState("dev");
   const [changeId, setChangeId] = useState("");
   const [owner, setOwner] = useState("");
+  const [strategyId, setStrategyId] = useState("gov:EnvPrefixed");
 
   if (!isOpen) return null;
 
@@ -34,11 +35,12 @@ export default function UploadSchemaModal({
     try {
       setLoading(true);
       const formData = new FormData();
-      formData.append("files", file);
+      formData.append("files", file);  // Backend는 list[UploadFile]을 받음
       formData.append("env", environment);
       formData.append("change_id", changeId);
       formData.append("owner", owner);
-      formData.append("registry_id", registryId);
+      // registry_id는 Query 파라미터로 전달 (FormData에 포함하지 않음)
+      formData.append("strategy_id", strategyId);
       
       await onSubmit(registryId, formData);
       handleClose();
@@ -55,6 +57,7 @@ export default function UploadSchemaModal({
     setEnvironment("dev");
     setChangeId("");
     setOwner("");
+    setStrategyId("gov:EnvPrefixed");
     setDragActive(false);
     onClose();
   };
@@ -109,7 +112,7 @@ export default function UploadSchemaModal({
           <form onSubmit={handleSubmit}>
             <div className="p-6 space-y-6">
               {/* Required Fields */}
-              <div className="grid gap-4 md:grid-cols-3">
+              <div className="grid gap-4 md:grid-cols-2">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Environment *
@@ -125,6 +128,30 @@ export default function UploadSchemaModal({
                     <option value="prod">Production</option>
                   </select>
                 </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Naming Strategy *
+                  </label>
+                  <select
+                    value={strategyId}
+                    onChange={(e) => setStrategyId(e.target.value)}
+                    required
+                    className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  >
+                    <optgroup label="SR Built-in">
+                      <option value="builtin:TopicNameStrategy">Topic Name (topic-key/value)</option>
+                      <option value="builtin:RecordNameStrategy">Record Name (namespace.record)</option>
+                      <option value="builtin:TopicRecordNameStrategy">Topic+Record (topic-namespace.record)</option>
+                    </optgroup>
+                    <optgroup label="Kafka-Gov Extended">
+                      <option value="gov:EnvPrefixed">Env Prefixed (env.namespace-value)</option>
+                      <option value="gov:TeamScoped">Team Scoped (team.namespace.record)</option>
+                      <option value="gov:CompactRecord">Compact Record (record)</option>
+                    </optgroup>
+                  </select>
+                </div>
+              </div>
+              <div className="grid gap-4 md:grid-cols-2">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Change ID *
@@ -221,12 +248,13 @@ export default function UploadSchemaModal({
               {/* Info */}
               <div className="rounded-lg bg-blue-50 p-4">
                 <h4 className="text-sm font-medium text-blue-900 mb-2">
-                  Schema File Format
+                  Subject Naming Strategy
                 </h4>
                 <ul className="space-y-1 text-xs text-blue-800">
-                  <li>• Avro schema 형식 (.avsc 또는 .json)</li>
-                  <li>• 파일명이 subject로 사용됩니다</li>
-                  <li>• 스키마는 Schema Registry에 등록됩니다</li>
+                  <li>• <strong>Topic Name:</strong> 파일명-key/value (예: orders-value)</li>
+                  <li>• <strong>Record Name:</strong> 스키마의 namespace.record (예: com.company.Order)</li>
+                  <li>• <strong>Env Prefixed:</strong> 환경.파일명-namespace.record (예: prod.orders-com.company.Order)</li>
+                  <li>• <strong>Team Scoped:</strong> 팀.namespace.record (예: platform.com.company.Order)</li>
                 </ul>
               </div>
             </div>

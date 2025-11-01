@@ -11,18 +11,17 @@ from app.shared.domain.policy_types import (
     DomainPolicyViolation,
     DomainResourceType,
 )
-from app.topic.infrastructure.kafka_adapter import KafkaTopicAdapter
-
-from ...domain.models import DomainTopicBatch, DomainTopicPlan, DomainTopicSpec
-from ...domain.policies.management import (
+from app.topic.domain.models import DomainTopicBatch, DomainTopicPlan, DomainTopicSpec
+from app.topic.domain.policies.management import (
     IPolicyRepository,
     PolicyReference,
     PolicyStatus,
     PolicyType,
 )
-from ...domain.policies.validation import PolicyResolver
-from ...domain.repositories import IAuditRepository, ITopicMetadataRepository
-from ...domain.services import TopicPlannerService
+from app.topic.domain.policies.validation import PolicyResolver
+from app.topic.domain.repositories import IAuditRepository, ITopicMetadataRepository
+from app.topic.domain.services import TopicPlannerService
+from app.topic.infrastructure.adapter.kafka_adapter import KafkaTopicAdapter
 
 
 def _translate_policy_error(error: Exception) -> str:

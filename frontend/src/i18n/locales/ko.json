@@ -19,10 +19,16 @@
   "nav": {
     "dashboard": "대시보드",
     "topics": "토픽",
+    "teamAnalysis": "팀 분석",
+    "consumerGroups": "컨슈머 그룹",
     "schemas": "스키마",
+    "schemaAnalysis": "스키마 분석",
     "kafkaConnect": "Kafka Connect",
     "connections": "연결",
     "policies": "정책",
+    "policyTopic": "토픽 정책",
+    "policySchema": "스키마 정책",
+    "policyIncident": "Incident 파티션 정책",
     "analysis": "분석",
     "history": "이력",
     "settings": "설정"
@@ -104,7 +110,21 @@
       "recommendation": "권장 사항",
       "loading": "토픽 정보를 불러오는 중...",
       "error": "토픽 정보를 불러오는데 실패했습니다",
-      "noAlerts": "현재 알림이 없습니다"
+      "noAlerts": "현재 알림이 없습니다",
+      "metricsHint": "메트릭은 가장 최근에 저장된 스냅샷 기준으로 표시됩니다.",
+      "refreshMetrics": "스냅샷 갱신",
+      "syncMetrics": "DB 동기화",
+      "refreshing": "갱신 중...",
+      "syncing": "동기화 중...",
+      "metricsLoadFailed": "토픽 메트릭을 불러오지 못했습니다.",
+      "metricsRefreshStarted": "메트릭 스냅샷 갱신을 시작했습니다.",
+      "metricsRefreshTriggered": "메트릭 스냅샷 갱신 작업이 트리거되었습니다.",
+      "metricsRefreshFailed": "메트릭 스냅샷 갱신에 실패했습니다.",
+      "metricsSyncStarted": "메트릭 동기화를 시작했습니다.",
+      "metricsSyncTriggered": "메트릭 동기화 작업이 트리거되었습니다.",
+      "metricsSyncFailed": "메트릭 동기화에 실패했습니다.",
+      "noMetricsTitle": "저장된 메트릭 스냅샷이 없습니다.",
+      "noMetricsDescription": "동기화 버튼을 눌러 최신 메트릭을 수집하세요."
     }
   },
   "schema": {
@@ -148,6 +168,22 @@
     "archive": "보관",
     "versions": "버전",
     "noPolicies": "정책이 없습니다"
+  },
+  "incidentPolicy": {
+    "title": "Incident 파티션 정책",
+    "description": "Kafka 파티션 대응 정책을 온/오프로 제어합니다.",
+    "toggleOn": "활성",
+    "toggleOff": "비활성",
+    "actions": "동작",
+    "addPolicy": "정책 추가",
+    "columns": {
+      "enabled": "상태",
+      "id": "정책 ID",
+      "name": "정책 이름",
+      "duration": "지속 시간",
+      "createdAt": "등록일",
+      "updatedAt": "수정일"
+    }
   },
   "connection": {
     "list": "연결 목록",

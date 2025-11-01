@@ -254,5 +254,5 @@ class SchemaArtifact(BaseModel):
 
     subject: SubjectName
     version: SchemaVersion
-    storage_url: StorageUrl
+    storage_url: StorageUrl | None = None  # Optional when no Object Storage
     checksum: SchemaHash | None = None

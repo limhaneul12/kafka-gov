@@ -41,6 +41,22 @@ services:
       - kafka-network
     restart: unless-stopped
 
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+    networks:
+      - kafka-network
+    restart: unless-stopped
+    volumes:
+      - redis_data:/data
+
   # 마이그레이션 전용 서비스
   migration:
     build:
@@ -106,10 +122,18 @@ services:
       - STORAGE_BUCKET_NAME=kafka-gov-schemas
       - STORAGE_REGION=us-east-1
       - STORAGE_USE_SSL=false
+      # Redis/Celery 설정
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_DB=0
     depends_on:
       mysql:
         condition: service_healthy
       minio:
+        condition: service_healthy
+      redis:
         condition: service_healthy
       # migration:
       #   condition: service_completed_successfully
@@ -119,6 +143,82 @@ services:
       timeout: 10s
       retries: 3
       start_period: 40s
+    networks:
+      - kafka-network
+    restart: unless-stopped
+    volumes:
+      - ./logs:/app/logs
+
+  # Celery Worker (메트릭 수집 작업 실행)
+  celery-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: ["uv", "run", "celery", "-A", "app.celery_app", "worker", "--loglevel=info"]
+    environment:
+      # Database 설정
+      - DB_HOST=mysql
+      - DB_PORT=3306
+      - DB_USERNAME=user
+      - DB_PASSWORD=password
+      - DB_DATABASE=kafka_gov
+      - DB_POOL_SIZE=10
+      - DB_MAX_OVERFLOW=20
+      - DB_ECHO=false
+      # App 설정
+      - APP_DEBUG=true
+      - APP_LOG_LEVEL=INFO
+      - APP_ENVIRONMENT=development
+      # Kafka 설정
+      - KAFKA_BOOTSTRAP_SERVERS=kafka1:19092,kafka2:29092,kafka3:39092
+      - KAFKA_SECURITY_PROTOCOL=PLAINTEXT
+      - KAFKA_REQUEST_TIMEOUT_MS=30000
+      - KAFKA_RETRIES=3
+      # Redis (Celery Broker/Backend)
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - kafka-network
+    restart: unless-stopped
+    volumes:
+      - ./logs:/app/logs
+
+  # Celery Beat (주기적 스케줄러)
+  celery-beat:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: ["uv", "run", "celery", "-A", "app.celery_app", "beat", "--loglevel=info"]
+    environment:
+      # Database 설정
+      - DB_HOST=mysql
+      - DB_PORT=3306
+      - DB_USERNAME=user
+      - DB_PASSWORD=password
+      - DB_DATABASE=kafka_gov
+      - DB_POOL_SIZE=10
+      - DB_MAX_OVERFLOW=20
+      - DB_ECHO=false
+      # App 설정
+      - APP_DEBUG=true
+      - APP_LOG_LEVEL=INFO
+      - APP_ENVIRONMENT=development
+      # Kafka 설정
+      - KAFKA_BOOTSTRAP_SERVERS=kafka1:19092,kafka2:29092,kafka3:39092
+      - KAFKA_SECURITY_PROTOCOL=PLAINTEXT
+      - KAFKA_REQUEST_TIMEOUT_MS=30000
+      - KAFKA_RETRIES=3
+      # Redis (Celery Broker/Backend)
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+    depends_on:
+      redis:
+        condition: service_healthy
     networks:
       - kafka-network
     restart: unless-stopped
@@ -173,6 +273,7 @@ services:
 volumes:
   mysql_data:
   minio_data:
+  redis_data:
   nginx_logs:
 
 networks:

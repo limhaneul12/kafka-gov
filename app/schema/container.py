@@ -12,7 +12,7 @@ from .application.use_cases import (
     SchemaSyncUseCase,
     SchemaUploadUseCase,
 )
-from .domain.policies import SchemaPolicyEngine
+from .domain.policy_engine import SchemaPolicyEngine
 from .domain.repositories.interfaces import (
     ISchemaAuditRepository,
     ISchemaMetadataRepository,
@@ -90,5 +90,4 @@ class SchemaContainer(containers.DeclarativeContainer):
         connection_manager=cluster.connection_manager,  # ConnectionManager 주입
         metadata_repository=metadata_repository,
         audit_repository=audit_repository,
-        correlation_repository=None,  # Analysis 모듈 제거로 None
     )
