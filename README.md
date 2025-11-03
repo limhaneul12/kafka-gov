@@ -24,9 +24,9 @@
 
 ## 🔄 Latest Updates (2025-11)
 
-- **Topic Detail 실시간 메트릭**: 페이지 진입 시 `GET /api/metrics/topics/{topic}/live`를 우선 호출해 파티션 상세가 즉시 표시됩니다. `Refresh Snapshot` 버튼은 수동 재조회 전용으로 남겨두었습니다.
-- **초기 스냅샷 자동화**: FastAPI lifespan 훅이 클러스터별 스냅샷이 없으면 Celery `manual_sync_metrics` 태스크를 자동으로 트리거하여 초기 메트릭 공백을 방지합니다.
-- **사이드바 개편 & Incident Policy UI**: Topics/Schemas 메뉴 구조를 재정렬하고, 정책 섹션에 "Incident Partition Policy" 프리뷰 페이지를 추가했습니다(백엔드 연동 전까지 데모 데이터 표시).
+- **Topic Detail Live Metrics**: When you open the page, `GET /api/metrics/topics/{topic}/live` is called first so partition details appear immediately. The `Refresh Snapshot` button is reserved for manual re-fetches.
+- **Initial Snapshot Automation**: The FastAPI lifespan hook automatically triggers the Celery `manual_sync_metrics` task when a cluster has no snapshot, preventing gaps in the first metrics view.
+- **Sidebar Refresh & Incident Policy UI**: Reorganized the Topics/Schemas navigation and added an "Incident Partition Policy" preview page under Policies (shows demo data until backend integration lands).
 
 ---
 
