@@ -28,7 +28,7 @@ def _get_worker_loop() -> asyncio.AbstractEventLoop:
     return _WORKER_LOOP
 
 
-def _run_in_worker_loop(coro: Coroutine[Any, Any, T]) -> T:
+def _run_in_worker_loop[T](coro: Coroutine[Any, Any, T]) -> T:
     """Celery 워커에서 공용 이벤트 루프로 코루틴 실행"""
     loop = _get_worker_loop()
 
