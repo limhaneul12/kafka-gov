@@ -21,6 +21,7 @@ from app.schema.interface.schemas import (
     SchemaBatchDryRunResponse,
     SchemaBatchRequest,
     SchemaDeleteImpactResponse,
+    SchemaSyncResponse,
     SchemaUploadResponse,
 )
 from app.schema.interface.types.enums import CompatibilityMode, Environment
@@ -296,7 +297,7 @@ async def list_schema_artifacts(
 async def sync_schemas(
     registry_id: str = Query(..., description="Schema Registry ID"),
     sync_use_case=Depends(Provide[AppContainer.schema_container.sync_use_case]),
-) -> dict[str, int]:
+) -> SchemaSyncResponse:
     """Schema Registry → DB 동기화"""
     result = await sync_use_case.execute(registry_id=registry_id, actor=DEFAULT_USER)
-    return result
+    return SchemaSyncResponse.model_validate(result)

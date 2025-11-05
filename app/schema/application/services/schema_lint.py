@@ -131,7 +131,7 @@ class SchemaLintService:
 
         snake_case vs camelCase 혼용 감지
         """
-        violations = []
+        violations: list[LintViolation] = []
         fields = schema_dict.get("fields", [])
 
         if not fields:
@@ -164,14 +164,14 @@ class SchemaLintService:
 
     def _check_pii_candidates(self, schema_dict: dict[str, Any]) -> list[LintViolation]:
         """PII 후보 필드 태깅"""
-        violations = []
         fields = schema_dict.get("fields", [])
+        violations: list[LintViolation] = []
 
         for field in fields:
-            name = field.get("name", "").lower()
-
             # PII 키워드 매칭
-            matched_keywords = [kw for kw in self.PII_KEYWORDS if kw in name]
+            matched_keywords = [
+                kw for kw in self.PII_KEYWORDS if kw in field.get("name", "").lower()
+            ]
 
             if matched_keywords:
                 violations.append(
@@ -192,7 +192,7 @@ class SchemaLintService:
 
         bytes는 바이너리 데이터 전용. 문자열은 string 사용 권장
         """
-        violations = []
+        violations: list[LintViolation] = []
         fields = schema_dict.get("fields", [])
 
         bytes_count = sum(1 for f in fields if f.get("type") == "bytes")
@@ -215,23 +215,18 @@ class SchemaLintService:
 
         union이 너무 많으면 복잡도 증가
         """
-        violations = []
         fields = schema_dict.get("fields", [])
-
-        for field in fields:
-            field_type = field.get("type")
-
-            # union은 list로 표현됨
-            if isinstance(field_type, list) and len(field_type) > 3:
-                violations.append(
-                    LintViolation(
-                        code="EXCESSIVE_UNION",
-                        severity=ViolationSeverity.INFO,
-                        rule="Union 타입은 3개 이하 권장",
-                        actual=f"필드 {field.get('name')}: {len(field_type)}개 union",
-                        hint="타입 체계 단순화 또는 별도 record로 분리 고려",
-                    )
-                )
+        violations: list[LintViolation] = [
+            LintViolation(
+                code="EXCESSIVE_UNION",
+                severity=ViolationSeverity.INFO,
+                rule="Union 타입은 3개 이하 권장",
+                actual=f"필드 {field.get('name')}: {len(field.get('type'))}개 union",
+                hint="타입 체계 단순화 또는 별도 record로 분리 고려",
+            )
+            for field in fields
+            if isinstance(field.get("type"), list) and len(field.get("type")) > 3
+        ]
 
         return violations
 
@@ -242,7 +237,6 @@ class SchemaLintService:
 
         중첩이 깊으면 직렬화/역직렬화 비용 증가
         """
-        violations = []
 
         def get_depth(obj: Any, current_depth: int = 0) -> int:
             """재귀적으로 map 깊이 계산"""
@@ -255,19 +249,18 @@ class SchemaLintService:
             return current_depth
 
         fields = schema_dict.get("fields", [])
-        for field in fields:
-            depth = get_depth(field.get("type"))
 
-            if depth > max_depth:
-                violations.append(
-                    LintViolation(
-                        code="DEEP_MAP",
-                        severity=ViolationSeverity.INFO,
-                        rule=f"Map 중첩은 {max_depth}단계 이하 권장",
-                        actual=f"필드 {field.get('name')}: {depth}단계 map",
-                        hint="중첩 구조 단순화 또는 flat record 구조 고려",
-                    )
-                )
+        violations: list[LintViolation] = [
+            LintViolation(
+                code="DEEP_MAP",
+                severity=ViolationSeverity.INFO,
+                rule=f"Map 중첩은 {max_depth}단계 이하 권장",
+                actual=f"필드 {field.get('name')}: {get_depth(field.get('type'))}단계 map",
+                hint="중첩 구조 단순화 또는 flat record 구조 고려",
+            )
+            for field in fields
+            if get_depth(field.get("type")) > max_depth
+        ]
 
         return violations
 

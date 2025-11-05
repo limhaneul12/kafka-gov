@@ -173,3 +173,25 @@ class SchemaUploadResponse(BaseModel):
         serialization_alias="artifacts",
     )
     summary: dict[str, int] = Field(default_factory=dict)
+
+
+class SchemaSyncCatalogMetrics(BaseModel):
+    """스키마 카탈로그 동기화 메트릭"""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    subjects_total: int = 0
+    subjects_new: int = 0
+    versions_total: int = 0
+    versions_new: int = 0
+
+
+class SchemaSyncResponse(BaseModel):
+    """스키마 동기화 응답"""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    total: int
+    added: int
+    updated: int
+    catalog: SchemaSyncCatalogMetrics = Field(default_factory=SchemaSyncCatalogMetrics)

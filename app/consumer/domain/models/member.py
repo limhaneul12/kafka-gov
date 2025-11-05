@@ -4,7 +4,7 @@ Consumer Group 내 개별 멤버(Consumer) 모델
 - ConsumerMember: 멤버 정보
 - MemberStats: 멤버별 통계
 
-참고: cal.md 4️⃣ - Fairness Index 계산
+참고: cal.md - Fairness Index 계산
 """
 
 from dataclasses import dataclass
@@ -23,7 +23,7 @@ class ConsumerMember:
     - 할당 파티션 수 (assigned_tp_count)
 
     용도:
-    - Fairness Index 계산 (cal.md 4️⃣)
+    - Fairness Index 계산 (cal.md)
     - Hotspot 감지
     """
 

@@ -4,8 +4,13 @@ from __future__ import annotations
 
 import logging
 import uuid
+from collections.abc import Callable
+from contextlib import AbstractAsyncContextManager
+
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.cluster.domain.services import IConnectionManager
+from app.schema.application.services.catalog_sync import CatalogSyncService
 from app.schema.infrastructure.schema_registry_adapter import ConfluentSchemaRegistryAdapter
 from app.shared.constants import AuditAction, AuditStatus, AuditTarget
 
@@ -26,12 +31,14 @@ class SchemaSyncUseCase:
         connection_manager: IConnectionManager,
         metadata_repository: ISchemaMetadataRepository,
         audit_repository: ISchemaAuditRepository,
+        session_factory: Callable[[], AbstractAsyncContextManager[AsyncSession]] | None = None,
     ) -> None:
         self.connection_manager = connection_manager
         self.metadata_repository = metadata_repository
         self.audit_repository = audit_repository
+        self.session_factory = session_factory
 
-    async def execute(self, registry_id: str, actor: str) -> dict[str, int]:
+    async def execute(self, registry_id: str, actor: str) -> dict[str, dict[str, int] | int]:
         """Schema Registry의 모든 스키마를 DB로 동기화
 
         Returns:
@@ -61,23 +68,15 @@ class SchemaSyncUseCase:
             all_subjects = await registry_repository.list_all_subjects()
             logger.warning(f"[Schema Sync] Found {len(all_subjects)} subjects")
 
-            if not all_subjects:
-                await self.audit_repository.log_operation(
-                    change_id=change_id,
-                    action=AuditAction.SYNC,
-                    target=AuditTarget.SCHEMA_REGISTRY,
-                    actor=actor,
-                    status=AuditStatus.COMPLETED,
-                    message="No schemas found in Schema Registry",
-                )
-                return {"total": 0, "added": 0, "updated": 0}
-
-            # 3. 각 subject의 최신 버전 정보 조회
-            subjects_info = await registry_repository.describe_subjects(all_subjects)
+            # 3. 각 subject의 최신 버전 정보 조회 (없으면 빈 dict)
+            subjects_info = (
+                await registry_repository.describe_subjects(all_subjects) if all_subjects else {}
+            )
 
             # 4. DB에 artifact로 저장
             added_count = 0
             skipped_count = 0
+            catalog_metrics: dict[str, int] | None = None
 
             for subject, info in subjects_info.items():
                 artifact = DomainSchemaArtifact(
@@ -94,10 +93,28 @@ class SchemaSyncUseCase:
                     # 이미 존재하는 경우는 무시 (중복 키 에러)
                     skipped_count += 1
 
+            if self.session_factory is not None:
+                async with self.session_factory() as session:
+                    catalog_service = CatalogSyncService(sr_client=registry_client, session=session)
+                    metrics = await catalog_service.sync_all()
+                    catalog_metrics = {
+                        "subjects_total": metrics.subjects_total,
+                        "subjects_new": metrics.subjects_new,
+                        "versions_total": metrics.versions_total,
+                        "versions_new": metrics.versions_new,
+                    }
+
             result = {
                 "total": len(subjects_info),
                 "added": added_count,
                 "updated": skipped_count,
+                "catalog": catalog_metrics
+                or {
+                    "subjects_total": 0,
+                    "subjects_new": 0,
+                    "versions_total": 0,
+                    "versions_new": 0,
+                },
             }
 
             await self.audit_repository.log_operation(

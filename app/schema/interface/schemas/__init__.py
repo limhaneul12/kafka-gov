@@ -16,6 +16,8 @@ from .response import (
     SchemaBatchApplyResponse,
     SchemaBatchDryRunResponse,
     SchemaDeleteImpactResponse,
+    SchemaSyncCatalogMetrics,
+    SchemaSyncResponse,
     SchemaUploadResponse,
 )
 
@@ -34,5 +36,7 @@ __all__ = [
     "SchemaPlanItem",
     "SchemaReference",
     "SchemaSource",
+    "SchemaSyncCatalogMetrics",
+    "SchemaSyncResponse",
     "SchemaUploadResponse",
 ]

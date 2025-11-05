@@ -272,8 +272,13 @@ items:
         });
       } else {
         setShowDryRunResult(true);
+        const totalItems =
+          result.summary?.total_items ??
+          result.summary?.totalItems ??
+          (Array.isArray(result.plan) ? result.plan.length : 0);
+
         toast.success("Dry-run 완료", {
-          description: `${result.total_items}개 항목 검증 완료`
+          description: `${totalItems}개 항목 검증 완료`
         });
       }
     } catch (error) {

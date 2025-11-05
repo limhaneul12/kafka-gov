@@ -5,12 +5,11 @@ from __future__ import annotations
 import yaml as pyyaml
 from pydantic import ValidationError
 
+from app.topic.application.batch_use_cases.batch_apply import TopicBatchApplyUseCase
 from app.topic.domain.models import DomainTopicApplyResult
 from app.topic.interface.adapters import safe_convert_request_to_batch
 from app.topic.interface.helpers import translate_usecase_failure, translate_validation_error
 from app.topic.interface.schemas import FailureDetail, TopicBatchApplyResponse, TopicBatchRequest
-
-from .batch_apply import TopicBatchApplyUseCase
 
 
 class TopicBatchApplyFromYAMLUseCase:
@@ -113,11 +112,11 @@ class TopicBatchApplyFromYAMLUseCase:
         # 4. 배치 Apply UseCase 호출
         try:
             result: DomainTopicApplyResult = await self.batch_apply_use_case.execute(
-                cluster_id, batch, actor
+                cluster_id=cluster_id, batch=batch, actor=actor
             )
 
             # UseCase 결과를 Response로 변환
-            failed_details = [
+            failed_details: list[FailureDetail] = [
                 translate_usecase_failure(fail_item)
                 for fail_item in result.failed
                 if isinstance(fail_item, dict)

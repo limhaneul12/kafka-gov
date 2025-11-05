@@ -615,7 +615,7 @@ class TopicBatchApplyUseCase:
                 return []
 
             # 4. 각 spec에 대해 검증
-            all_violations = []
+            all_violations: list[DomainPolicyViolation] = []
             for spec in specs:
                 violations = validator.validate(spec)
                 if violations:

@@ -6,24 +6,23 @@ SR → DB 증분 동기화 (jobs.md 스펙 준수)
 - rule_set, metadata 누락 없이 수집
 """
 
-from __future__ import annotations
-
 import asyncio
 import hashlib
 import logging
 import re
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any
 
 import orjson
 from confluent_kafka.schema_registry import AsyncSchemaRegistryClient
 from confluent_kafka.schema_registry.error import SchemaRegistryError
-from sqlalchemy import text
+from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.schema.infrastructure.catalog_models import SchemaSubjectModel, SchemaVersionModel
+from app.schema.infrastructure.models import SchemaArtifactModel, SchemaMetadataModel
 
 logger = logging.getLogger(__name__)
 
@@ -36,8 +35,13 @@ class SyncMetrics:
     subjects_new: int = 0
     versions_total: int = 0
     versions_new: int = 0
+    subjects_removed: int = 0
+    versions_removed: int = 0
+    artifacts_removed: int = 0
+    metadata_removed: int = 0
     errors: int = 0
     duration_seconds: float = 0.0
+    removed_subjects: set[str] = field(default_factory=set, repr=False)
 
 
 class CatalogSyncService:
@@ -91,6 +95,63 @@ class CatalogSyncService:
             metrics.subjects_total = len(subjects)
             logger.info(f"[CatalogSync] Found {len(subjects)} subjects")
 
+            # 1-1. 제거 대상 계산 (SR에 없어진 subject)
+            existing_subjects: set[str] = set()
+
+            subject_stmt = await self.session.execute(select(SchemaSubjectModel.subject))
+            existing_subjects.update(row[0] for row in subject_stmt)
+
+            artifact_stmt = await self.session.execute(select(SchemaArtifactModel.subject))
+            existing_subjects.update(row[0] for row in artifact_stmt)
+
+            metadata_stmt = await self.session.execute(select(SchemaMetadataModel.subject))
+            existing_subjects.update(row[0] for row in metadata_stmt)
+
+            stale_subjects = existing_subjects - set(subjects)
+
+            if stale_subjects:
+                logger.info("[CatalogSync] Removing %d stale subjects", len(stale_subjects))
+
+                # 삭제될 버전 개수 계산
+                version_count_stmt = await self.session.execute(
+                    select(func.count())
+                    .select_from(SchemaVersionModel)
+                    .where(SchemaVersionModel.subject.in_(stale_subjects))
+                )
+                versions_removed = int(version_count_stmt.scalar() or 0)
+
+                # 삭제될 아티팩트 개수 계산
+                artifact_count_stmt = await self.session.execute(
+                    select(func.count())
+                    .select_from(SchemaArtifactModel)
+                    .where(SchemaArtifactModel.subject.in_(stale_subjects))
+                )
+                artifacts_removed = int(artifact_count_stmt.scalar() or 0)
+
+                await self.session.execute(
+                    delete(SchemaVersionModel).where(SchemaVersionModel.subject.in_(stale_subjects))
+                )
+                await self.session.execute(
+                    delete(SchemaArtifactModel).where(
+                        SchemaArtifactModel.subject.in_(stale_subjects)
+                    )
+                )
+                metadata_delete = await self.session.execute(
+                    delete(SchemaMetadataModel).where(
+                        SchemaMetadataModel.subject.in_(stale_subjects)
+                    )
+                )
+                await self.session.execute(
+                    delete(SchemaSubjectModel).where(SchemaSubjectModel.subject.in_(stale_subjects))
+                )
+                await self.session.commit()
+
+                metrics.subjects_removed += len(stale_subjects)
+                metrics.versions_removed += versions_removed
+                metrics.artifacts_removed += artifacts_removed
+                metrics.metadata_removed += metadata_delete.rowcount or 0
+                metrics.removed_subjects.update(stale_subjects)
+
             # 2. 각 subject별 증분 동기화 (세마포어 제한)
             tasks = [self._sync_subject(subject, metrics) for subject in subjects]
             await asyncio.gather(*tasks, return_exceptions=True)
@@ -125,11 +186,11 @@ class CatalogSyncService:
             try:
                 # DB에서 현재 latest_version 조회
                 stmt = await self.session.execute(
-                    text("SELECT latest_version FROM schema_subjects WHERE subject = :subject"),
-                    {"subject": subject},
+                    select(SchemaSubjectModel.latest_version).where(
+                        SchemaSubjectModel.subject == subject
+                    )
                 )
-                row = stmt.fetchone()
-                current_latest = row[0] if row else None
+                current_latest = stmt.scalar_one_or_none()
 
                 # SR에서 최신 버전 조회
                 latest_registered = await self._get_latest_version_with_retry(subject)

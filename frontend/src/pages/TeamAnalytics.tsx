@@ -73,7 +73,11 @@ export default function TeamAnalytics() {
         auditAPI.recent(100).catch(() => ({ data: [] })),
       ]);
 
-      setTopics(topicsData.data.topics || []);
+      const topicsPayload = topicsData.data as {
+        items?: Topic[];
+        topics?: Topic[];
+      };
+      setTopics(topicsPayload.items ?? topicsPayload.topics ?? []);
       setActivities(activitiesData.data || []);
     } catch (error) {
       console.error("Failed to load team analytics data:", error);

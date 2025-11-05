@@ -83,6 +83,7 @@ class SchemaContainer(containers.DeclarativeContainer):
         connection_manager=cluster.connection_manager,  # ConnectionManager 주입
         metadata_repository=metadata_repository,
         audit_repository=audit_repository,
+        session_factory=infrastructure.database_manager.provided.get_db_session,
     )
 
     delete_use_case: providers.Provider[SchemaDeleteUseCase] = providers.Factory(
