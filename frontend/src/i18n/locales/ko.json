@@ -170,19 +170,116 @@
     "noPolicies": "정책이 없습니다"
   },
   "incidentPolicy": {
-    "title": "Incident 파티션 정책",
-    "description": "Kafka 파티션 대응 정책을 온/오프로 제어합니다.",
-    "toggleOn": "활성",
-    "toggleOff": "비활성",
-    "actions": "동작",
-    "addPolicy": "정책 추가",
-    "columns": {
-      "enabled": "상태",
-      "id": "정책 ID",
-      "name": "정책 이름",
-      "duration": "지속 시간",
-      "createdAt": "등록일",
-      "updatedAt": "수정일"
+    "list": {
+      "title": "Incident 파티션 정책",
+      "description": "등록된 Incident 대응 정책을 확인하고 컴포저에서 상세 편집하세요.",
+      "create": "정책 추가",
+      "tableTitle": "정책 목록",
+      "tableFilter": "필터",
+      "columns": {
+        "id": "정책 ID",
+        "name": "정책 이름",
+        "validPeriod": "유효 시간",
+        "createdAt": "등록일",
+        "createdBy": "등록자",
+        "status": "상태"
+      },
+      "status": {
+        "draft": "초안",
+        "active": "사용 중",
+        "archived": "보관됨"
+      },
+      "empty": "Incident 정책이 없습니다"
+    },
+    "composer": {
+      "title": "Policy Dynamics Composer",
+      "subtitle": "{name} 편집 중",
+      "actions": {
+        "backToList": "목록으로",
+        "saveDraft": "임시 저장",
+        "publishMock": "Mock 게시"
+      },
+      "notFound": "요청한 Incident 정책을 찾을 수 없습니다.",
+      "scope": {
+        "title": "대상 범위",
+        "environment": "환경",
+        "selector": "Selector (prefix / regex)"
+      },
+      "schedule": {
+        "title": "Duration / 스케줄",
+        "mode": "모드",
+        "interval": "Interval",
+        "timezone": "Timezone",
+        "ttl": "TTL (선택)",
+        "blackout": "Blackout (RRULE)",
+        "blackoutPlaceholder": "예: Sat,Sun",
+        "rateLimit": "Rate Limit",
+        "perMinutes": "분당",
+        "maxAlerts": "최대 알림"
+      },
+      "ruleBuilder": {
+        "title": "Rule Builder",
+        "description": "AND/OR 로직으로 조건을 묶고 임계값을 조정하세요.",
+        "nested": "Nested Rule Groups",
+        "groupLabel": "그룹 로직",
+        "conditionLabel": "조건 {index}",
+        "compareTarget": "비교 대상",
+        "deviation": "편차",
+        "baseline": "Baseline",
+        "window": "윈도우",
+        "stat": "통계"
+      },
+      "response": {
+        "title": "위반 시 대응",
+        "slack": "Slack 알림",
+        "enforce": "차단 Enforce",
+        "waiver": "Waiver 요청",
+        "tags": "태그",
+        "severity": "심각도",
+        "severityWarn": "경고",
+        "severityBlock": "차단",
+        "severityInfo": "정보",
+        "memo": "메모 (선택)",
+        "memoPlaceholder": "정책 메모 또는 변경 이유를 작성하세요"
+      },
+      "preview": {
+        "title": "Preview",
+        "scope": "대상 & 스케줄 요약",
+        "scheduleSummary": "mode: {mode} · interval: {interval} · timezone: {timezone}",
+        "rule": "규칙",
+        "response": "대응",
+        "slackOn": "Slack 알림이 활성화되어 있습니다",
+        "slackOff": "Slack 알림이 비활성화되어 있습니다",
+        "tags": "태그: {tags}",
+        "jsonTitle": "JSON",
+        "copyJson": "JSON 복사",
+        "copySuccess": "정책 JSON을 복사했습니다",
+        "copyError": "JSON을 복사할 수 없습니다"
+      },
+      "meta": {
+        "title": "메타 정보",
+        "id": "정책 ID",
+        "owner": "등록자",
+        "createdAt": "등록일",
+        "valid": "유효 시간"
+      }
+    },
+    "ruleEditor": {
+      "addCondition": "조건 추가",
+      "clearAll": "전체 초기화",
+      "copyJson": "JSON 복사",
+      "saveMockLabel": "Mock 저장",
+      "metric": "메트릭",
+      "operator": "연산자",
+      "threshold": "임계값",
+      "remove": "삭제",
+      "logicLabel": "조건 조합",
+      "emptyPlaceholder": "조건을 추가하세요.",
+      "copySuccess": "룰 JSON이 복사되었습니다",
+      "copyError": "JSON 복사에 실패했습니다",
+      "minCondition": "최소 한 개의 조건이 필요합니다.",
+      "cleared": "모든 조건이 기본값으로 초기화되었습니다.",
+      "saveMockSuccess": "Mock 정책 \"{name}\"을(를) 저장했습니다"
     }
   },
   "connection": {

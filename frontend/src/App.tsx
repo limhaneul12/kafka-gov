@@ -8,6 +8,7 @@ import TopicPolicies from "./pages/TopicPolicies";
 import Schemas from "./pages/Schemas";
 import SchemaPolicies from "./pages/SchemaPolicies";
 import IncidentPolicies from "./pages/IncidentPolicies";
+import IncidentPolicyComposer from "./pages/IncidentPolicyComposer";
 import Connect from "./pages/Connect/index";
 import Connections from "./pages/Connections/index";
 import Consumers from "./pages/Consumers";
@@ -36,6 +37,7 @@ function App() {
             <Route path="schemas" element={<Schemas />} />
             <Route path="schemas/policies" element={<SchemaPolicies />} />
             <Route path="policies/incidents" element={<IncidentPolicies />} />
+            <Route path="policies/incidents/:policyId" element={<IncidentPolicyComposer />} />
             <Route path="connect" element={<Connect />} />
             <Route path="connections" element={<Connections />} />
             <Route path="consumers" element={<Consumers />} />

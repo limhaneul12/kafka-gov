@@ -1,48 +1,41 @@
-import { useTranslation } from "react-i18next";
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
+import { useNavigate } from "react-router-dom";
 import { Shield } from "lucide-react";
 
 import Button from "../components/ui/Button";
+import Badge from "../components/ui/Badge";
+import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/Card";
 import { cn } from "../utils/cn";
+import {
+  incidentPolicyLibrary,
+  type IncidentPolicyStatus,
+} from "./incidentPoliciesData";
 
-interface IncidentPolicyItem {
-  id: string;
-  name: string;
-  duration: string;
-  enabled: boolean;
-  createdAt: string;
-  updatedAt: string;
-}
+type BadgeVariant = "default" | "success" | "warning" | "danger" | "info";
 
-const initialPolicies: IncidentPolicyItem[] = [
-  {
-    id: "INC-001",
-    name: "Critical partition freeze",
-    duration: "15m",
-    enabled: true,
-    createdAt: "2025-09-22",
-    updatedAt: "2025-10-12",
-  },
-  {
-    id: "INC-002",
-    name: "High-lag throttle",
-    duration: "1h",
-    enabled: false,
-    createdAt: "2025-10-01",
-    updatedAt: "2025-10-05",
-  },
-];
+const statusBadgeVariant: Record<IncidentPolicyStatus, BadgeVariant> = {
+  draft: "warning",
+  active: "success",
+  archived: "default",
+};
 
 export default function IncidentPolicies() {
   const { t } = useTranslation();
-  const [policies, setPolicies] = useState<IncidentPolicyItem[]>(initialPolicies);
+  const navigate = useNavigate();
+  const [activeState, setActiveState] = useState<Record<string, boolean>>(() =>
+    Object.fromEntries(incidentPolicyLibrary.map((policy) => [policy.id, policy.active]))
+  );
 
-  const togglePolicy = (id: string) => {
-    setPolicies((prev) =>
-      prev.map((policy) =>
-        policy.id === id ? { ...policy, enabled: !policy.enabled } : policy,
-      ),
-    );
+  const handleToggleActive = (policyId: string) => {
+    setActiveState((prev) => ({
+      ...prev,
+      [policyId]: !prev[policyId],
+    }));
+  };
+
+  const handleRowClick = (policyId: string) => {
+    navigate(`/policies/incidents/${policyId}`);
   };
 
   return (
@@ -55,83 +48,105 @@ export default function IncidentPolicies() {
               {t("nav.policyIncident")}
             </span>
           </div>
-          <h1 className="text-2xl font-bold">{t("incidentPolicy.title")}</h1>
-          <p className="text-sm text-gray-500">{t("incidentPolicy.description")}</p>
+          <h1 className="text-2xl font-bold">{t("incidentPolicy.list.title")}</h1>
+          <p className="text-sm text-gray-500">{t("incidentPolicy.list.description")}</p>
         </div>
-        <Button variant="secondary" disabled>
-          {t("incidentPolicy.addPolicy")}
+        <Button variant="secondary" className="gap-2" disabled>
+          {t("incidentPolicy.list.create")}
         </Button>
       </div>
 
-      <div className="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
-        <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50">
-            <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
-                {t("incidentPolicy.columns.enabled")}
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
-                {t("incidentPolicy.columns.id")}
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
-                {t("incidentPolicy.columns.name")}
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
-                {t("incidentPolicy.columns.duration")}
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
-                {t("incidentPolicy.columns.createdAt")}
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
-                {t("incidentPolicy.columns.updatedAt")}
-              </th>
-              <th className="px-6 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-500">
-                {t("incidentPolicy.actions")}
-              </th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-200">
-            {policies.map((policy) => (
-              <tr key={policy.id} className="hover:bg-gray-50">
-                <td className="px-6 py-4">
-                  <div className="flex items-center gap-3">
-                    <button
-                      type="button"
-                      onClick={() => togglePolicy(policy.id)}
-                      className={cn(
-                        "relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2",
-                        policy.enabled ? "bg-green-500" : "bg-gray-300",
-                      )}
-                    >
-                      <span
-                        className={cn(
-                          "inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform",
-                          policy.enabled ? "translate-x-5" : "translate-x-1",
-                        )}
-                      />
-                    </button>
-                    <span className="text-sm font-medium text-gray-700">
-                      {policy.enabled ? t("incidentPolicy.toggleOn") : t("incidentPolicy.toggleOff")}
-                    </span>
-                  </div>
-                </td>
-                <td className="px-6 py-4 text-sm text-gray-600">{policy.id}</td>
-                <td className="px-6 py-4 text-sm font-medium text-gray-900">{policy.name}</td>
-                <td className="px-6 py-4 text-sm text-gray-600">{policy.duration}</td>
-                <td className="px-6 py-4 text-sm text-gray-600">{policy.createdAt}</td>
-                <td className="px-6 py-4 text-sm text-gray-600">{policy.updatedAt}</td>
-                <td className="px-6 py-4 text-right text-sm text-gray-500">
-                  —
-                </td>
+      <Card>
+        <CardHeader className="flex items-center justify-between">
+          <CardTitle className="text-base">
+            {t("incidentPolicy.list.tableTitle")}
+          </CardTitle>
+          <Button variant="ghost" size="sm" disabled>
+            {t("incidentPolicy.list.tableFilter")}
+          </Button>
+        </CardHeader>
+        <CardContent className="p-0">
+          <table className="min-w-full divide-y divide-gray-200 text-sm">
+            <thead className="bg-gray-50 text-xs uppercase tracking-wide text-gray-500">
+              <tr>
+                <th scope="col" className="px-6 py-3 text-left">
+                  {t("incidentPolicy.list.columns.id")}
+                </th>
+                <th scope="col" className="px-6 py-3 text-left">
+                  {t("incidentPolicy.list.columns.name")}
+                </th>
+                <th scope="col" className="px-6 py-3 text-left">
+                  {t("incidentPolicy.list.columns.validPeriod")}
+                </th>
+                <th scope="col" className="px-6 py-3 text-left">
+                  {t("incidentPolicy.list.columns.createdAt")}
+                </th>
+                <th scope="col" className="px-6 py-3 text-left">
+                  {t("incidentPolicy.list.columns.createdBy")}
+                </th>
+                <th scope="col" className="px-6 py-3 text-right">
+                  {t("incidentPolicy.list.columns.status")}
+                </th>
               </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-
-      <p className="text-xs text-gray-500">
-        ※ Backend API 연동 전까지는 데모 데이터로 표시됩니다.
-      </p>
+            </thead>
+            <tbody className="divide-y divide-gray-200">
+              {incidentPolicyLibrary.map((policy) => {
+                const isActive = Boolean(activeState[policy.id]);
+                return (
+                  <tr
+                    key={policy.id}
+                    className="cursor-pointer transition-colors hover:bg-blue-50/40"
+                    onClick={() => handleRowClick(policy.id)}
+                  >
+                    <td className="px-6 py-4 font-mono text-xs text-gray-500">
+                      {policy.id}
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="flex flex-col gap-1">
+                        <span className="font-medium text-gray-900">{policy.name}</span>
+                        <span className="text-xs text-gray-500">{policy.description}</span>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 text-gray-600">{policy.validPeriod}</td>
+                    <td className="px-6 py-4 text-gray-600">{policy.createdAt}</td>
+                    <td className="px-6 py-4 text-gray-600">@{policy.createdBy}</td>
+                    <td className="px-6 py-4">
+                      <div className="flex items-center justify-end gap-3">
+                        <Badge variant={statusBadgeVariant[policy.status]}>
+                          {t(`incidentPolicy.list.status.${policy.status}`)}
+                        </Badge>
+                        <button
+                          type="button"
+                          className={cn(
+                            "relative inline-flex h-6 w-12 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2",
+                            isActive ? "bg-blue-600" : "bg-gray-300",
+                          )}
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            handleToggleActive(policy.id);
+                          }}
+                        >
+                          <span
+                            className={cn(
+                              "inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform",
+                              isActive ? "translate-x-6" : "translate-x-1",
+                            )}
+                          />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+          {incidentPolicyLibrary.length === 0 ? (
+            <div className="px-6 py-12 text-center text-sm text-gray-500">
+              {t("incidentPolicy.list.empty")}
+            </div>
+          ) : null}
+        </CardContent>
+      </Card>
     </div>
   );
 }

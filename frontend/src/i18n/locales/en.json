@@ -170,19 +170,116 @@
     "noPolicies": "No policies available"
   },
   "incidentPolicy": {
-    "title": "Incident Partition Policies",
-    "description": "Toggle incident response rules for Kafka partitions.",
-    "toggleOn": "Active",
-    "toggleOff": "Inactive",
-    "actions": "Actions",
-    "addPolicy": "Add Policy",
-    "columns": {
-      "enabled": "Status",
-      "id": "Policy ID",
-      "name": "Policy Name",
-      "duration": "Duration",
-      "createdAt": "Created At",
-      "updatedAt": "Updated At"
+    "list": {
+      "title": "Incident Partition Policies",
+      "description": "Browse incident response policies and open the composer to edit details.",
+      "create": "New Policy",
+      "tableTitle": "Registered Policies",
+      "tableFilter": "Filter",
+      "columns": {
+        "id": "Policy ID",
+        "name": "Policy Name",
+        "validPeriod": "Validity",
+        "createdAt": "Created",
+        "createdBy": "Owner",
+        "status": "Status"
+      },
+      "status": {
+        "draft": "Draft",
+        "active": "Active",
+        "archived": "Archived"
+      },
+      "empty": "No incident policies found"
+    },
+    "composer": {
+      "title": "Policy Dynamics Composer",
+      "subtitle": "Editing {name}",
+      "actions": {
+        "backToList": "Back to list",
+        "saveDraft": "Save draft",
+        "publishMock": "Publish mock"
+      },
+      "notFound": "The requested incident policy could not be found.",
+      "scope": {
+        "title": "Scope",
+        "environment": "Environment",
+        "selector": "Selector (prefix / regex)"
+      },
+      "schedule": {
+        "title": "Duration / Schedule",
+        "mode": "Mode",
+        "interval": "Interval",
+        "timezone": "Timezone",
+        "ttl": "TTL (optional)",
+        "blackout": "Blackout (RRULE)",
+        "blackoutPlaceholder": "e.g. Sat,Sun",
+        "rateLimit": "Rate limit",
+        "perMinutes": "Per minutes",
+        "maxAlerts": "Max alerts"
+      },
+      "ruleBuilder": {
+        "title": "Rule Builder",
+        "description": "Group conditions with AND/OR logic and adjust thresholds.",
+        "nested": "Nested rule groups",
+        "groupLabel": "Group logic",
+        "conditionLabel": "Condition {index}",
+        "compareTarget": "Target",
+        "deviation": "Deviation",
+        "baseline": "Baseline",
+        "window": "Window",
+        "stat": "Statistic"
+      },
+      "response": {
+        "title": "Response",
+        "slack": "Slack alert",
+        "enforce": "Enforce block",
+        "waiver": "Waiver request",
+        "tags": "Tags",
+        "severity": "Severity",
+        "severityWarn": "Warn",
+        "severityBlock": "Block",
+        "severityInfo": "Info",
+        "memo": "Memo (optional)",
+        "memoPlaceholder": "Add policy memo or change reason"
+      },
+      "preview": {
+        "title": "Preview",
+        "scope": "Scope & schedule",
+        "scheduleSummary": "mode: {mode} · interval: {interval} · timezone: {timezone}",
+        "rule": "Rule summary",
+        "response": "Response",
+        "slackOn": "Slack alert is enabled",
+        "slackOff": "Slack alert is disabled",
+        "tags": "Tags: {tags}",
+        "jsonTitle": "JSON",
+        "copyJson": "Copy JSON",
+        "copySuccess": "Policy JSON copied",
+        "copyError": "Unable to copy JSON"
+      },
+      "meta": {
+        "title": "Meta",
+        "id": "Policy ID",
+        "owner": "Created by",
+        "createdAt": "Created at",
+        "valid": "Validity"
+      }
+    },
+    "ruleEditor": {
+      "addCondition": "Add Condition",
+      "clearAll": "Clear All",
+      "copyJson": "Copy JSON",
+      "saveMockLabel": "Save Mock",
+      "metric": "Metric",
+      "operator": "Operator",
+      "threshold": "Threshold",
+      "remove": "Remove",
+      "logicLabel": "Combine conditions with",
+      "emptyPlaceholder": "Add a condition to start.",
+      "copySuccess": "Rule JSON copied",
+      "copyError": "Failed to copy JSON",
+      "minCondition": "At least one condition is required.",
+      "cleared": "All conditions were reset to default.",
+      "saveMockSuccess": "Mock policy \"{name}\" saved"
     }
   },
   "connection": {
