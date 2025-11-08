@@ -52,9 +52,35 @@ class AppSettings(BaseSettings):
     app_name: str = Field(default="Kafka Governance", description="애플리케이션 이름")
     app_version: str = Field(default="1.0.0", description="애플리케이션 버전")
     debug: bool = Field(default=False, description="디버그 모드")
+    environment: str = Field(
+        default="development", description="실행 환경 (development/staging/production)"
+    )
+
+    # CORS 설정
+    cors_origins: list[str] = Field(
+        default=["*"],
+        description="허용할 CORS 오리진 목록 (콤마로 구분)",
+    )
 
     # 데이터베이스 설정 (유일한 하위 설정)
     database: DatabaseSettings = Field(default_factory=DatabaseSettings)
+
+    @property
+    def is_production(self) -> bool:
+        """프로덕션 환경 여부"""
+        return self.environment.lower() in ("prod", "production")
+
+    @property
+    def is_development(self) -> bool:
+        """개발 환경 여부"""
+        return self.environment.lower() in ("dev", "development", "local")
+
+    @property
+    def parsed_cors_origins(self) -> list[str]:
+        """CORS origins 파싱 (환경변수가 문자열로 들어올 경우 대비)"""
+        if isinstance(self.cors_origins, str):
+            return [origin.strip() for origin in self.cors_origins.split(",")]
+        return self.cors_origins
 
 
 @lru_cache

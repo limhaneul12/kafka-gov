@@ -44,8 +44,15 @@ RUN echo 'worker_processes auto;' > /etc/nginx/nginx.conf && \
 # 로그 디렉토리 생성
 RUN mkdir -p /var/log/nginx
 
-# 헬스 체크용 curl 설치
-RUN apk add --no-cache curl
+# 헬스 체크용 curl 및 Basic Auth용 apache2-utils 설치
+RUN apk add --no-cache curl apache2-utils
+
+# Basic Auth용 .htpasswd 파일 생성 (선택적)
+# 환경변수로 사용자명/비밀번호 설정 가능
+# 기본값: admin / changeme (반드시 변경 필요!)
+ARG DOCS_AUTH_USER=admin
+ARG DOCS_AUTH_PASSWORD=changeme
+RUN htpasswd -bc /etc/nginx/.htpasswd ${DOCS_AUTH_USER} ${DOCS_AUTH_PASSWORD}
 
 # 포트 노출
 EXPOSE 80

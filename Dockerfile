@@ -34,4 +34,19 @@ EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
     CMD curl -f http://localhost:8000/health || exit 1
 
-CMD ["uv", "run", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# 멀티프로세스 실행 (Gunicorn + UvicornWorker)
+# --workers: CPU 코어 기반 (2개 권장, 환경변수로 조정 가능)
+# --worker-class: Uvicorn의 비동기 워커 사용
+# --timeout: 요청 타임아웃 (120초)
+# --graceful-timeout: Graceful shutdown 시간 (30초)
+# --keep-alive: Keep-Alive 연결 유지 시간 (5초)
+CMD ["uv", "run", "gunicorn", "app.main:app", \
+     "-k", "uvicorn.workers.UvicornWorker", \
+     "--workers", "2", \
+     "--bind", "0.0.0.0:8000", \
+     "--timeout", "120", \
+     "--graceful-timeout", "30", \
+     "--keep-alive", "5", \
+     "--log-level", "info", \
+     "--access-logfile", "-", \
+     "--error-logfile", "-"]

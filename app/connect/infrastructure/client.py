@@ -3,6 +3,8 @@
 Reference: https://docs.confluent.io/platform/current/connect/references/restapi.html
 """
 
+from __future__ import annotations
+
 from typing import Any
 
 import httpx
@@ -16,6 +18,12 @@ class KafkaConnectRestClient:
 
     공식 REST API를 호출하는 어댑터입니다.
     Python용 공식 라이브러리가 없어 직접 구현합니다.
+    HTTP 클라이언트 재사용을 통한 성능 최적화 (Keep-Alive 연결 재사용)
+
+    Usage:
+        async with KafkaConnectRestClient(connect) as client:
+            connectors = await client.list_connectors()
+            status = await client.get_connector_status("my-connector")
     """
 
     def __init__(self, connect: KafkaConnect) -> None:
@@ -31,6 +39,38 @@ class KafkaConnectRestClient:
             self.auth = (connect.auth_username, connect.auth_password)
 
         self.timeout = 30.0
+
+        # HTTP 클라이언트 (재사용)
+        self._client: httpx.AsyncClient | None = None
+
+    async def __aenter__(self) -> KafkaConnectRestClient:
+        """컨텍스트 매니저 진입: HTTP 클라이언트 생성"""
+        self._client = httpx.AsyncClient(
+            auth=self.auth,
+            timeout=self.timeout,
+            limits=httpx.Limits(
+                max_keepalive_connections=5,
+                max_connections=10,
+                keepalive_expiry=30.0,
+            ),
+        )
+        return self
+
+    async def __aexit__(self, *args) -> None:
+        """컨텍스트 매니저 종료: HTTP 클라이언트 정리"""
+        if self._client:
+            await self._client.aclose()
+            self._client = None
+
+    @property
+    def client(self) -> httpx.AsyncClient:
+        """HTTP 클라이언트 반환 (컨텍스트 매니저 내에서만 사용)"""
+        if self._client is None:
+            raise RuntimeError(
+                "KafkaConnectRestClient must be used as async context manager. "
+                "Use: async with KafkaConnectRestClient(connect) as client:"
+            )
+        return self._client
 
     async def _request(
         self,
@@ -56,22 +96,21 @@ class KafkaConnectRestClient:
         content = orjson.dumps(json) if json else None
         headers = {"Content-Type": "application/json"} if content else None
 
-        async with httpx.AsyncClient(auth=self.auth, timeout=self.timeout) as client:
-            response = await client.request(
-                method=method,
-                url=url,
-                content=content,
-                params=params,
-                headers=headers,
-            )
-            response.raise_for_status()
+        response = await self.client.request(
+            method=method,
+            url=url,
+            content=content,
+            params=params,
+            headers=headers,
+        )
+        response.raise_for_status()
 
-            # DELETE 등 응답 본문이 없는 경우
-            if response.status_code == 204 or not response.content:
-                return None
+        # DELETE 등 응답 본문이 없는 경우
+        if response.status_code == 204 or not response.content:
+            return None
 
-            # orjson으로 역직렬화
-            return orjson.loads(response.content)
+        # orjson으로 역직렬화
+        return orjson.loads(response.content)
 
     # ========== Connector 관리 ==========
 

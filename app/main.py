@@ -23,6 +23,7 @@ from .container import AppContainer
 from .schema.interface.router import router as schema_router
 from .shared.error_handlers import format_validation_error
 from .shared.interface.router import router as shared_router
+from .shared.settings import settings
 from .topic.interface.routers.metrics_router import router as metrics_router
 from .topic.interface.routers.policy_router import router as policy_router
 from .topic.interface.routers.topic_router import router as topic_router
@@ -70,17 +71,23 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
 
 def create_app() -> FastAPI:
+    # 환경별 API 문서 설정 (프로덕션에서는 비활성화)
+    docs_url = None if settings.is_production else "/swagger"
+    redoc_url = None if settings.is_production else "/redoc"
+    openapi_url = None if settings.is_production else "/openapi.json"
+
     app = FastAPI(
         default_response_class=ORJSONResponse,
         title="Kafka Governance API",
         description="Kafka Topic / Schema Registry 관리용 API",
         version="0.1.0",
-        docs_url="/swagger",
-        redoc_url="/redoc",
+        docs_url=docs_url,
+        redoc_url=redoc_url,
+        openapi_url=openapi_url,
         lifespan=lifespan,
         swagger_ui_parameters={
             "defaultModelsExpandDepth": -1,
-            "defaultModelRendering": "example",  # ← 유효한 값으로 교체
+            "defaultModelRendering": "example",
             "displayRequestDuration": True,
             "docExpansion": "none",
             "syntaxHighlight.theme": "obsidian",
@@ -88,13 +95,17 @@ def create_app() -> FastAPI:
         },
     )
 
-    # CORS
+    # CORS - 환경별 설정
+    cors_origins = settings.parsed_cors_origins
+    logger.info(f"CORS origins configured: {cors_origins} (environment: {settings.environment})")
+
     app.add_middleware(
         CORSMiddleware,  # type: ignore[arg-type]
-        allow_origins=["*"],  # 운영에선 화이트리스트 권장
+        allow_origins=cors_origins,
         allow_credentials=True,
-        allow_methods=["*"],
+        allow_methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
         allow_headers=["*"],
+        expose_headers=["X-Request-ID"],
     )
 
     # ✅ 컨테이너 인스턴스 생성 & 보관
@@ -114,12 +125,11 @@ def create_app() -> FastAPI:
     container.wire(
         packages=[
             # 라우터/핸들러 패키지들
-            "app.cluster.interface",  # Cluster API (ConnectionManager 제공)
+            "app.cluster.interface",
             "app.topic.interface",
             "app.consumer.interface",
             "app.schema.interface",
             "app.shared.interface",
-            "app.cluster.interface",
             "app.connect.interface",
         ]
     )

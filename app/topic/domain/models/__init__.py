@@ -11,6 +11,14 @@ from .config import (
     DomainTopicMetadata,
 )
 
+# Metrics
+from .metrics import (
+    ClusterMetrics,
+    PartitionDetails,
+    TopicMeta,
+    TopicMetrics,
+)
+
 # Plan and Result
 from .plan import (
     DomainTopicApplyResult,
@@ -60,6 +68,11 @@ __all__ = [
     # Config and Metadata
     "DomainTopicConfig",
     "DomainTopicMetadata",
+    # Metrics
+    "ClusterMetrics",
+    "PartitionDetails",
+    "TopicMeta",
+    "TopicMetrics",
     # Plan
     "DomainTopicPlan",
     "DomainTopicPlanItem",

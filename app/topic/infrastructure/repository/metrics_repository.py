@@ -1,4 +1,8 @@
-"""메트릭 스냅샷 Repository"""
+"""메트릭 스냅샷 Repository
+
+Note: MetricsSnapshot.topic_metrics는 relationship(lazy="selectin")으로 설정되어
+N+1 쿼리 없이 자동으로 Eager Loading됩니다.
+"""
 
 from collections.abc import Callable
 from contextlib import AbstractAsyncContextManager
@@ -7,7 +11,7 @@ from datetime import UTC, datetime, timedelta
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.topic.domain.models.metrics import TopicMetrics
+from app.topic.domain.models import TopicMetrics
 from app.topic.domain.repositories.interfaces import IMetricsRepository
 from app.topic.infrastructure.models.metrics_models import (
     LeaderDistribution,
