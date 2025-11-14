@@ -1,30 +1,39 @@
-"""Kafka 메트릭 수집 Adapter
+"""Kafka 메트릭 수집 Adapter (Redis 멀티워커 캐싱 지원)
 
-사용 방법 (다른 모듈에서):
+2단계 캐싱 전략:
+    - L1 (메모리): 프로세스 내 빠른 조회, TTL 기반
+    - L2 (Redis): 워커 간 공유, 중복 Kafka 호출 방지
+
+사용 방법 (DI Container를 통한 주입):
     ```python
     from app.container import AppContainer
-    from app.topic.infrastructure.adapter.metrics.collector import TopicMetricsCollector
 
     async def example(cluster_id: str):
-        # cluster_id로 kafka-python KafkaAdminClient 동적 획득
+        # ConnectionManager를 통해 AdminClient 획득
         connection_manager = AppContainer.cluster_container.connection_manager()
         admin_client = await connection_manager.get_kafka_py_admin_client(cluster_id)
 
-        # 수집기 생성 및 사용
-        collector = TopicMetricsCollector(admin_client=admin_client, ttl_seconds=60)
-        await collector.refresh()
+        # Factory를 통해 Collector 생성 (Redis 자동 주입)
+        metrics_collector_factory = AppContainer.topic_container.metrics_collector()
+        collector = metrics_collector_factory(
+            admin_client=admin_client,
+            cluster_id=cluster_id,
+        )
+
+        # 자동으로 L1 → L2 → Kafka 순서로 조회
         metrics = await collector.get_all_topic_metrics()
-        leader = await collector.get_leader_distribution()
-        return metrics, leader
+        return metrics
     ```
 """
 
 import asyncio
+import pickle
 import time
 from collections.abc import Iterable
 from typing import Any
 
 from kafka import KafkaAdminClient
+from redis.asyncio import Redis
 
 from app.topic.domain.models.metrics import (
     ClusterMetrics,
@@ -37,16 +46,36 @@ from app.topic.domain.models.metrics import (
 class BaseMetricsCollector:
     """공통 메트릭 수집 기반 클래스"""
 
-    def __init__(self, admin_client: KafkaAdminClient, ttl_seconds: int = 15) -> None:
+    def __init__(
+        self,
+        admin_client: KafkaAdminClient,
+        cluster_id: str,
+        ttl_seconds: int = 15,
+        redis: Redis | None = None,
+    ) -> None:
         self.ttl_seconds = ttl_seconds
         self.admin = admin_client
+        self.cluster_id = cluster_id
+        self.redis = redis
+
+        # L1 캐시 (메모리) - 인스턴스별 독립
         self._snapshot: TopicMetrics | None = None
         self._snapshot_time: float | None = None
 
+    def _get_redis_key(self) -> str:
+        """Redis 캐시 키 생성"""
+        return f"metrics:cluster:{self.cluster_id}:snapshot"
+
     async def refresh(self) -> None:
-        """스냅샷 강제 갱신."""
+        """스냅샷 강제 갱신 (L1 + L2 업데이트)"""
         self._snapshot = await self._collect_all_partition_info()
         self._snapshot_time = time.time()
+
+        # L2: Redis 저장 (워커 간 공유)
+        if self.redis:
+            key = self._get_redis_key()
+            value = pickle.dumps(self._snapshot)
+            await self.redis.setex(key, self.ttl_seconds, value)
 
     def _is_snapshot_expired(self) -> bool:
         """스냅샷 만료 여부 확인"""
@@ -55,8 +84,23 @@ class BaseMetricsCollector:
         return time.time() - self._snapshot_time > self.ttl_seconds
 
     async def _get_snapshot(self) -> TopicMetrics | None:
-        if self._snapshot is None or self._is_snapshot_expired():
-            await self.refresh()
+        """2단계 캐시 조회: L1(메모리) → L2(Redis) → Kafka"""
+
+        # L1: 메모리 캐시 (가장 빠름)
+        if self._snapshot is not None and not self._is_snapshot_expired():
+            return self._snapshot
+
+        # L2: Redis 캐시 (워커 간 공유)
+        if self.redis:
+            key = self._get_redis_key()
+            cached = await self.redis.get(key)
+            if cached:
+                self._snapshot = pickle.loads(cached)
+                self._snapshot_time = time.time()
+                return self._snapshot
+
+        # 캐시 미스: Kafka에서 수집
+        await self.refresh()
         return self._snapshot
 
     async def _collect_all_partition_info(self) -> TopicMetrics:
@@ -73,22 +117,20 @@ class BaseMetricsCollector:
         log_dirs_response = await asyncio.to_thread(self.admin.describe_log_dirs)
         log_dir_entries: Iterable[Any] = getattr(log_dirs_response, "log_dirs", []) or []
 
-        # 4. 로그 디렉토리 정보 평탄화 (빠른 조회용)
-        log_dir_map = {}
-        for log_dir in log_dir_entries:
-            if log_dir[0] != 0:  # error_code check
-                continue
-            for topic_info in log_dir[2]:
-                topic_name = topic_info[0]
-                for partition_info in topic_info[1]:
-                    partition_id = partition_info[0]
-                    log_dir_map[(topic_name, partition_id)] = {
-                        "size": partition_info[1],
-                        "offset_lag": partition_info[2],
-                        "is_future_key": partition_info[3],
-                    }
+        # 4. 로그 디렉토리 정보 평탄화 (comprehension 활용)
+        log_dir_map = {
+            (topic_info[0], partition_info[0]): {
+                "size": partition_info[1],
+                "offset_lag": partition_info[2],
+                "is_future_key": partition_info[3],
+            }
+            for log_dir in log_dir_entries
+            if log_dir[0] == 0  # error_code check
+            for topic_info in log_dir[2]
+            for partition_info in topic_info[1]
+        }
 
-        topic_meta = {
+        topic_meta: dict[str, TopicMeta] = {
             topic_metadata["topic"]: TopicMeta(
                 partition_details=[
                     PartitionDetails(

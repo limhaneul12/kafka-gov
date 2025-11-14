@@ -3,17 +3,18 @@
 from __future__ import annotations
 
 import asyncio
-import logging
 from collections.abc import Callable
 from functools import partial
 from typing import Any
 
 from confluent_kafka.admin import AdminClient, ConfigResource, NewPartitions, NewTopic
 
+from app.shared.logging_config import get_logger
+
 from ...domain.models import DomainTopicSpec, TopicName
 from ...domain.repositories.interfaces import ITopicRepository
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 TopicMetadata = dict[TopicName, Exception | None]
 TopicConfig = dict[TopicName, dict[str, str]]
 TopicPartitions = dict[TopicName, int]
@@ -54,10 +55,20 @@ class KafkaTopicAdapter(ITopicRepository):  # type: ignore[misc]
             try:
                 await asyncio.get_event_loop().run_in_executor(None, future.result, 30.0)
                 results[topic_name] = None  # 성공
-                logger.info(f"Successfully {operation} topic: {topic_name}")
+                logger.info(
+                    "kafka_operation_success",
+                    operation=operation,
+                    topic_name=topic_name,
+                )
             except Exception as e:
                 results[topic_name] = e
-                logger.error(f"Failed to {operation} topic {topic_name}: {e}")
+                logger.error(
+                    "kafka_operation_failed",
+                    operation=operation,
+                    topic_name=topic_name,
+                    error_type=e.__class__.__name__,
+                    error_message=str(e),
+                )
 
         return results
 
@@ -181,7 +192,11 @@ class KafkaTopicAdapter(ITopicRepository):  # type: ignore[misc]
         futures: dict = self.admin_client.alter_configs(resources, request_timeout=60.0)
 
         # ConfigResource에서 토픽 이름 추출 함수
-        def extract_topic_name(resource: Any) -> str:
+        def extract_topic_name(
+            resource: Any,
+        ) -> str:  # ConfigResource | str - 운영/테스트 환경 대응
+            """Any 사용 이유: Confluent Kafka는 ConfigResource 객체를 반환하지만,
+            테스트 환경에서는 문자열 mock을 사용할 수 있어 유연한 타입 처리 필요"""
             # Confluent returns keys as ConfigResource; tests may mock with strings
             if topic_name := getattr(resource, "name", None):
                 return topic_name

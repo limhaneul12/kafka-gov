@@ -12,7 +12,6 @@ from .application.use_cases import (
     SchemaSyncUseCase,
     SchemaUploadUseCase,
 )
-from .domain.policy_engine import SchemaPolicyEngine
 from .domain.repositories.interfaces import (
     ISchemaAuditRepository,
     ISchemaMetadataRepository,
@@ -46,16 +45,12 @@ class SchemaContainer(containers.DeclarativeContainer):
         session_factory=infrastructure.database_manager.provided.get_db_session,
     )
 
-    # Domain Services
-    policy_engine: providers.Provider[SchemaPolicyEngine] = providers.Singleton(SchemaPolicyEngine)
-
     # Use Cases (ConnectionManager 주입)
     dry_run_use_case: providers.Provider[SchemaBatchDryRunUseCase] = providers.Factory(
         SchemaBatchDryRunUseCase,
         connection_manager=cluster.connection_manager,  # ConnectionManager 주입
         metadata_repository=metadata_repository,
         audit_repository=audit_repository,
-        policy_engine=policy_engine,
     )
 
     apply_use_case: providers.Provider[SchemaBatchApplyUseCase] = providers.Factory(
@@ -63,7 +58,6 @@ class SchemaContainer(containers.DeclarativeContainer):
         connection_manager=cluster.connection_manager,  # ConnectionManager 주입
         metadata_repository=metadata_repository,
         audit_repository=audit_repository,
-        policy_engine=policy_engine,
     )
 
     plan_use_case: providers.Provider[SchemaPlanUseCase] = providers.Factory(

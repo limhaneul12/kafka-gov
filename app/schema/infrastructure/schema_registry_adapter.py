@@ -4,12 +4,13 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
-import logging
 from collections.abc import Iterable
 
 import orjson
 from confluent_kafka.schema_registry import AsyncSchemaRegistryClient, Schema, ServerConfig
 from confluent_kafka.schema_registry.error import SchemaRegistryError
+
+from app.shared.logging_config import get_logger
 
 from ..domain.models import (
     CompatibilityResult,
@@ -24,7 +25,7 @@ from ..domain.models import (
 from ..domain.repositories.interfaces import ISchemaRegistryRepository
 from .error_handlers import handle_schema_registry_error
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class ConfluentSchemaRegistryAdapter(ISchemaRegistryRepository):  # type: ignore[misc]
@@ -73,7 +74,12 @@ class ConfluentSchemaRegistryAdapter(ISchemaRegistryRepository):  # type: ignore
                         canonical_hash=self._canonicalize_and_hash(schema_str),
                     )
             except SchemaRegistryError as e:
-                logger.warning(f"Failed to get schema for subject {subject}: {e}")
+                logger.warning(
+                    "schema_fetch_failed",
+                    subject=subject,
+                    error_type=e.__class__.__name__,
+                    error_message=str(e),
+                )
                 continue
 
         return result

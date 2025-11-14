@@ -17,7 +17,6 @@ from ..domain.models import (
     DomainSubjectStrategy,
 )
 from .schemas import (
-    PolicyViolation,
     SchemaArtifact,
     SchemaBatchApplyResponse,
     SchemaBatchDryRunResponse,
@@ -160,18 +159,6 @@ class SchemaConverter:
             for item in plan.items
         ]
 
-        # 위반 사항 변환
-        violations: list[PolicyViolation] = [
-            PolicyViolation(
-                subject=v.subject,
-                rule=v.rule,
-                message=v.message,
-                severity=v.severity,
-                field=v.field,
-            )
-            for v in plan.violations
-        ]
-
         # 호환성 보고서 변환
         compatibility_reports: list[SchemaCompatibilityReport] = [
             SchemaCompatibilityReport(
@@ -206,7 +193,7 @@ class SchemaConverter:
             env=Environment(plan.env.value),
             change_id=plan.change_id,
             plan=plan_items,
-            violations=violations,
+            violations=[],
             compatibility=compatibility_reports,
             impacts=impacts,
             summary=plan.summary(),

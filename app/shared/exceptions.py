@@ -43,7 +43,7 @@ def safe_parse(
 
     def decorator(func: Callable[..., T]) -> Callable[..., T]:
         @wraps(func)
-        def wrapper(*args: Any, **kwargs: Any) -> T:
+        def wrapper(*args: Any, **kwargs: Any) -> T:  # 범용 데코레이터 - 다양한 함수 시그니처 지원
             try:
                 return func(*args, **kwargs)
             except format_errors as e:
@@ -76,7 +76,9 @@ def safe_async_parse(
 
     def decorator(func: Callable[..., Awaitable[T]]) -> Callable[..., Awaitable[T]]:
         @wraps(func)
-        async def wrapper(*args: Any, **kwargs: Any) -> T:
+        async def wrapper(
+            *args: Any, **kwargs: Any
+        ) -> T:  # 범용 데코레이터 - 다양한 함수 시그니처 지원
             try:
                 return await func(*args, **kwargs)
             except format_errors as e:

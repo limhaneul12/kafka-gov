@@ -39,8 +39,13 @@ class PlanRepository:
         self.session_factory = session_factory
 
     @staticmethod
-    async def _maybe_await(value: Any) -> Any:
-        """테스트에서 AsyncMock이 반환한 awaitable을 안전하게 처리"""
+    async def _maybe_await(value: Any) -> Any:  # T | Awaitable[T] - 테스트 환경 대응
+        """테스트에서 AsyncMock이 반환한 awaitable을 안전하게 처리
+
+        Note:
+            Any 사용 이유: 운영 환경에서는 T 타입을, 테스트 환경에서는
+            Awaitable[T]를 반환할 수 있어 동적 타입 처리 필요
+        """
         return await value if inspect.isawaitable(value) else value
 
     async def save_plan(self, plan: DomainTopicPlan, created_by: str) -> None:

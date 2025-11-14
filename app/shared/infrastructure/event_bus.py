@@ -17,12 +17,22 @@ class EventBus:
         self._handlers: dict[str, list[Callable[[Any], Awaitable[None] | None]]] = defaultdict(list)
 
     def subscribe(self, event_type: str, handler: Callable[[Any], Awaitable[None] | None]) -> None:
-        """이벤트 핸들러 등록"""
+        """이벤트 핸들러 등록
+
+        Note:
+            handler의 Any 파라미터: 다양한 이벤트 타입을 처리하는 핸들러를 받기 위함
+        """
         self._handlers[event_type].append(handler)
         logger.info(f"Handler registered for event: {event_type}")
 
-    async def publish(self, event: Any) -> None:
-        """이벤트 발행 - 모든 핸들러 실행"""
+    async def publish(self, event: Any) -> None:  # DomainEvent (다형성)
+        """이벤트 발행 - 모든 핸들러 실행
+
+        Note:
+            event를 Any로 선언한 이유: TopicCreated, SchemaRegistered 등
+            다양한 DomainEvent 서브타입을 받아야 하며, Protocol로 정의하면
+            event_type, aggregate_id 속성만 보장하면 되므로 Any 사용
+        """
         event_type = event.event_type
         handlers = self._handlers.get(event_type, [])
 

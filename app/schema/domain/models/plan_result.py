@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from .policy import DomainPolicyViolation, DomainSchemaCompatibilityReport, DomainSchemaImpactRecord
+from .policy import DomainSchemaCompatibilityReport, DomainSchemaImpactRecord
 from .types_enum import (
     ChangeId,
     DomainCompatibilityMode,
@@ -45,7 +45,6 @@ class DomainSchemaPlan:
     change_id: ChangeId
     env: DomainEnvironment
     items: tuple[DomainSchemaPlanItem, ...]
-    violations: tuple[DomainPolicyViolation, ...] = ()
     compatibility_reports: tuple[DomainSchemaCompatibilityReport, ...] = ()
     impacts: tuple[DomainSchemaImpactRecord, ...] = ()
 
@@ -66,7 +65,6 @@ class DomainSchemaPlan:
             "update_count": action_counts[DomainPlanAction.UPDATE],
             "delete_count": action_counts[DomainPlanAction.DELETE],
             "none_count": action_counts[DomainPlanAction.NONE],
-            "violation_count": len(self.violations),
             "incompatible_count": sum(
                 1 for report in self.compatibility_reports if not report.is_compatible
             ),
@@ -74,13 +72,7 @@ class DomainSchemaPlan:
 
     @property
     def can_apply(self) -> bool:
-        return not any(v.is_error for v in self.violations) and all(
-            report.is_compatible for report in self.compatibility_reports
-        )
-
-    @property
-    def error_violations(self) -> tuple[DomainPolicyViolation, ...]:
-        return tuple(v for v in self.violations if v.is_error)
+        return all(report.is_compatible for report in self.compatibility_reports)
 
 
 @dataclass(frozen=True, slots=True)

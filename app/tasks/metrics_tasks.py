@@ -62,7 +62,11 @@ async def _collect_and_store_metrics_async(cluster_id: str) -> None:
         # 1. AdminClient 주입 기반 메트릭 수집
         connection_manager = AppContainer.cluster_container.connection_manager()
         admin_client = await connection_manager.get_kafka_py_admin_client(cluster_id)
-        collector = TopicMetricsCollector(admin_client=admin_client, ttl_seconds=0)
+        collector = TopicMetricsCollector(
+            admin_client=admin_client,
+            cluster_id=cluster_id,
+            ttl_seconds=0,
+        )
         await collector.refresh()
 
         metrics = await collector.get_all_topic_metrics()

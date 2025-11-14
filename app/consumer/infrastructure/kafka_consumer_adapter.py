@@ -36,6 +36,9 @@ from app.consumer.domain.value_objects import (
     PartitionOffset,
     TopicPartition,
 )
+from app.shared.logging_config import get_logger
+
+logger = get_logger(__name__)
 
 
 class KafkaConsumerAdapter:
@@ -207,8 +210,13 @@ class KafkaConsumerAdapter:
         # 4. Future.result() 호출을 스레드풀에서 실행
         try:
             result = await asyncio.to_thread(future.result)
-        except Exception:
+        except Exception as e:
             # 그룹이 없거나 오프셋 정보 없음
+            logger.warning(
+                "consumer_group_offset_not_found",
+                group_id=group_id,
+                error_type=e.__class__.__name__,
+            )
             return []
 
         # 5. ConsumerGroupTopicPartitions → PartitionOffset 변환

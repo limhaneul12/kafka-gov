@@ -69,15 +69,12 @@ export default function TeamAnalytics() {
     try {
       setLoading(true);
       const [topicsData, activitiesData] = await Promise.all([
-        topicsAPI.list(selectedCluster),
+        topicsAPI.listAll(selectedCluster), // 전체 토픽 조회 (페이지네이션 없음)
         auditAPI.recent(100).catch(() => ({ data: [] })),
       ]);
 
-      const topicsPayload = topicsData.data as {
-        items?: Topic[];
-        topics?: Topic[];
-      };
-      setTopics(topicsPayload.items ?? topicsPayload.topics ?? []);
+      // listAll은 직접 배열을 반환
+      setTopics(Array.isArray(topicsData.data) ? topicsData.data : []);
       setActivities(activitiesData.data || []);
     } catch (error) {
       console.error("Failed to load team analytics data:", error);

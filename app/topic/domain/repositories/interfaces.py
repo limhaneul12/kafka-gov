@@ -322,23 +322,27 @@ class IMetricsRepository(ABC):
     async def save_snapshot(
         self,
         cluster_id: str,
-        metrics: Any,
+        metrics: Any,  # TopicMetrics | dict - Infrastructure 레이어 타입 순환참조 방지
         leader_distribution: dict[int, int],
     ) -> int:
         """메트릭 스냅샷 저장
 
         Args:
             cluster_id: 클러스터 ID
-            metrics: 수집된 메트릭 데이터
+            metrics: 수집된 메트릭 데이터 (TopicMetrics 또는 dict 형태)
             leader_distribution: 브로커별 리더 파티션 수
 
         Returns:
             생성된 스냅샷 ID
+
+        Note:
+            metrics를 Any로 선언한 이유: Domain 레이어에서 Infrastructure의
+            TopicMetrics 타입을 직접 참조하면 순환 의존성이 발생하므로 Any 사용
         """
         ...
 
     @abstractmethod
-    async def get_latest_snapshot(self, cluster_id: str) -> Any:
+    async def get_latest_snapshot(self, cluster_id: str) -> Any:  # MetricsSnapshot | None
         """최신 스냅샷 조회
 
         Args:
@@ -346,6 +350,10 @@ class IMetricsRepository(ABC):
 
         Returns:
             최신 스냅샷 (없으면 None)
+
+        Note:
+            Any 사용 이유: Infrastructure ORM 모델(MetricsSnapshot)을 Domain에서
+            직접 참조하면 계층 경계를 위반하므로 Any 사용
         """
         ...
 
@@ -364,7 +372,13 @@ class IMetricsRepository(ABC):
 
     @abstractmethod
     async def get_latest_cluster_summary(self, cluster_id: str) -> dict[str, Any]:
-        """최신 스냅샷 기반 클러스터 요약 조회"""
+        """최신 스냅샷 기반 클러스터 요약 조회
+
+        Note:
+            dict[str, Any] 사용 이유: 요약 데이터 구조가 동적이며
+            (broker_count, total_partitions, total_size 등), 향후 필드 추가 가능성이 높아
+            구체적 TypedDict 정의보다 유연한 dict 사용
+        """
         ...
 
     @abstractmethod

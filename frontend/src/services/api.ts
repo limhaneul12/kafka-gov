@@ -72,6 +72,8 @@ export default api;
 export const topicsAPI = {
   list: (clusterId: string, page: number = 1, size: number = 20) => 
     api.get(`/v1/topics?cluster_id=${clusterId}&page=${page}&size=${size}`),
+  listAll: (clusterId: string) => 
+    api.get(`/v1/topics/all?cluster_id=${clusterId}`),
   uploadAndDryRun: (clusterId: string, file: File) => {
     const formData = new FormData();
     formData.append("file", file);

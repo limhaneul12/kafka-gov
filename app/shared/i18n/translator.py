@@ -33,12 +33,13 @@ class Translator:
         with open(file_path, encoding="utf-8") as f:
             return json.load(f)
 
-    def t(self, key: str, **kwargs: Any) -> str:
+    def t(self, key: str, **kwargs: Any) -> str:  # 다양한 타입의 포맷 변수 지원
         """Get translated text with optional formatting
 
         Args:
             key: Translation key in dot notation (e.g., "error.not_found")
-            **kwargs: Variables for string formatting
+            **kwargs: Variables for string formatting (Any 사용 이유: str, int, float 등
+                     다양한 타입의 포맷 변수를 지원하기 위함)
 
         Returns:
             Translated string, or the key itself if not found
@@ -51,7 +52,7 @@ class Translator:
             "Invalid value for partition: 0"
         """
         keys = key.split(".")
-        value: Any = self.translations
+        value: Any = self.translations  # 중첩 dict 탐색 시 타입 변화
 
         # Navigate through nested dict
         for k in keys:
@@ -75,12 +76,12 @@ class Translator:
 _translator = Translator("ko")
 
 
-def t(key: str, **kwargs: Any) -> str:
+def t(key: str, **kwargs: Any) -> str:  # 다양한 타입의 포맷 변수 지원
     """Get translated text (module-level function)
 
     Args:
         key: Translation key
-        **kwargs: Variables for formatting
+        **kwargs: Variables for formatting (Any 사용 이유: 포맷 변수의 타입 다양성)
 
     Returns:
         Translated string

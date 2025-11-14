@@ -3,6 +3,7 @@
 from typing import Any
 
 from kafka import KafkaAdminClient
+from redis.asyncio import Redis
 
 from app.topic.domain.models.metrics import TopicMetrics
 
@@ -13,20 +14,39 @@ from .storage import StorageMetricsCollector
 
 
 class TopicMetricsCollector:
-    """통합 카프카 메트릭 수집기"""
+    """통합 카프카 메트릭 수집기 (Redis 멀티워커 캐싱 지원)"""
 
-    def __init__(self, admin_client: KafkaAdminClient, ttl_seconds: int = 15) -> None:
+    def __init__(
+        self,
+        admin_client: KafkaAdminClient,
+        cluster_id: str,
+        ttl_seconds: int = 15,
+        redis: Redis | None = None,
+    ) -> None:
+        # 모든 하위 collector에 Redis와 cluster_id 전달
         self.partition_metrics = PartitionMetricsCollector(
-            admin_client=admin_client, ttl_seconds=ttl_seconds
+            admin_client=admin_client,
+            cluster_id=cluster_id,
+            ttl_seconds=ttl_seconds,
+            redis=redis,
         )
         self.storage_metrics = StorageMetricsCollector(
-            admin_client=admin_client, ttl_seconds=ttl_seconds
+            admin_client=admin_client,
+            cluster_id=cluster_id,
+            ttl_seconds=ttl_seconds,
+            redis=redis,
         )
         self.cluster_metrics = ClusterMetricsCollector(
-            admin_client=admin_client, ttl_seconds=ttl_seconds
+            admin_client=admin_client,
+            cluster_id=cluster_id,
+            ttl_seconds=ttl_seconds,
+            redis=redis,
         )
         self.leader_metrics = LeaderDistributionCollector(
-            admin_client=admin_client, ttl_seconds=ttl_seconds
+            admin_client=admin_client,
+            cluster_id=cluster_id,
+            ttl_seconds=ttl_seconds,
+            redis=redis,
         )
 
     async def get_all_topic_metrics(self) -> TopicMetrics | None:

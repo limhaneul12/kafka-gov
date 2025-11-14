@@ -6,7 +6,10 @@ interface AddConnectionModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSubmit: (type: string, data: Record<string, string>) => Promise<void>;
+  onUpdate?: (type: string, id: string, data: Record<string, unknown>) => Promise<void>;
   defaultType?: string;
+  editMode?: boolean;
+  initialData?: Record<string, unknown>;
 }
 
 type ConnectionType = "kafka" | "registry" | "storage" | "connect";
@@ -15,11 +18,19 @@ export default function AddConnectionModal({
   isOpen,
   onClose,
   onSubmit,
+  onUpdate,
   defaultType,
+  editMode = false,
+  initialData,
 }: AddConnectionModalProps) {
   const [connectionType, setConnectionType] = useState<ConnectionType>((defaultType as ConnectionType) || "kafka");
-  const [formData, setFormData] = useState<Record<string, string>>({});
+  const [formData, setFormData] = useState<Record<string, any>>(initialData || {});
   const [loading, setLoading] = useState(false);
+
+  // Edit 모드일 때 initialData로 form 초기화
+  if (editMode && initialData && Object.keys(formData).length === 0) {
+    setFormData(initialData);
+  }
 
   if (!isOpen) return null;
 
@@ -27,11 +38,22 @@ export default function AddConnectionModal({
     e.preventDefault();
     try {
       setLoading(true);
-      await onSubmit(connectionType, formData);
+      if (editMode && onUpdate) {
+        // Edit 모드: update API 호출
+        const idField = connectionType === 'kafka' ? 'cluster_id' 
+          : connectionType === 'registry' ? 'registry_id'
+          : connectionType === 'storage' ? 'storage_id'
+          : 'connect_id';
+        const id = formData[idField] as string;
+        await onUpdate(connectionType, id, formData);
+      } else {
+        // Add 모드: create API 호출
+        await onSubmit(connectionType, formData as Record<string, string>);
+      }
       handleClose();
     } catch (error) {
-      console.error("Failed to add connection:", error);
-      alert("Failed to add connection");
+      console.error(`Failed to ${editMode ? 'update' : 'add'} connection:`, error);
+      alert(`Failed to ${editMode ? 'update' : 'add'} connection`);
     } finally {
       setLoading(false);
     }
@@ -370,9 +392,11 @@ export default function AddConnectionModal({
         <div className="border-b border-gray-200 p-6">
           <div className="flex items-start justify-between">
             <div>
-              <h2 className="text-2xl font-bold text-gray-900">Add Connection</h2>
+              <h2 className="text-2xl font-bold text-gray-900">
+                {editMode ? "Edit Connection" : "Add Connection"}
+              </h2>
               <p className="mt-1 text-sm text-gray-600">
-                새로운 연결을 추가합니다
+                {editMode ? "연결 정보를 수정합니다" : "새로운 연결을 추가합니다"}
               </p>
             </div>
             <button
@@ -440,7 +464,9 @@ export default function AddConnectionModal({
                 Cancel
               </Button>
               <Button type="submit" disabled={loading}>
-                {loading ? "Adding..." : "Add Connection"}
+                {loading 
+                  ? (editMode ? "Updating..." : "Adding...") 
+                  : (editMode ? "Update Connection" : "Add Connection")}
               </Button>
             </div>
           </div>

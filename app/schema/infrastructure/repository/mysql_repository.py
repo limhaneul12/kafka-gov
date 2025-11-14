@@ -16,7 +16,6 @@ from app.schema.domain.models import (
     DomainCompatibilityMode,
     DomainEnvironment,
     DomainPlanAction,
-    DomainPolicyViolation,
     DomainSchemaApplyResult,
     DomainSchemaArtifact,
     DomainSchemaCompatibilityIssue,
@@ -67,16 +66,6 @@ class MySQLSchemaMetadataRepository(ISchemaMetadataRepository):
                             "diff": item.diff,
                         }
                         for item in plan.items
-                    ],
-                    "violations": [
-                        {
-                            "subject": v.subject,
-                            "rule": v.rule,
-                            "message": v.message,
-                            "severity": v.severity,
-                            "field": v.field,
-                        }
-                        for v in plan.violations
                     ],
                     "compatibility_reports": [
                         {
@@ -160,18 +149,6 @@ class MySQLSchemaMetadataRepository(ISchemaMetadataRepository):
                     for item in plan_data["items"]
                 ]
 
-                # 정책 위반 역직렬화
-                violations: list[DomainPolicyViolation] = [
-                    DomainPolicyViolation(
-                        subject=v["subject"],
-                        rule=v["rule"],
-                        message=v["message"],
-                        severity=v["severity"],
-                        field=v["field"],
-                    )
-                    for v in plan_data["violations"]
-                ]
-
                 compatibility_reports: list[DomainSchemaCompatibilityReport] = [
                     DomainSchemaCompatibilityReport(
                         subject=report["subject"],
@@ -206,7 +183,6 @@ class MySQLSchemaMetadataRepository(ISchemaMetadataRepository):
                     change_id=plan_data["change_id"],
                     env=env,
                     items=tuple(items),
-                    violations=tuple(violations),
                     compatibility_reports=tuple(compatibility_reports),
                     impacts=tuple(impacts),
                 )

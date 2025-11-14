@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from functools import lru_cache
 
-from pydantic import Field
+from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -57,10 +57,26 @@ class AppSettings(BaseSettings):
     )
 
     # CORS 설정
-    cors_origins: list[str] = Field(
-        default=["*"],
-        description="허용할 CORS 오리진 목록 (콤마로 구분)",
+    cors_origins: str | list[str] = Field(
+        default="*",
+        description="허용할 CORS 오리진 목록 (콤마로 구분 또는 JSON 배열)",
     )
+
+    @field_validator("cors_origins", mode="before")
+    @classmethod
+    def parse_cors_origins(cls, v: str | list[str]) -> list[str]:
+        """CORS origins를 환경 변수에서 파싱
+
+        - 문자열인 경우: 콤마로 분리
+        - 이미 리스트인 경우: 그대로 반환
+        """
+        if isinstance(v, str):
+            # 빈 문자열이면 기본값
+            if not v or v.strip() == "":
+                return ["*"]
+            # 콤마로 구분된 문자열 파싱
+            return [origin.strip() for origin in v.split(",") if origin.strip()]
+        return v
 
     # 데이터베이스 설정 (유일한 하위 설정)
     database: DatabaseSettings = Field(default_factory=DatabaseSettings)
@@ -77,10 +93,12 @@ class AppSettings(BaseSettings):
 
     @property
     def parsed_cors_origins(self) -> list[str]:
-        """CORS origins 파싱 (환경변수가 문자열로 들어올 경우 대비)"""
-        if isinstance(self.cors_origins, str):
-            return [origin.strip() for origin in self.cors_origins.split(",")]
-        return self.cors_origins
+        """CORS origins 반환 (validator에서 이미 파싱됨)"""
+        # validator에서 이미 list[str]로 변환되었으므로 그대로 반환
+        if isinstance(self.cors_origins, list):
+            return self.cors_origins
+        # 혹시 모를 경우 대비
+        return [self.cors_origins] if self.cors_origins else ["*"]
 
 
 @lru_cache

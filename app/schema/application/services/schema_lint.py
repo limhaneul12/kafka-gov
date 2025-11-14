@@ -238,8 +238,13 @@ class SchemaLintService:
         중첩이 깊으면 직렬화/역직렬화 비용 증가
         """
 
-        def get_depth(obj: Any, current_depth: int = 0) -> int:
-            """재귀적으로 map 깊이 계산"""
+        def get_depth(obj: Any, current_depth: int = 0) -> int:  # dict | str - Avro 스키마 구조
+            """재귀적으로 map 깊이 계산
+
+            Note:
+                Any 사용 이유: Avro 스키마의 type 필드는 문자열("string", "int" 등) 또는
+                중첩된 dict(map, record 등)일 수 있어 재귀 탐색을 위해 Any 필요
+            """
             if isinstance(obj, dict):
                 if obj.get("type") == "map":
                     values_type = obj.get("values")

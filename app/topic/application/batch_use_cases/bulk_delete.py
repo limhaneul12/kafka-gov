@@ -23,10 +23,17 @@ class TopicBulkDeleteUseCase:
 
     def __init__(
         self,
-        apply_use_case: Any,  # TopicBatchApplyUseCase (순환 참조 방지)
+        apply_use_case: Any,  # TopicBatchApplyUseCase - Application 레이어 간 순환 참조 방지
         audit_repository: IAuditRepository,
         metadata_repository: ITopicMetadataRepository,
     ) -> None:
+        """
+        Args:
+            apply_use_case: TopicBatchApplyUseCase 인스턴스
+                (Any 사용 이유: 같은 Application 레이어의 UseCase 간 순환 참조 방지)
+            audit_repository: 감사 로그 저장소
+            metadata_repository: 토픽 메타데이터 저장소
+        """
         self.apply_use_case = apply_use_case
         self.audit_repository = audit_repository
         self.metadata_repository = metadata_repository

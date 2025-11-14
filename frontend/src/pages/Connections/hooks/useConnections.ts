@@ -62,6 +62,35 @@ export function useConnections() {
     }
   };
 
+  const updateConnection = async (type: string, id: string, data: Record<string, unknown>) => {
+    try {
+      switch (type) {
+        case "kafka":
+          await clustersAPI.updateKafka(id, data);
+          break;
+        case "registry":
+          await clustersAPI.updateRegistry(id, data);
+          break;
+        case "storage":
+          await clustersAPI.updateStorage(id, data);
+          break;
+        case "connect":
+          await clustersAPI.updateConnect(id, data);
+          break;
+      }
+      await loadConnections();
+      toast.success(t("common.success"), {
+        description: "Connection updated successfully",
+      });
+    } catch (error) {
+      console.error("Failed to update connection:", error);
+      toast.error(t("error.general"), {
+        description: "Failed to update connection",
+      });
+      throw error;
+    }
+  };
+
   const deleteConnection = async (type: string, id: string, name: string) => {
     if (!confirm(`Delete "${name}"?`)) return;
 
@@ -90,23 +119,32 @@ export function useConnections() {
 
   const testConnection = async (type: string, id: string, name: string) => {
     try {
+      let response;
       switch (type) {
         case "kafka":
-          await clustersAPI.testKafka(id);
+          response = await clustersAPI.testKafka(id);
           break;
         case "registry":
-          await clustersAPI.testRegistry(id);
+          response = await clustersAPI.testRegistry(id);
           break;
         case "storage":
-          await clustersAPI.testStorage(id);
+          response = await clustersAPI.testStorage(id);
           break;
         case "connect":
-          await clustersAPI.testConnect(id);
+          response = await clustersAPI.testConnect(id);
           break;
       }
-      toast.success(t("connection.test"), {
-        description: `"${name}" ${t("dashboard.healthy")}`,
-      });
+
+      // Backend는 HTTP 200을 반환하지만 success 필드로 실제 연결 성공/실패 판단
+      if (response?.data?.success) {
+        toast.success(t("connection.test"), {
+          description: `"${name}" ${t("dashboard.healthy")} (${response.data.latency_ms?.toFixed(0)}ms)`,
+        });
+      } else {
+        toast.error(t("connection.test"), {
+          description: `"${name}" connection failed: ${response?.data?.message || "Unknown error"}`,
+        });
+      }
     } catch (error) {
       console.error("Failed to test connection:", error);
       toast.error(t("error.network"), {
@@ -155,6 +193,7 @@ export function useConnections() {
     loading,
     loadConnections,
     addConnection,
+    updateConnection,
     deleteConnection,
     testConnection,
     activateConnection,

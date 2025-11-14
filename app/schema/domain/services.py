@@ -17,7 +17,6 @@ from .models import (
     SchemaVersionInfo,
     SubjectName,
 )
-from .policy_engine import SchemaPolicyEngine
 from .repositories.interfaces import ISchemaRegistryRepository
 
 # 스키마 버전 임계값
@@ -151,16 +150,12 @@ class SchemaDeleteAnalyzer:
 class SchemaPlannerService:
     """스키마 배치 계획 생성 서비스"""
 
-    def __init__(
-        self, registry_repository: ISchemaRegistryRepository, policy_engine: SchemaPolicyEngine
-    ) -> None:
+    def __init__(self, registry_repository: ISchemaRegistryRepository) -> None:
         self.registry_repository = registry_repository
-        self.policy_engine = policy_engine
         self.impact_analyzer = SchemaImpactAnalyzer(registry_repository)
 
     async def create_plan(self, batch: DomainSchemaBatch) -> DomainSchemaPlan:
         """배치 계획 및 정책 검증 실행"""
-        violations = self.policy_engine.validate_batch(batch.specs)
 
         current_subjects = await self.registry_repository.describe_subjects(
             spec.subject for spec in batch.specs
@@ -206,7 +201,6 @@ class SchemaPlannerService:
             change_id=batch.change_id,
             env=batch.env,
             items=tuple(plan_items),
-            violations=tuple(violations),
             compatibility_reports=tuple(compatibility_reports),
             impacts=tuple(impacts),
         )

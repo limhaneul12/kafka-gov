@@ -19,6 +19,8 @@ export default function Connections() {
   const [activeTab, setActiveTab] = useState<TabType>("kafka");
   const [showAddModal, setShowAddModal] = useState(false);
   const [addType, setAddType] = useState<ConnectionType>("kafka");
+  const [editMode, setEditMode] = useState(false);
+  const [editData, setEditData] = useState<Record<string, unknown> | undefined>();
 
   const {
     clusters,
@@ -27,6 +29,7 @@ export default function Connections() {
     connects,
     loading,
     addConnection,
+    updateConnection,
     deleteConnection,
     testConnection,
     activateConnection,
@@ -34,12 +37,16 @@ export default function Connections() {
 
   const handleAddClick = (type: ConnectionType) => {
     setAddType(type);
+    setEditMode(false);
+    setEditData(undefined);
     setShowAddModal(true);
   };
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const handleEdit = (_type: ConnectionType, _data: unknown) => {
-    // TODO: Implement edit modal
+  const handleEdit = (type: ConnectionType, data: unknown) => {
+    setAddType(type);
+    setEditMode(true);
+    setEditData(data as Record<string, unknown>);
+    setShowAddModal(true);
   };
 
   const tabs = [
@@ -142,12 +149,19 @@ export default function Connections() {
         )}
       </Card>
 
-      {/* Add Modal */}
+      {/* Add/Edit Modal */}
       <AddConnectionModal
         isOpen={showAddModal}
-        onClose={() => setShowAddModal(false)}
+        onClose={() => {
+          setShowAddModal(false);
+          setEditMode(false);
+          setEditData(undefined);
+        }}
         onSubmit={addConnection}
+        onUpdate={updateConnection}
         defaultType={addType}
+        editMode={editMode}
+        initialData={editData}
       />
     </div>
   );

@@ -6,7 +6,6 @@ from fastapi import APIRouter, Depends, status
 from app.celery_app import celery_app
 from app.container import AppContainer
 from app.shared.error_handlers import handle_server_errors
-from app.topic.infrastructure.adapter.metrics.collector import TopicMetricsCollector
 from app.topic.interface.schemas.metrics_schemas import (
     ClusterMetricsResponse,
     TopicDistributionResponse,
@@ -41,7 +40,7 @@ async def get_topic_metrics(
     response_model=TopicMetricsResponse,
     status_code=status.HTTP_200_OK,
     summary="특정 토픽 메트릭 실시간 조회",
-    description="Kafka AdminClient를 통해 실시간 파티션 상세 정보를 조회합니다.",
+    description="Kafka AdminClient를 통해 실시간 파티션 상세 정보를 조회합니다. Redis 캐시를 통해 멀티워커 간 공유됩니다.",
     response_description="토픽 실시간 메트릭 조회 결과",
 )
 @inject
@@ -50,10 +49,18 @@ async def get_topic_metrics_live(
     topic_name: str,
     cluster_id: str,
     connection_manager=Depends(Provide[AppContainer.cluster_container.connection_manager]),
+    metrics_collector_factory=Depends(Provide[AppContainer.topic_container.metrics_collector]),
 ) -> TopicMetricsResponse:
-    """특정 토픽의 메트릭 실시간 조회"""
+    """특정 토픽의 메트릭 실시간 조회 (Redis 멀티워커 캐싱)"""
     admin_client = await connection_manager.get_kafka_py_admin_client(cluster_id)
-    collector = TopicMetricsCollector(admin_client=admin_client, ttl_seconds=0)
+
+    # Factory를 통해 Collector 생성 (Redis 자동 주입됨)
+    collector = metrics_collector_factory(
+        admin_client=admin_client,
+        cluster_id=cluster_id,
+        ttl_seconds=0,  # 실시간 조회는 캐시 없이
+    )
+
     await collector.refresh()
     metrics = await collector.get_all_topic_metrics()
 

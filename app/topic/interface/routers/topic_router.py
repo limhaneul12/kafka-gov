@@ -32,40 +32,24 @@ from app.topic.interface.schemas import (
 router = APIRouter(prefix="/v1/topics", tags=["topics"])
 
 
-@router.get(
-    "",
-    response_model=Page[TopicListItem],
-    status_code=status.HTTP_200_OK,
-    summary="토픽 목록 조회 (멀티 클러스터)",
-    description="특정 Kafka 클러스터에 등록된 모든 토픽 목록을 조회합니다.",
-    response_description="토픽 목록 조회 결과",
-)
-@inject
-@handle_server_errors(error_message="토픽 목록 조회 실패")
-async def list_topics(
-    cluster_id: str = Query(..., description="Kafka Cluster ID"),
-    params: Params = Depends(),
-    use_case=Depends(Provide[AppContainer.topic_container.list_use_case]),
-) -> Page[TopicListItem]:
-    """토픽 목록 조회"""
-    topics_data = await use_case.execute(cluster_id)
+def _convert_owner_to_owners(topic_dict: dict) -> list[str]:
+    """owner 또는 owners 필드를 owners 리스트로 변환"""
+    if "owners" in topic_dict:
+        return (
+            topic_dict["owners"]
+            if isinstance(topic_dict["owners"], list)
+            else [topic_dict["owners"]]
+        )
+    if topic_dict.get("owner"):
+        return (
+            [topic_dict["owner"]] if isinstance(topic_dict["owner"], str) else topic_dict["owner"]
+        )
+    return []
 
-    # dict를 TopicListItem으로 변환
-    def _convert_owner_to_owners(topic_dict: dict) -> list[str]:
-        """owner 또는 owners 필드를 owners 리스트로 변환"""
-        if "owners" in topic_dict:
-            return (
-                topic_dict["owners"]
-                if isinstance(topic_dict["owners"], list)
-                else [topic_dict["owners"]]
-            )
-        if topic_dict.get("owner"):
-            return (
-                [topic_dict["owner"]]
-                if isinstance(topic_dict["owner"], str)
-                else topic_dict["owner"]
-            )
-        return []
+
+async def _fetch_all_topics(cluster_id: str, use_case) -> list[TopicListItem]:
+    """공통 토픽 조회 로직 - 전체 토픽을 TopicListItem으로 변환하여 반환"""
+    topics_data = await use_case.execute(cluster_id)
 
     topics: list[TopicListItem] = [
         TopicListItem(
@@ -82,6 +66,46 @@ async def list_topics(
         )
         for topic in topics_data
     ]
+
+    return topics
+
+
+@router.get(
+    "/all",
+    response_model=list[TopicListItem],
+    status_code=status.HTTP_200_OK,
+    summary="전체 토픽 목록 조회 (페이지네이션 없음)",
+    description="특정 Kafka 클러스터의 모든 토픽을 페이지네이션 없이 조회합니다. Team Analytics 등에서 사용.",
+    response_description="전체 토픽 목록",
+)
+@inject
+@handle_server_errors(error_message="전체 토픽 목록 조회 실패")
+async def list_all_topics(
+    cluster_id: str = Query(..., description="Kafka Cluster ID"),
+    use_case=Depends(Provide[AppContainer.topic_container.list_use_case]),
+) -> list[TopicListItem]:
+    """전체 토픽 목록 조회 (페이지네이션 없음)"""
+    return await _fetch_all_topics(cluster_id, use_case)
+
+
+@router.get(
+    "",
+    response_model=Page[TopicListItem],
+    status_code=status.HTTP_200_OK,
+    summary="토픽 목록 조회 (멀티 클러스터)",
+    description="특정 Kafka 클러스터에 등록된 모든 토픽 목록을 조회합니다.",
+    response_description="토픽 목록 조회 결과",
+)
+@inject
+@handle_server_errors(error_message="토픽 목록 조회 실패")
+async def list_topics(
+    cluster_id: str = Query(..., description="Kafka Cluster ID"),
+    params: Params = Depends(),
+    use_case=Depends(Provide[AppContainer.topic_container.list_use_case]),
+) -> Page[TopicListItem]:
+    """토픽 목록 조회 (페이지네이션)"""
+    # 공통 함수로 전체 토픽 조회
+    topics = await _fetch_all_topics(cluster_id, use_case)
 
     # Manual pagination
     start: int = (params.page - 1) * params.size

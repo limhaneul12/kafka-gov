@@ -146,7 +146,9 @@ def create_preset_instance(preset_name: str, **kwargs: Any) -> BaseGuardrailPres
 
     Args:
         preset_name: Preset name
-        **kwargs: Preset creation arguments (overridable, uses Any for flexibility)
+        **kwargs: Preset creation arguments
+            (Any 사용 이유: dev/stg/prod 각 preset 클래스의 생성자 파라미터가 다르며,
+             동적으로 override 가능한 설정값들이므로 유연한 타입 필요)
 
     Returns:
         Preset instance

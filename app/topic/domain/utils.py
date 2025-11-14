@@ -53,6 +53,10 @@ def format_diff_string(current_value: Any, target_value: Any) -> str:
         'none→value'
         >>> format_diff_string("old", "new")
         'old→new'
+
+    Note:
+        Any 사용 이유: Kafka config 값이 str, int, bool 등 다양한 타입이 올 수 있으며,
+        모든 타입을 str()로 변환하는 범용 함수이므로 Any 사용이 적절함
     """
     current_str = "none" if current_value is None else str(current_value)
     target_str = "none" if target_value is None else str(target_value)

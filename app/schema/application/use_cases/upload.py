@@ -33,7 +33,6 @@ from ...domain.models import (
     DomainSchemaUploadResult,
     DomainSubjectStrategy,
 )
-from ...domain.policies.naming import get_registry as get_naming_registry
 from ...domain.repositories.interfaces import (
     ISchemaAuditRepository,
     ISchemaMetadataRepository,
@@ -461,101 +460,20 @@ class SchemaUploadUseCase:
         filename: str,
         schema_content: str,
     ) -> str:
-        """Build subject name using Naming Policy
+        """Build subject name from environment and filename.
+
+        현재 구현은 naming policy 없이 단순 규칙을 사용한다.
 
         Args:
             context: Upload context
             filename: Schema file name
-            schema_content: Schema content (for extracting namespace/record)
+            schema_content: Schema content (unused, kept for signature compatibility)
 
         Returns:
-            str: Generated subject name
-
-        Raises:
-            ValueError: If strategy not found or validation fails
-        """
-        registry = get_naming_registry()
-
-        # Get input class for strategy
-        input_class = registry.get_input_class(context.strategy_id)
-        if not input_class:
-            raise ValueError(f"Naming strategy '{context.strategy_id}' not found")
-
-        # Prepare input data (all possible fields)
-        input_data = self._prepare_strategy_input(
-            context=context,
-            filename=filename,
-            schema_content=schema_content,
-        )
-
-        # Validate and build subject using Pydantic
-        try:
-            inp = input_class(**input_data)
-            return inp.build_subject()
-        except ValueError as e:
-            raise ValueError(f"Subject validation failed: {e}") from e
-
-    def _prepare_strategy_input(
-        self,
-        context: UploadContext,
-        filename: str,
-        schema_content: str,
-    ) -> dict:
-        """Prepare input data for naming strategy
-
-        All possible fields are provided. Pydantic will validate and use only required ones.
-
-        Args:
-            context: Upload context
-            filename: Schema file name
-            schema_content: Schema content
-
-        Returns:
-            dict: Input data with all possible fields
+            str: Generated subject name (e.g. "dev.test" for DEV + test.avsc)
         """
         base_name = Path(filename).stem
-        namespace, record = self._extract_namespace_record(schema_content)
-
-        # Provide all possible fields - Pydantic will pick what it needs
-        return {
-            # Common fields
-            "topic": base_name,
-            "key_or_value": "value",
-            # Schema-extracted fields
-            "namespace": namespace or "default",
-            "record": record or base_name,
-            # Context fields
-            "env": context.env.value,
-            "team": context.owner,
-        }
-
-    def _extract_namespace_record(self, schema_content: str) -> tuple[str | None, str | None]:
-        """Extract namespace and record name from schema content
-
-        Args:
-            schema_content: Schema content (JSON/Avro)
-
-        Returns:
-            tuple: (namespace, record_name)
-        """
-        try:
-            schema_dict = orjson.loads(schema_content)
-
-            # Avro schema
-            if isinstance(schema_dict, dict):
-                namespace = schema_dict.get("namespace")
-                record_name = schema_dict.get("name")
-
-                # Handle full name (namespace.record)
-                if record_name and "." in record_name:
-                    parts = record_name.rsplit(".", 1)
-                    return parts[0], parts[1]
-
-                return namespace, record_name
-
-            return None, None
-        except Exception:
-            return None, None
+        return f"{context.env.value}.{base_name}"
 
     async def _publish_schema_registered_event(
         self,

@@ -72,9 +72,11 @@ class TopicContainer(containers.DeclarativeContainer):
         session_factory=infrastructure.database_manager.provided.get_db_session,
     )
 
-    # Metrics Collector (실시간 Kafka 메트릭 수집)
+    # Metrics Collector Factory (실시간 Kafka 메트릭 수집, Redis 캐싱 지원)
     metrics_collector: providers.Provider[TopicMetricsCollector] = providers.Factory(
         TopicMetricsCollector,
+        # admin_client와 cluster_id는 런타임에 전달
+        redis=infrastructure.redis_client,
     )
 
     # Use Cases (ConnectionManager 주입)

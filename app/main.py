@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import logging
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
@@ -23,12 +22,17 @@ from .container import AppContainer
 from .schema.interface.router import router as schema_router
 from .shared.error_handlers import format_validation_error
 from .shared.interface.router import router as shared_router
+from .shared.logging_config import configure_structlog, get_logger
+from .shared.middleware import RequestLoggingMiddleware
 from .shared.settings import settings
 from .topic.interface.routers.metrics_router import router as metrics_router
 from .topic.interface.routers.policy_router import router as policy_router
 from .topic.interface.routers.topic_router import router as topic_router
 
-logger = logging.getLogger(__name__)
+# structlog 초기화 (애플리케이션 최상단에서 1회만)
+configure_structlog()
+
+logger = get_logger(__name__)
 
 
 async def _trigger_initial_metrics_sync(container: AppContainer) -> None:
@@ -42,12 +46,21 @@ async def _trigger_initial_metrics_sync(container: AppContainer) -> None:
         for cluster in clusters:
             snapshot = await metrics_repository.get_latest_snapshot(cluster.cluster_id)
             if snapshot is None:
-                logger.info("Triggering initial metrics sync for cluster %s", cluster.cluster_id)
+                logger.info(
+                    "trigger_initial_metrics_sync",
+                    cluster_id=cluster.cluster_id,
+                    cluster_name=cluster.name,
+                )
                 celery_app.send_task(
                     "app.tasks.metrics_tasks.manual_sync_metrics", args=[cluster.cluster_id]
                 )
-    except Exception:
-        logger.exception("Failed to trigger initial metrics sync")
+    except Exception as e:
+        logger.error(
+            "initial_metrics_sync_failed",
+            error_type=e.__class__.__name__,
+            error_message=str(e),
+            exc_info=True,
+        )
 
 
 @asynccontextmanager
@@ -59,15 +72,20 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         container.init_resources()
         await _trigger_initial_metrics_sync(container)
 
-        logger.info("컨테이너 초기화 완료")
+        logger.info("app_startup_completed", environment=settings.environment)
         yield
-    except Exception:
-        logger.exception("초기화 중 오류 발생")
+    except Exception as e:
+        logger.error(
+            "app_startup_failed",
+            error_type=e.__class__.__name__,
+            error_message=str(e),
+            exc_info=True,
+        )
         raise
     finally:
         # Resource 종료
         container.shutdown_resources()
-        logger.info("리소스 정리 완료")
+        logger.info("app_shutdown_completed")
 
 
 def create_app() -> FastAPI:
@@ -97,7 +115,14 @@ def create_app() -> FastAPI:
 
     # CORS - 환경별 설정
     cors_origins = settings.parsed_cors_origins
-    logger.info(f"CORS origins configured: {cors_origins} (environment: {settings.environment})")
+    logger.info(
+        "cors_configured",
+        origins=cors_origins,
+        environment=settings.environment,
+    )
+
+    # Request Logging Middleware (trace_id 전파)
+    app.add_middleware(RequestLoggingMiddleware)  # type: ignore[arg-type]
 
     app.add_middleware(
         CORSMiddleware,  # type: ignore[arg-type]
@@ -160,9 +185,12 @@ def create_app() -> FastAPI:
     @app.exception_handler(RequestValidationError)
     async def validation_exception_handler(request: Request, exc: RequestValidationError):
         """Pydantic validation 에러를 사용자 친화적인 메시지로 변환"""
-        logger.error(f"Validation error on {request.method} {request.url.path}")
-        logger.error(f"Request body: {await request.body()}")
-        logger.error(f"Validation errors: {exc.errors()}")
+        # 구조화된 로깅 (trace_id는 middleware에서 자동 추가됨)
+        logger.error(
+            "validation_error",
+            error_count=len(exc.errors()),
+            errors=exc.errors(),
+        )
 
         # 사용자 친화적인 메시지로 변환
         friendly_message = format_validation_error(exc)  # type: ignore[arg-type]

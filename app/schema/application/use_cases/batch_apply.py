@@ -6,7 +6,6 @@ import uuid
 from datetime import datetime
 
 from app.cluster.domain.services import IConnectionManager
-from app.schema.domain.policy_engine import SchemaPolicyEngine
 from app.schema.infrastructure.schema_registry_adapter import ConfluentSchemaRegistryAdapter
 from app.schema.infrastructure.storage.minio_adapter import MinIOObjectStorageAdapter
 from app.shared.constants import AuditAction, AuditStatus, AuditTarget
@@ -35,12 +34,10 @@ class SchemaBatchApplyUseCase:
         connection_manager: IConnectionManager,
         metadata_repository: ISchemaMetadataRepository,
         audit_repository: ISchemaAuditRepository,
-        policy_engine: SchemaPolicyEngine,
     ) -> None:
         self.connection_manager = connection_manager
         self.metadata_repository = metadata_repository
         self.audit_repository = audit_repository
-        self.policy_engine = policy_engine
         self.event_bus = get_event_bus()
 
     async def execute(
@@ -82,7 +79,7 @@ class SchemaBatchApplyUseCase:
                 )
 
             # 3. Planner Service 생성 및 계획 수립
-            planner_service = SchemaPlannerService(registry_repository, self.policy_engine)  # type: ignore[arg-type]
+            planner_service = SchemaPlannerService(registry_repository)  # type: ignore[arg-type]
             plan = await planner_service.create_plan(batch)
 
             if not plan.can_apply:
