@@ -1,4 +1,46 @@
 services:
+  mysql:
+    image: mysql:8.0
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_DATABASE: kafka_gov
+      MYSQL_USER: user
+      MYSQL_PASSWORD: password
+    volumes:
+      - mysql_data:/var/lib/mysql
+    ports:
+      - "3306:3306"
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-prootpassword"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks:
+      - kafka-network
+
+  minio:
+    image: minio/minio:RELEASE.2024-09-13T20-26-02Z
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin123
+      MINIO_BROWSER_REDIRECT_URL: http://localhost:9001
+    volumes:
+      - minio_data:/data
+    ports:
+      - "9000:9000"  # MinIO API
+      - "9001:9001"  # MinIO Console
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+      start_period: 30s
+    networks:
+      - kafka-network
+    restart: unless-stopped
+
   redis:
     image: redis:7-alpine
     ports:
@@ -20,24 +62,27 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    user: "0:0"
     environment:
-      - KAFKA_GOV_DATABASE_URL=sqlite+aiosqlite:////app/data/kafka_gov.db
+      - DATABASE_URL=mysql+asyncmy://user:password@mysql:3306/kafka_gov?charset=utf8mb4
+      # migrate.sh 스크립트용 환경 변수
+      - DB_HOST=mysql
+      - DB_PORT=3306
+      - DB_USER=user
+      - DB_PASSWORD=password
+      - DB_NAME=kafka_gov
+      - KAFKA_BOOTSTRAP_SERVERS=kafka1:19092,kafka2:29092,kafka3:39092
+      - KAFKA_SCHEMA_REGISTRY_URL=http://schema-registry:8081
+      - JWT_SECRET_KEY=your-super-secret-jwt-key-change-in-production
+      - JWT_ALGORITHM=HS256
+      - JWT_ACCESS_TOKEN_EXPIRE_MINUTES=1440
+      - ENVIRONMENT=development
+      - LOG_LEVEL=INFO
+    depends_on:
+      mysql:
+        condition: service_healthy
     volumes:
-      - db_data:/app/data
-    command:
-      - sh
-      - -c
-      - |
-          set -e
-          if [ -z "$(ls -A migrations/versions 2>/dev/null || true)" ]; then
-            echo "[migration] No Alembic revisions found, generating initial schema via autogenerate..."
-            uv run alembic -c alembic.ini revision -m "initial schema" --autogenerate
-          else
-            echo "[migration] Alembic revisions already exist, skipping autogenerate."
-          fi
-          echo "[migration] Running Alembic upgrade to head..."
-          uv run alembic -c alembic.ini upgrade head
+      - ./script:/app/script
+    command: ["/app/script/migrate.sh"]
     networks:
       - kafka-network
     restart: "no"  # 한 번만 실행
@@ -46,16 +91,23 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    user: "0:0"
     ports:
       - "8000:8000"
     environment:
+      # Database 설정
+      - DB_HOST=mysql
+      - DB_PORT=3306
+      - DB_USERNAME=user
+      - DB_PASSWORD=password
+      - DB_DATABASE=kafka_gov
+      - DB_POOL_SIZE=10
+      - DB_MAX_OVERFLOW=20
+      - DB_ECHO=false
       # App 설정
       - APP_DEBUG=true
       - APP_LOG_LEVEL=INFO
       - APP_ENVIRONMENT=development  # development/staging/production
       - APP_CORS_ORIGINS=http://localhost:3000,http://localhost:5173,http://localhost:80  # CORS 허용 오리진
-      - KAFKA_GOV_DATABASE_URL=sqlite+aiosqlite:////app/data/kafka_gov.db
       # Kafka 설정
       - KAFKA_BOOTSTRAP_SERVERS=kafka1:19092,kafka2:29092,kafka3:39092
       - KAFKA_SECURITY_PROTOCOL=PLAINTEXT
@@ -64,6 +116,13 @@ services:
       # Schema Registry 설정
       - SCHEMA_REGISTRY_URL=http://schema-registry:8081
       - SCHEMA_REGISTRY_TIMEOUT=30
+      # MinIO/Storage 설정
+      - STORAGE_ENDPOINT_URL=http://minio:9000
+      - STORAGE_ACCESS_KEY=minioadmin
+      - STORAGE_SECRET_KEY=minioadmin123
+      - STORAGE_BUCKET_NAME=kafka-gov-schemas
+      - STORAGE_REGION=us-east-1
+      - STORAGE_USE_SSL=false
       # Redis/Celery 설정
       - CELERY_BROKER_URL=redis://redis:6379/0
       - CELERY_RESULT_BACKEND=redis://redis:6379/0
@@ -71,8 +130,14 @@ services:
       - REDIS_PORT=6379
       - REDIS_DB=0
     depends_on:
+      mysql:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
       redis:
         condition: service_healthy
+      # migration:
+      #   condition: service_completed_successfully
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 30s
@@ -84,21 +149,27 @@ services:
     restart: unless-stopped
     volumes:
       - ./logs:/app/logs
-      - db_data:/app/data
 
   # Celery Worker (메트릭 수집 작업 실행)
   celery-worker:
     build:
       context: .
       dockerfile: Dockerfile
-    user: "0:0"
     command: ["uv", "run", "celery", "-A", "app.celery_app", "worker", "--loglevel=info"]
     environment:
+      # Database 설정
+      - DB_HOST=mysql
+      - DB_PORT=3306
+      - DB_USERNAME=user
+      - DB_PASSWORD=password
+      - DB_DATABASE=kafka_gov
+      - DB_POOL_SIZE=10
+      - DB_MAX_OVERFLOW=20
+      - DB_ECHO=false
       # App 설정
       - APP_DEBUG=true
       - APP_LOG_LEVEL=INFO
       - APP_ENVIRONMENT=development
-      - KAFKA_GOV_DATABASE_URL=sqlite+aiosqlite:////app/data/kafka_gov.db
       # Kafka 설정
       - KAFKA_BOOTSTRAP_SERVERS=kafka1:19092,kafka2:29092,kafka3:39092
       - KAFKA_SECURITY_PROTOCOL=PLAINTEXT
@@ -108,6 +179,8 @@ services:
       - CELERY_BROKER_URL=redis://redis:6379/0
       - CELERY_RESULT_BACKEND=redis://redis:6379/0
     depends_on:
+      mysql:
+        condition: service_healthy
       redis:
         condition: service_healthy
     networks:
@@ -121,9 +194,17 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    user: "0:0"
     command: ["uv", "run", "celery", "-A", "app.celery_app", "beat", "--loglevel=info"]
     environment:
+      # Database 설정
+      - DB_HOST=mysql
+      - DB_PORT=3306
+      - DB_USERNAME=user
+      - DB_PASSWORD=password
+      - DB_DATABASE=kafka_gov
+      - DB_POOL_SIZE=10
+      - DB_MAX_OVERFLOW=20
+      - DB_ECHO=false
       # App 설정
       - APP_DEBUG=true
       - APP_LOG_LEVEL=INFO
@@ -196,9 +277,10 @@ services:
 
 
 volumes:
+  mysql_data:
+  minio_data:
   redis_data:
   nginx_logs:
-  db_data:
 
 networks:
   kafka-network:

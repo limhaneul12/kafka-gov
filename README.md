@@ -18,6 +18,57 @@
 
 ---
 
+## 🧭 Onboarding Guide
+
+If you're new to Kafka-Gov, we recommend the following onboarding path.
+
+1. **Choose your mode**
+   - Just want to try the UI and features quickly → **Lite Mode (SQLite)**
+   - Running a team PoC or a more production-like environment → **Full Stack Mode (Docker + MySQL)**
+
+2. **Prepare your environment**
+   - Lite Mode:
+     - Install Python 3.12+ and [uv](https://github.com/astral-sh/uv)
+     - If you do not set any DB-related values in `.env`, Kafka-Gov will automatically use SQLite
+   - Full Stack Mode:
+     - Install Docker / Docker Compose
+     - Optionally adjust Kafka/Schema Registry settings in `.env` for your environment
+
+3. **Configure the metadata database**
+   - Default: when nothing is configured, `sqlite+aiosqlite:///./kafka_gov.db` is used
+   - MySQL example:
+     ```bash
+     KAFKA_GOV_DATABASE_URL=mysql+aiomysql://user:password@mysql:3306/kafka_gov?charset=utf8mb4
+     ```
+   - PostgreSQL example:
+     ```bash
+     KAFKA_GOV_DATABASE_URL=postgresql+asyncpg://user:password@postgres:5432/kafka_gov
+     ```
+
+4. **Run migrations**
+   - Alembic always uses `settings.database.url`, so as long as the URL is correct, migrations target the right DB.
+   - Local (Lite Mode) example (recommended):
+     ```bash
+     bash script/migrate.sh
+     # or, if executable
+     ./script/migrate.sh
+     ```
+   - Advanced (run Alembic directly):
+     ```bash
+     uv run alembic upgrade head
+     ```
+   - In Docker environments, the `migration` service included in `docker-compose.yml` is responsible for running migrations.
+
+5. **Open the UI and register your first connections**
+   - Open `http://localhost:8000` in your browser
+   - Register Kafka Cluster / Schema Registry connections directly through the UI
+   - From then on, all governance metadata is stored in the selected DB (SQLite/MySQL/Postgres)
+
+After onboarding, see [Quick Start](./docs/getting-started/quick-start.md) and
+[Configuration](./docs/getting-started/configuration.md) for more details.
+
+---
+
 ## 🌟 What is Kafka-Gov?
 
 Kafka-Gov transforms Kafka from a simple message broker into a **governed enterprise platform** with:
@@ -56,22 +107,57 @@ Kafka-Gov transforms Kafka from a simple message broker into a **governed enterp
 
 ## 🚀 Quick Start
 
+Kafka-Gov supports **Airflow-style metadata DB switching**.
+
+### 1) Lite Mode (SQLite, no Docker required)
+
+For local development or quick evaluation, Kafka-Gov uses a SQLite file as the metadata store.
+
 ```bash
 # 1. Clone and setup
 git clone https://github.com/limhaneul12/kafka-gov.git
 cd kafka-gov
 cp .env.example .env
 
-# 2. Start all services
+# 2. (optional) If you do not set any DB env vars, SQLite is used by default
+#    When KAFKA_GOV_DATABASE_URL is unset, ./kafka_gov.db is created/used automatically
+
+# 3. Install dependencies
+uv sync
+
+# 4. Run DB migrations (uses settings.database.url → default SQLite)
+bash script/migrate.sh
+
+# 5. Start backend API
+uv run uvicorn app.main:app --reload
+
+# 6. (optional) Start frontend (from ./frontend)
+# pnpm install
+# pnpm dev
+```
+
+In this mode, the **local file `./kafka_gov.db`** is used as the metadata database.
+
+### 2) Full Stack Mode (Docker Compose + MySQL)
+
+For production-like setups, use Docker Compose to start MySQL/Kafka/Schema Registry/Redis together.
+
+```bash
+# 1. Clone and setup
+git clone https://github.com/limhaneul12/kafka-gov.git
+cd kafka-gov
+cp .env.example .env
+
+# 2. Start all services (includes MySQL-backed metadata DB)
 docker-compose up -d
 
-# 3. Access web UI
+# 3. Access web UI (proxied by nginx)
 open http://localhost:8000
 ```
 
 **That's it!** 🎉
 
-See [Quick Start Guide](./docs/getting-started/quick-start.md) for detailed instructions.
+See [Quick Start Guide](./docs/getting-started/quick-start.md) for more details.
 
 ---
 
@@ -173,7 +259,7 @@ Environment-specific rules prevent production incidents:
 
 **Backend:** Python 3.12+ • FastAPI • Pydantic v2 • SQLAlchemy 2.0 • Confluent Kafka  
 **Frontend:** React 19 • TypeScript • TailwindCSS • Rolldown  
-**Infrastructure:** MySQL • Kafka • Schema Registry • MinIO • Kafka Connect
+**Infrastructure:** SQLite (Lite Mode) • MySQL (Production) • Kafka • Schema Registry • MinIO • Kafka Connect
 
 ---
 
