@@ -5,8 +5,10 @@ from __future__ import annotations
 import logging
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
+from typing import Any
 
 from sqlalchemy import MetaData
+from sqlalchemy.engine import make_url
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
     AsyncSession,
@@ -46,22 +48,37 @@ class DatabaseManager:
         if self._engine is not None:
             return
 
-        self._engine = create_async_engine(
-            self.database_url,
-            echo=self.echo,
-            pool_pre_ping=True,
-            pool_recycle=3600,  # 1시간
-            pool_size=10,
-            max_overflow=20,
-            # 성능 최적화 설정
-            pool_timeout=30,  # 연결 대기 시간
-            pool_reset_on_return="commit",  # 트랜잭션 정리
-            connect_args={
-                "charset": "utf8mb4",
-                "use_unicode": True,
-                "autocommit": False,
-            },
-        )
+        url = make_url(self.database_url)
+        backend = url.get_backend_name()
+
+        engine_kwargs: dict[str, Any] = {
+            "echo": self.echo,
+        }
+
+        if backend == "sqlite":
+            # SQLite는 기본 풀 설정만 사용 (파일 기반 로컬 DB)
+            self._engine = create_async_engine(self.database_url, **engine_kwargs)
+        else:
+            # MySQL/PostgreSQL 등 네트워크 DB는 풀/타임아웃 최적화
+            engine_kwargs.update(
+                {
+                    "pool_pre_ping": True,
+                    "pool_recycle": 3600,
+                    "pool_size": 10,
+                    "max_overflow": 20,
+                    "pool_timeout": 30,
+                    "pool_reset_on_return": "commit",
+                }
+            )
+
+            if backend == "mysql":
+                engine_kwargs["connect_args"] = {
+                    "charset": "utf8mb4",
+                    "use_unicode": True,
+                    "autocommit": False,
+                }
+
+            self._engine = create_async_engine(self.database_url, **engine_kwargs)
 
         self._session_factory = async_sessionmaker(
             bind=self._engine,

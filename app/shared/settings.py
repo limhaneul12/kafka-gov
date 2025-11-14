@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from functools import lru_cache
 
 from pydantic import Field, field_validator
@@ -22,12 +23,18 @@ class DatabaseSettings(BaseSettings):
 
     model_config = model_config_module("DB_")
 
-    # MySQL 연결 설정
+    # MySQL 연결 설정 (환경변수 DB_* 가 설정된 경우에만 사용)
     host: str = Field(default="mysql", description="데이터베이스 호스트")
     port: int = Field(default=3306, ge=1, le=65535, description="데이터베이스 포트")
     username: str = Field(default="user", description="데이터베이스 사용자명")
     password: str = Field(default="password", description="데이터베이스 비밀번호")
     database: str = Field(default="kafka_gov", description="데이터베이스명")
+
+    # SQLite 기본 파일 경로 (Airflow-lite 모드용)
+    sqlite_path: str = Field(
+        default="./kafka_gov.db",
+        description="기본 SQLite 메타데이터 DB 파일 경로",
+    )
 
     # 연결 풀 설정
     pool_size: int = Field(default=10, ge=1, le=100, description="연결 풀 크기")
@@ -39,8 +46,39 @@ class DatabaseSettings(BaseSettings):
 
     @property
     def url(self) -> str:
-        """데이터베이스 연결 URL 생성"""
-        return f"mysql+aiomysql://{self.username}:{self.password}@{self.host}:{self.port}/{self.database}"
+        """데이터베이스 연결 URL 생성 (Airflow 스타일 우선순위)
+
+        우선순위:
+        1. KAFKA_GOV_DATABASE_URL
+        2. DATABASE_URL (호환용)
+        3. DB_* 환경변수 기반 MySQL URL
+        4. 아무 설정도 없으면 SQLite 기본 파일
+        """
+
+        # 1) 프로젝트 전용 URL (권장)
+        explicit_url = os.getenv("KAFKA_GOV_DATABASE_URL")
+
+        # 2) 일반적인 DATABASE_URL (기존 문서/도구 호환)
+        if not explicit_url:
+            explicit_url = os.getenv("DATABASE_URL")
+
+        if explicit_url:
+            return explicit_url
+
+        # 3) DB_* 환경변수가 하나라도 설정된 경우 MySQL URL 구성
+        has_mysql_env = any(
+            os.getenv(name) is not None
+            for name in ("DB_HOST", "DB_PORT", "DB_USERNAME", "DB_PASSWORD", "DB_DATABASE")
+        )
+
+        if has_mysql_env:
+            return (
+                f"mysql+aiomysql://{self.username}:{self.password}"
+                f"@{self.host}:{self.port}/{self.database}"
+            )
+
+        # 4) 완전 무설정이면 SQLite 파일을 기본 메타데이터 DB로 사용
+        return f"sqlite+aiosqlite:///{self.sqlite_path}"
 
 
 class AppSettings(BaseSettings):

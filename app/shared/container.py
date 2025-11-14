@@ -37,9 +37,7 @@ class InfrastructureContainer(containers.DeclarativeContainer):
     )
 
     # Redis Client - Resource (자동 생명주기 관리)
-    redis_client = providers.Resource(
-        init_redis,
-    )
+    redis_client = providers.Resource(init_redis)
 
     # Repositories
     audit_activity_repository = providers.Factory(

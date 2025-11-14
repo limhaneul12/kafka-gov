@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import create_async_engine
 
 # ---- Project metadata import ----
 # NOTE: Base.metadata must include all Table definitions for autogenerate.
-from app.shared.settings import settings  # noqa: F401
+from app.shared.settings import settings
 from app.shared.database import Base
 
 # If needed, import models so they are registered on Base.metadata
@@ -42,7 +42,6 @@ from app.consumer.infrastructure.models import (
     ConsumerGroupRebalanceRollupModel,
 )
 
-# Alembic Config
 config = context.config
 
 # Logging
@@ -61,11 +60,14 @@ def do_run_migrations(connection):
 
 
 async def run_migrations_online() -> None:
-    """Run migrations in 'online' (async) mode."""
-    cfg = config.get_section(config.config_ini_section) or {}
-    async_url = cfg.get("sqlalchemy.url")
-    if not async_url:
-        raise RuntimeError("sqlalchemy.url is not configured in alembic.ini")
+    """Run migrations in 'online' (async) mode.
+
+    Note:
+        앱 실행과 동일한 설정 경로(settings.database.url)를 사용해
+        Alembic 마이그레이션 대상으로 선택된 DB에 접속한다.
+    """
+    async_url = settings.database.url
+    config.set_main_option("sqlalchemy.url", async_url)
 
     engine = create_async_engine(async_url, pool_pre_ping=True)
 
@@ -77,9 +79,8 @@ async def run_migrations_online() -> None:
 
 def run_migrations_offline() -> None:
     """Run migrations in 'offline' mode."""
-    url = config.get_main_option("sqlalchemy.url")
-    if not url:
-        raise RuntimeError("sqlalchemy.url is not configured in alembic.ini")
+    url = settings.database.url
+    config.set_main_option("sqlalchemy.url", url)
 
     context.configure(
         url=url,
