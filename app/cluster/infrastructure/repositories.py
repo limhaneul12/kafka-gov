@@ -12,7 +12,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.cluster.domain.models import (
     KafkaCluster,
     KafkaConnect,
-    ObjectStorage,
     SaslMechanism,
     SchemaRegistry,
     SecurityProtocol,
@@ -20,14 +19,12 @@ from app.cluster.domain.models import (
 from app.cluster.domain.repositories import (
     IKafkaClusterRepository,
     IKafkaConnectRepository,
-    IObjectStorageRepository,
     ISchemaRegistryRepository,
 )
 
 from .models import (
     KafkaClusterModel,
     KafkaConnectModel,
-    ObjectStorageModel,
     SchemaRegistryModel,
 )
 
@@ -332,148 +329,6 @@ class MySQLSchemaRegistryRepository(ISchemaRegistryRepository):
             ssl_cert_location=model.ssl_cert_location,
             ssl_key_location=model.ssl_key_location,
             timeout=model.timeout,
-            is_active=model.is_active,
-            created_at=model.created_at,
-            updated_at=model.updated_at,
-        )
-
-
-class MySQLObjectStorageRepository(IObjectStorageRepository):
-    """MySQL 기반 Object Storage 리포지토리 (Session Factory 패턴)"""
-
-    def __init__(self, session_factory: SessionFactory) -> None:
-        self.session_factory = session_factory
-
-    async def create(self, storage: ObjectStorage) -> ObjectStorage:
-        """스토리지 생성 (또는 재활성화)"""
-        async with self.session_factory() as session:
-            # 기존 레코드 확인
-            result = await session.execute(
-                select(ObjectStorageModel).where(
-                    ObjectStorageModel.storage_id == storage.storage_id
-                )
-            )
-            existing_model = result.scalar_one_or_none()
-
-            if existing_model:
-                # 재활성화
-                existing_model.name = storage.name
-                existing_model.endpoint_url = storage.endpoint_url
-                existing_model.description = storage.description
-                existing_model.access_key = storage.access_key
-                existing_model.secret_key = storage.secret_key
-                existing_model.bucket_name = storage.bucket_name
-                existing_model.region = storage.region
-                existing_model.use_ssl = storage.use_ssl
-                existing_model.is_active = True
-                await session.commit()
-                await session.refresh(existing_model)
-                logger.info(f"Object Storage reactivated: {storage.storage_id}")
-                return self._model_to_domain(existing_model)
-            else:
-                # 새 레코드 생성
-                model = ObjectStorageModel(
-                    storage_id=storage.storage_id,
-                    name=storage.name,
-                    endpoint_url=storage.endpoint_url,
-                    description=storage.description,
-                    access_key=storage.access_key,
-                    secret_key=storage.secret_key,
-                    bucket_name=storage.bucket_name,
-                    region=storage.region,
-                    use_ssl=storage.use_ssl,
-                    is_active=storage.is_active,
-                )
-
-                session.add(model)
-                await session.commit()
-                await session.refresh(model)
-
-                logger.info(f"Object Storage created: {storage.storage_id}")
-                return self._model_to_domain(model)
-
-    async def get_by_id(self, storage_id: str) -> ObjectStorage | None:
-        """ID로 스토리지 조회"""
-        async with self.session_factory() as session:
-            result = await session.execute(
-                select(ObjectStorageModel).where(ObjectStorageModel.storage_id == storage_id)
-            )
-            model = result.scalar_one_or_none()
-
-            return self._model_to_domain(model) if model else None
-
-    async def list_all(self, active_only: bool = True) -> list[ObjectStorage]:
-        """전체 스토리지 목록 조회"""
-        async with self.session_factory() as session:
-            query = select(ObjectStorageModel)
-            if active_only:
-                query = query.where(ObjectStorageModel.is_active == True)  # noqa: E712
-
-            result = await session.execute(query.order_by(ObjectStorageModel.created_at.desc()))
-            models = result.scalars().all()
-
-            return [self._model_to_domain(model) for model in models]
-
-    async def update(self, storage: ObjectStorage) -> ObjectStorage:
-        """스토리지 정보 수정"""
-        async with self.session_factory() as session:
-            result = await session.execute(
-                select(ObjectStorageModel).where(
-                    ObjectStorageModel.storage_id == storage.storage_id
-                )
-            )
-            model = result.scalar_one_or_none()
-
-            if not model:
-                raise ValueError(f"Object Storage not found: {storage.storage_id}")
-
-            # 필드 업데이트
-            model.name = storage.name
-            model.endpoint_url = storage.endpoint_url
-            model.description = storage.description
-            model.access_key = storage.access_key
-            model.secret_key = storage.secret_key
-            model.bucket_name = storage.bucket_name
-            model.region = storage.region
-            model.use_ssl = storage.use_ssl
-            model.is_active = storage.is_active
-
-            await session.commit()
-            await session.refresh(model)
-
-            logger.info(f"Object Storage updated: {storage.storage_id}")
-            return self._model_to_domain(model)
-
-    async def delete(self, storage_id: str) -> bool:
-        """스토리지 삭제 (소프트 삭제)"""
-        async with self.session_factory() as session:
-            result = await session.execute(
-                select(ObjectStorageModel).where(ObjectStorageModel.storage_id == storage_id)
-            )
-            model = result.scalar_one_or_none()
-
-            if not model:
-                return False
-
-            model.is_active = False
-            await session.commit()
-
-            logger.info(f"Object Storage deleted (soft): {storage_id}")
-            return True
-
-    @staticmethod
-    def _model_to_domain(model: ObjectStorageModel) -> ObjectStorage:
-        """SQLAlchemy 모델 → Domain 모델 변환"""
-        return ObjectStorage(
-            storage_id=model.storage_id,
-            name=model.name,
-            endpoint_url=model.endpoint_url,
-            description=model.description,
-            access_key=model.access_key,
-            secret_key=model.secret_key,
-            bucket_name=model.bucket_name,
-            region=model.region,
-            use_ssl=model.use_ssl,
             is_active=model.is_active,
             created_at=model.created_at,
             updated_at=model.updated_at,

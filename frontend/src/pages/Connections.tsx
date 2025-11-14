@@ -6,24 +6,23 @@ import Loading from "../components/ui/Loading";
 import AddConnectionModal from "../components/connection/AddConnectionModal";
 import EditConnectionModal from "../components/connection/EditConnectionModal";
 import { clustersAPI } from "../services/api";
-import { Plus, Server, Database, HardDrive, Link, Edit, Trash2, CheckCircle } from "lucide-react";
-import type { KafkaCluster, SchemaRegistry, ObjectStorage, KafkaConnect } from "../types";
+import { Plus, Server, Database, Link, Edit, Trash2, CheckCircle } from "lucide-react";
+import type { KafkaCluster, SchemaRegistry, KafkaConnect } from "../types";
 import { toast } from "sonner";
 
 export default function Connections() {
   const [clusters, setClusters] = useState<KafkaCluster[]>([]);
   const [registries, setRegistries] = useState<SchemaRegistry[]>([]);
-  const [storages, setStorages] = useState<ObjectStorage[]>([]);
   const [connects, setConnects] = useState<KafkaConnect[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
-  const [editType, setEditType] = useState<"kafka" | "registry" | "storage" | "connect">("kafka");
+  const [editType, setEditType] = useState<"kafka" | "registry" | "connect">("kafka");
   const [editId, setEditId] = useState<string>("");
-  const [editData, setEditData] = useState<KafkaCluster | SchemaRegistry | ObjectStorage | KafkaConnect | null>(null);
+  const [editData, setEditData] = useState<KafkaCluster | SchemaRegistry | KafkaConnect | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<{
     isOpen: boolean;
-    type: "kafka" | "registry" | "storage" | "connect";
+    type: "kafka" | "registry" | "connect";
     id: string;
     name: string;
   }>({ isOpen: false, type: "kafka", id: "", name: "" });
@@ -54,24 +53,21 @@ export default function Connections() {
     try {
       setLoading(true);
       console.log('[Connections] Loading connections...');
-      const [clustersRes, registriesRes, storagesRes, connectsRes] = await Promise.all([
+      const [clustersRes, registriesRes, connectsRes] = await Promise.all([
         clustersAPI.listKafka(),
         clustersAPI.listRegistries(),
-        clustersAPI.listStorages(),
         clustersAPI.listConnects(),
       ]);
       
       console.log('[Connections] API responses:', {
         clusters: clustersRes.data.length,
         registries: registriesRes.data.length,
-        storages: storagesRes.data.length,
         connects: connectsRes.data.length,
       });
       console.log('[Connections] Registry list:', registriesRes.data);
       
       setClusters(clustersRes.data);
       setRegistries(registriesRes.data);
-      setStorages(storagesRes.data);
       setConnects(connectsRes.data);
       
       console.log('[Connections] State updated successfully');
@@ -93,9 +89,6 @@ export default function Connections() {
           break;
         case "registry":
           await clustersAPI.createRegistry(data);
-          break;
-        case "storage":
-          await clustersAPI.createStorage(data);
           break;
         case "connect":
           await clustersAPI.createConnect(data);
@@ -163,11 +156,6 @@ export default function Connections() {
           console.log('[Connections] Schema Registry deleted successfully');
           toast.success('삭제 완료', { description: 'Schema Registry가 삭제되었습니다.' });
           break;
-        case "storage":
-          console.log('[Connections] Deleting Object Storage:', id);
-          await clustersAPI.deleteStorage(id);
-          toast.success('삭제 완료', { description: 'Object Storage가 삭제되었습니다.' });
-          break;
         case "connect":
           console.log('[Connections] Deleting Kafka Connect:', id);
           await clustersAPI.deleteConnect(id);
@@ -212,33 +200,6 @@ export default function Connections() {
     });
   };
 
-  // Object Storage handlers
-  const handleDeleteStorage = (storageId: string, name: string) => {
-    setDeleteConfirm({
-      isOpen: true,
-      type: "storage",
-      id: storageId,
-      name,
-    });
-  };
-
-  const handleTestStorage = async (storageId: string, name: string) => {
-    try {
-      await clustersAPI.testStorage(storageId);
-      toast.success('연결 테스트 성공', { description: `"${name}" 스토리지 연결이 정상입니다.` });
-    } catch (error) {
-      console.error("Failed to test storage:", error);
-      toast.error('연결 테스트 실패', { description: `"${name}" 스토리지 연결에 실패했습니다. Endpoint URL을 확인하세요.` });
-    }
-  };
-
-  const handleEditStorage = (storage: ObjectStorage) => {
-    setEditType("storage");
-    setEditId(storage.storage_id);
-    setEditData(storage);
-    setShowEditModal(true);
-  };
-
   // Kafka Connect handlers
   const handleDeleteConnect = (connectId: string, name: string) => {
     setDeleteConfirm({
@@ -274,9 +235,6 @@ export default function Connections() {
           break;
         case "registry":
           await clustersAPI.updateRegistry(editId, data);
-          break;
-        case "storage":
-          await clustersAPI.updateStorage(editId, data);
           break;
         case "connect":
           await clustersAPI.updateConnect(editId, data);
@@ -544,61 +502,7 @@ export default function Connections() {
         </CardContent>
       </Card>
 
-      {/* Object Storages */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <HardDrive className="h-5 w-5" />
-            Object Storages ({storages.length})
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-3">
-            {storages.map((storage) => (
-              <div
-                key={storage.storage_id}
-                className="flex items-center justify-between rounded-lg border border-gray-200 p-4"
-              >
-                <div className="flex-1">
-                  <h4 className="font-medium text-gray-900">{storage.name}</h4>
-                  <p className="text-sm text-gray-600">
-                    {storage.endpoint_url} / {storage.bucket_name}
-                  </p>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Badge variant={storage.is_active ? "success" : "default"}>
-                    {storage.is_active ? "Active" : "Inactive"}
-                  </Badge>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => handleTestStorage(storage.storage_id, storage.name)}
-                    title="Test Connection"
-                  >
-                    <CheckCircle className="h-4 w-4 text-blue-600" />
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => handleEditStorage(storage)}
-                    title="Edit"
-                  >
-                    <Edit className="h-4 w-4 text-gray-600" />
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => handleDeleteStorage(storage.storage_id, storage.name)}
-                    title="Delete"
-                  >
-                    <Trash2 className="h-4 w-4 text-red-600" />
-                  </Button>
-                </div>
-              </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
+      {/* Object Storages 섹션은 Object Storage 기능 제거로 삭제되었습니다. */}
     </div>
   );
 }

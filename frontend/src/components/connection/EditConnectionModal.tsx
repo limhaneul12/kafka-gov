@@ -7,13 +7,11 @@ interface EditConnectionModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSubmit: (data: Record<string, string>) => Promise<void>;
-  type: "kafka" | "registry" | "storage" | "connect";
+  type: "kafka" | "registry" | "connect";
   initialData: {
     name: string;
     url?: string;
     bootstrap_servers?: string;
-    endpoint_url?: string;
-    bucket_name?: string;
     description?: string | null;
   };
 }
@@ -38,8 +36,6 @@ export default function EditConnectionModal({
         name: initialData.name || "",
         url: initialData.url || "",
         bootstrap_servers: initialData.bootstrap_servers || "",
-        endpoint_url: initialData.endpoint_url || "",
-        bucket_name: initialData.bucket_name || "",
         description: initialData.description || "",
       });
     }
@@ -206,60 +202,6 @@ export default function EditConnectionModal({
           </>
         );
 
-      case "storage":
-        return (
-          <>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Storage Name *
-              </label>
-              <input
-                type="text"
-                value={formData.name || ""}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                required
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Endpoint URL *
-              </label>
-              <input
-                type="text"
-                value={formData.endpoint_url || ""}
-                onChange={(e) => setFormData({ ...formData, endpoint_url: e.target.value })}
-                required
-                placeholder="http://minio:9000"
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Bucket Name *
-              </label>
-              <input
-                type="text"
-                value={formData.bucket_name || ""}
-                onChange={(e) => setFormData({ ...formData, bucket_name: e.target.value })}
-                required
-                placeholder="schemas"
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Description
-              </label>
-              <textarea
-                value={formData.description || ""}
-                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                rows={2}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-              />
-            </div>
-          </>
-        );
     }
   };
 
@@ -271,8 +213,6 @@ export default function EditConnectionModal({
         return "Edit Schema Registry";
       case "connect":
         return "Edit Kafka Connect";
-      case "storage":
-        return "Edit Object Storage";
     }
   };
 

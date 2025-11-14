@@ -7,34 +7,27 @@ from dependency_injector import containers, providers
 from app.cluster.application.use_cases import (
     CreateKafkaClusterUseCase,
     CreateKafkaConnectUseCase,
-    CreateObjectStorageUseCase,
     CreateSchemaRegistryUseCase,
     DeleteKafkaClusterUseCase,
     DeleteKafkaConnectUseCase,
-    DeleteObjectStorageUseCase,
     DeleteSchemaRegistryUseCase,
     GetKafkaClusterUseCase,
     GetKafkaConnectUseCase,
-    GetObjectStorageUseCase,
     GetSchemaRegistryUseCase,
     ListKafkaClustersUseCase,
     ListKafkaConnectsUseCase,
-    ListObjectStoragesUseCase,
     ListSchemaRegistriesUseCase,
     TestKafkaConnectConnectionUseCase,
     TestKafkaConnectionUseCase,
-    TestObjectStorageConnectionUseCase,
     TestSchemaRegistryConnectionUseCase,
     UpdateKafkaClusterUseCase,
     UpdateKafkaConnectUseCase,
-    UpdateObjectStorageUseCase,
     UpdateSchemaRegistryUseCase,
 )
 from app.cluster.domain.services import ConnectionManager
 from app.cluster.infrastructure.repositories import (
     MySQLKafkaClusterRepository,
     MySQLKafkaConnectRepository,
-    MySQLObjectStorageRepository,
     MySQLSchemaRegistryRepository,
 )
 
@@ -60,12 +53,6 @@ class ClusterContainer(containers.DeclarativeContainer):
         MySQLSchemaRegistryRepository,
         session_factory=infrastructure.database_manager.provided.get_db_session,
     )
-
-    object_storage_repository = providers.Factory(
-        MySQLObjectStorageRepository,
-        session_factory=infrastructure.database_manager.provided.get_db_session,
-    )
-
     kafka_connect_repository = providers.Factory(
         MySQLKafkaConnectRepository,
         session_factory=infrastructure.database_manager.provided.get_db_session,
@@ -77,7 +64,6 @@ class ClusterContainer(containers.DeclarativeContainer):
         ConnectionManager,
         kafka_cluster_repo=kafka_cluster_repository,
         schema_registry_repo=schema_registry_repository,
-        storage_repo=object_storage_repository,
     )
 
     # ========================================================================
@@ -151,43 +137,6 @@ class ClusterContainer(containers.DeclarativeContainer):
 
     test_schema_registry_connection_use_case = providers.Factory(
         TestSchemaRegistryConnectionUseCase,
-        connection_manager=connection_manager,
-    )
-
-    # ========================================================================
-    # Object Storage Use Cases
-    # ========================================================================
-
-    create_object_storage_use_case = providers.Factory(
-        CreateObjectStorageUseCase,
-        storage_repo=object_storage_repository,
-        connection_manager=connection_manager,
-    )
-
-    list_object_storages_use_case = providers.Factory(
-        ListObjectStoragesUseCase,
-        storage_repo=object_storage_repository,
-    )
-
-    get_object_storage_use_case = providers.Factory(
-        GetObjectStorageUseCase,
-        storage_repo=object_storage_repository,
-    )
-
-    update_object_storage_use_case = providers.Factory(
-        UpdateObjectStorageUseCase,
-        storage_repo=object_storage_repository,
-        connection_manager=connection_manager,
-    )
-
-    delete_object_storage_use_case = providers.Factory(
-        DeleteObjectStorageUseCase,
-        storage_repo=object_storage_repository,
-        connection_manager=connection_manager,
-    )
-
-    test_object_storage_connection_use_case = providers.Factory(
-        TestObjectStorageConnectionUseCase,
         connection_manager=connection_manager,
     )
 

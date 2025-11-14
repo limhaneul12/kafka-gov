@@ -9,7 +9,6 @@ import pytest
 
 from app.cluster.domain.models import (
     KafkaCluster,
-    ObjectStorage,
     SchemaRegistry,
     SecurityProtocol,
 )
@@ -24,7 +23,6 @@ class TestConnectionManagerKafka:
         self,
         mock_kafka_cluster_repo,
         mock_schema_registry_repo,
-        mock_object_storage_repo,
         sample_kafka_cluster,
     ):
         """Kafka AdminClient 최초 생성"""
@@ -34,7 +32,6 @@ class TestConnectionManagerKafka:
         manager = ConnectionManager(
             kafka_cluster_repo=mock_kafka_cluster_repo,
             schema_registry_repo=mock_schema_registry_repo,
-            storage_repo=mock_object_storage_repo,
         )
 
         # When
@@ -54,7 +51,6 @@ class TestConnectionManagerKafka:
         self,
         mock_kafka_cluster_repo,
         mock_schema_registry_repo,
-        mock_object_storage_repo,
         sample_kafka_cluster,
     ):
         """Kafka AdminClient 캐싱 확인"""
@@ -64,7 +60,6 @@ class TestConnectionManagerKafka:
         manager = ConnectionManager(
             kafka_cluster_repo=mock_kafka_cluster_repo,
             schema_registry_repo=mock_schema_registry_repo,
-            storage_repo=mock_object_storage_repo,
         )
 
         # When
@@ -87,7 +82,6 @@ class TestConnectionManagerKafka:
         self,
         mock_kafka_cluster_repo,
         mock_schema_registry_repo,
-        mock_object_storage_repo,
     ):
         """존재하지 않는 클러스터 조회 시 에러"""
         # Given
@@ -96,7 +90,6 @@ class TestConnectionManagerKafka:
         manager = ConnectionManager(
             kafka_cluster_repo=mock_kafka_cluster_repo,
             schema_registry_repo=mock_schema_registry_repo,
-            storage_repo=mock_object_storage_repo,
         )
 
         # When & Then
@@ -108,7 +101,6 @@ class TestConnectionManagerKafka:
         self,
         mock_kafka_cluster_repo,
         mock_schema_registry_repo,
-        mock_object_storage_repo,
     ):
         """비활성 클러스터 조회 시 에러"""
         # Given
@@ -126,7 +118,6 @@ class TestConnectionManagerKafka:
         manager = ConnectionManager(
             kafka_cluster_repo=mock_kafka_cluster_repo,
             schema_registry_repo=mock_schema_registry_repo,
-            storage_repo=mock_object_storage_repo,
         )
 
         # When & Then
@@ -142,7 +133,6 @@ class TestConnectionManagerSchemaRegistry:
         self,
         mock_kafka_cluster_repo,
         mock_schema_registry_repo,
-        mock_object_storage_repo,
         sample_schema_registry,
     ):
         """Schema Registry Client 최초 생성"""
@@ -172,7 +162,6 @@ class TestConnectionManagerSchemaRegistry:
         self,
         mock_kafka_cluster_repo,
         mock_schema_registry_repo,
-        mock_object_storage_repo,
         sample_schema_registry,
     ):
         """Schema Registry Client 캐싱 확인"""
@@ -203,7 +192,6 @@ class TestConnectionManagerSchemaRegistry:
         self,
         mock_kafka_cluster_repo,
         mock_schema_registry_repo,
-        mock_object_storage_repo,
     ):
         """존재하지 않는 레지스트리 조회 시 에러"""
         # Given
@@ -224,7 +212,6 @@ class TestConnectionManagerSchemaRegistry:
         self,
         mock_kafka_cluster_repo,
         mock_schema_registry_repo,
-        mock_object_storage_repo,
     ):
         """비활성 레지스트리 조회 시 에러"""
         # Given
@@ -241,131 +228,11 @@ class TestConnectionManagerSchemaRegistry:
         manager = ConnectionManager(
             kafka_cluster_repo=mock_kafka_cluster_repo,
             schema_registry_repo=mock_schema_registry_repo,
-            storage_repo=mock_object_storage_repo,
         )
 
         # When & Then
         with pytest.raises(ValueError, match="Schema Registry is inactive"):
             await manager.get_schema_registry_client("inactive-registry")
-
-
-class TestConnectionManagerMinIO:
-    """ConnectionManager - MinIO Client 관련 테스트"""
-
-    @pytest.mark.asyncio
-    async def test_get_minio_client_creates_new_client(
-        self,
-        mock_kafka_cluster_repo,
-        mock_schema_registry_repo,
-        mock_object_storage_repo,
-        sample_object_storage,
-    ):
-        """MinIO Client 최초 생성"""
-        # Given
-        mock_object_storage_repo.get_by_id.return_value = sample_object_storage
-
-        manager = ConnectionManager(
-            kafka_cluster_repo=mock_kafka_cluster_repo,
-            schema_registry_repo=mock_schema_registry_repo,
-            storage_repo=mock_object_storage_repo,
-        )
-
-        # When
-        with patch("app.cluster.domain.services.Minio") as mock_minio_class:
-            mock_client = MagicMock()
-            mock_minio_class.return_value = mock_client
-
-            client, bucket_name = await manager.get_minio_client("test-storage-1")
-
-        # Then
-        assert client == mock_client
-        assert bucket_name == "test-bucket"
-        mock_object_storage_repo.get_by_id.assert_called_once_with("test-storage-1")
-        mock_minio_class.assert_called_once()
-
-    @pytest.mark.asyncio
-    async def test_get_minio_client_uses_cache(
-        self,
-        mock_kafka_cluster_repo,
-        mock_schema_registry_repo,
-        mock_object_storage_repo,
-        sample_object_storage,
-    ):
-        """MinIO Client 캐싱 확인"""
-        # Given
-        mock_object_storage_repo.get_by_id.return_value = sample_object_storage
-
-        manager = ConnectionManager(
-            kafka_cluster_repo=mock_kafka_cluster_repo,
-            schema_registry_repo=mock_schema_registry_repo,
-            storage_repo=mock_object_storage_repo,
-        )
-
-        # When
-        with patch("app.cluster.domain.services.Minio") as mock_minio_class:
-            mock_client = MagicMock()
-            mock_minio_class.return_value = mock_client
-
-            result1 = await manager.get_minio_client("test-storage-1")
-            result2 = await manager.get_minio_client("test-storage-1")
-
-        # Then
-        assert result1 == result2
-        mock_object_storage_repo.get_by_id.assert_called_once()
-        mock_minio_class.assert_called_once()
-
-    @pytest.mark.asyncio
-    async def test_get_minio_client_not_found(
-        self,
-        mock_kafka_cluster_repo,
-        mock_schema_registry_repo,
-        mock_object_storage_repo,
-    ):
-        """존재하지 않는 스토리지 조회 시 에러"""
-        # Given
-        mock_object_storage_repo.get_by_id.return_value = None
-
-        manager = ConnectionManager(
-            kafka_cluster_repo=mock_kafka_cluster_repo,
-            schema_registry_repo=mock_schema_registry_repo,
-            storage_repo=mock_object_storage_repo,
-        )
-
-        # When & Then
-        with pytest.raises(ValueError, match="Object Storage not found"):
-            await manager.get_minio_client("non-existent")
-
-    @pytest.mark.asyncio
-    async def test_get_minio_client_inactive(
-        self,
-        mock_kafka_cluster_repo,
-        mock_schema_registry_repo,
-        mock_object_storage_repo,
-    ):
-        """비활성 스토리지 조회 시 에러"""
-        # Given
-        inactive_storage = ObjectStorage(
-            storage_id="inactive-storage",
-            name="Inactive",
-            endpoint_url="localhost:9000",
-            access_key="admin",
-            secret_key="password",
-            bucket_name="bucket",
-            is_active=False,
-            created_at=datetime.now(),
-            updated_at=datetime.now(),
-        )
-        mock_object_storage_repo.get_by_id.return_value = inactive_storage
-
-        manager = ConnectionManager(
-            kafka_cluster_repo=mock_kafka_cluster_repo,
-            schema_registry_repo=mock_schema_registry_repo,
-            storage_repo=mock_object_storage_repo,
-        )
-
-        # When & Then
-        with pytest.raises(ValueError, match="Object Storage is inactive"):
-            await manager.get_minio_client("inactive-storage")
 
 
 class TestConnectionManagerCacheInvalidation:
@@ -376,7 +243,6 @@ class TestConnectionManagerCacheInvalidation:
         self,
         mock_kafka_cluster_repo,
         mock_schema_registry_repo,
-        mock_object_storage_repo,
         sample_kafka_cluster,
     ):
         """Kafka 캐시 무효화"""
@@ -410,7 +276,6 @@ class TestConnectionManagerCacheInvalidation:
         self,
         mock_kafka_cluster_repo,
         mock_schema_registry_repo,
-        mock_object_storage_repo,
         sample_schema_registry,
     ):
         """Schema Registry 캐시 무효화"""
@@ -420,7 +285,6 @@ class TestConnectionManagerCacheInvalidation:
         manager = ConnectionManager(
             kafka_cluster_repo=mock_kafka_cluster_repo,
             schema_registry_repo=mock_schema_registry_repo,
-            storage_repo=mock_object_storage_repo,
         )
 
         with patch("app.cluster.domain.services.AsyncSchemaRegistryClient") as mock_client_class:
@@ -436,55 +300,21 @@ class TestConnectionManagerCacheInvalidation:
             await manager.get_schema_registry_client("test-registry-1")
             assert mock_schema_registry_repo.get_by_id.call_count == 2
 
-    @pytest.mark.asyncio
-    async def test_invalidate_storage_cache(
-        self,
-        mock_kafka_cluster_repo,
-        mock_schema_registry_repo,
-        mock_object_storage_repo,
-        sample_object_storage,
-    ):
-        """Object Storage 캐시 무효화"""
-        # Given
-        mock_object_storage_repo.get_by_id.return_value = sample_object_storage
-
-        manager = ConnectionManager(
-            kafka_cluster_repo=mock_kafka_cluster_repo,
-            schema_registry_repo=mock_schema_registry_repo,
-            storage_repo=mock_object_storage_repo,
-        )
-
-        with patch("app.cluster.domain.services.Minio") as mock_minio_class:
-            mock_client = MagicMock()
-            mock_minio_class.return_value = mock_client
-
-            await manager.get_minio_client("test-storage-1")
-
-            # When
-            manager.invalidate_cache("storage", "test-storage-1")
-
-            # Then
-            await manager.get_minio_client("test-storage-1")
-            assert mock_object_storage_repo.get_by_id.call_count == 2
-
     def test_clear_all_caches(
         self,
         mock_kafka_cluster_repo,
         mock_schema_registry_repo,
-        mock_object_storage_repo,
     ):
         """전체 캐시 초기화"""
         # Given
         manager = ConnectionManager(
             kafka_cluster_repo=mock_kafka_cluster_repo,
             schema_registry_repo=mock_schema_registry_repo,
-            storage_repo=mock_object_storage_repo,
         )
 
         # 캐시에 데이터 추가 (직접 접근)
         manager._kafka_clients["test-1"] = MagicMock()
         manager._schema_registry_clients["test-2"] = MagicMock()
-        manager._minio_clients["test-3"] = (MagicMock(), "bucket")
 
         # When
         manager.clear_all_caches()
@@ -492,5 +322,4 @@ class TestConnectionManagerCacheInvalidation:
         # Then
         assert len(manager._kafka_clients) == 0
         assert len(manager._schema_registry_clients) == 0
-        assert len(manager._minio_clients) == 0
         assert len(manager._locks) == 0

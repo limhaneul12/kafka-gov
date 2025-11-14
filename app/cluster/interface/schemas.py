@@ -130,59 +130,6 @@ class SchemaRegistryResponse(BaseModel):
 
 
 # ============================================================================
-# Object Storage Schemas
-# ============================================================================
-
-
-class ObjectStorageCreateRequest(BaseModel):
-    """Object Storage 생성 요청"""
-
-    storage_id: str = Field(..., description="스토리지 ID (고유)", min_length=1, max_length=100)
-    name: str = Field(..., description="스토리지 이름", min_length=1, max_length=255)
-    endpoint_url: str = Field(..., description="엔드포인트 URL (예: localhost:9000)")
-    description: str | None = Field(None, description="설명")
-    access_key: str = Field(..., description="액세스 키", min_length=1)
-    secret_key: str = Field(..., description="시크릿 키", min_length=1)
-    bucket_name: str = Field(..., description="버킷명", min_length=1, max_length=255)
-    region: str = Field(default="us-east-1", description="리전")
-    use_ssl: bool = Field(default=False, description="SSL 사용 여부")
-
-
-class ObjectStorageUpdateRequest(BaseModel):
-    """Object Storage 수정 요청"""
-
-    name: str = Field(..., description="스토리지 이름", min_length=1, max_length=255)
-    endpoint_url: str = Field(..., description="엔드포인트 URL")
-    description: str | None = Field(None, description="설명")
-    access_key: str = Field(..., description="액세스 키", min_length=1)
-    secret_key: str = Field(..., description="시크릿 키", min_length=1)
-    bucket_name: str = Field(..., description="버킷명", min_length=1, max_length=255)
-    region: str = Field(default="us-east-1", description="리전")
-    use_ssl: bool = Field(default=False, description="SSL 사용 여부")
-    is_active: bool = Field(default=True, description="활성화 여부")
-
-
-class ObjectStorageResponse(BaseModel):
-    """Object Storage 응답"""
-
-    storage_id: str
-    name: str
-    endpoint_url: str
-    description: str | None
-    access_key: str
-    # secret_key: 보안상 응답에서 제외
-    bucket_name: str
-    region: str
-    use_ssl: bool
-    is_active: bool
-    created_at: datetime
-    updated_at: datetime
-
-    class Config:
-        from_attributes = True
-
-
-# ============================================================================
 # Kafka Connect Schemas
 # ============================================================================
 

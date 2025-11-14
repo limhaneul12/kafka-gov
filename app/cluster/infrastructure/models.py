@@ -99,47 +99,6 @@ class SchemaRegistryModel(Base):
         return f"<SchemaRegistry(id={self.registry_id}, name={self.name})>"
 
 
-class ObjectStorageModel(Base):
-    """Object Storage 테이블"""
-
-    __tablename__ = "object_storages"
-
-    # 기본 키
-    storage_id: Mapped[str] = mapped_column(String(100), primary_key=True, comment="스토리지 ID")
-
-    # 기본 정보
-    name: Mapped[str] = mapped_column(String(255), nullable=False, comment="스토리지 이름")
-    endpoint_url: Mapped[str] = mapped_column(Text, nullable=False, comment="엔드포인트 URL")
-    description: Mapped[str | None] = mapped_column(Text, comment="설명")
-
-    # 인증 설정
-    access_key: Mapped[str] = mapped_column(String(255), nullable=False, comment="액세스 키")
-    secret_key: Mapped[str] = mapped_column(
-        String(255), nullable=False, comment="시크릿 키 (암호화)"
-    )
-
-    # 버킷 설정
-    bucket_name: Mapped[str] = mapped_column(String(255), nullable=False, comment="버킷명")
-    region: Mapped[str] = mapped_column(String(100), default="us-east-1", comment="리전")
-
-    # SSL 설정
-    use_ssl: Mapped[bool] = mapped_column(Boolean, default=False, comment="SSL 사용 여부")
-
-    # 상태
-    is_active: Mapped[bool] = mapped_column(Boolean, default=True, comment="활성화 여부")
-
-    # 감사 정보
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now(), comment="생성 시간"
-    )
-    updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), comment="수정 시간"
-    )
-
-    def __repr__(self) -> str:
-        return f"<ObjectStorage(id={self.storage_id}, name={self.name})>"
-
-
 class KafkaConnectModel(Base):
     """Kafka Connect 테이블"""
 

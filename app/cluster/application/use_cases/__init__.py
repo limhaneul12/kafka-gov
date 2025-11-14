@@ -32,14 +32,6 @@ from .registry import (
     TestSchemaRegistryConnectionUseCase,
     UpdateSchemaRegistryUseCase,
 )
-from .storage import (
-    CreateObjectStorageUseCase,
-    DeleteObjectStorageUseCase,
-    GetObjectStorageUseCase,
-    ListObjectStoragesUseCase,
-    TestObjectStorageConnectionUseCase,
-    UpdateObjectStorageUseCase,
-)
 
 __all__ = [
     "CreateConnectorUseCase",
@@ -47,36 +39,29 @@ __all__ = [
     "CreateKafkaClusterUseCase",
     # Kafka Connect
     "CreateKafkaConnectUseCase",
-    # Object Storage
-    "CreateObjectStorageUseCase",
     # Schema Registry
     "CreateSchemaRegistryUseCase",
     "DeleteConnectorUseCase",
     "DeleteKafkaClusterUseCase",
     "DeleteKafkaConnectUseCase",
-    "DeleteObjectStorageUseCase",
     "DeleteSchemaRegistryUseCase",
     "GetConnectorDetailsUseCase",
     "GetConnectorStatusUseCase",
     "GetKafkaClusterUseCase",
     "GetKafkaConnectUseCase",
-    "GetObjectStorageUseCase",
     "GetSchemaRegistryUseCase",
     # Connectors
     "ListConnectorsUseCase",
     "ListKafkaClustersUseCase",
     "ListKafkaConnectsUseCase",
-    "ListObjectStoragesUseCase",
     "ListSchemaRegistriesUseCase",
     "PauseConnectorUseCase",
     "RestartConnectorUseCase",
     "ResumeConnectorUseCase",
     "TestKafkaConnectConnectionUseCase",
     "TestKafkaConnectionUseCase",
-    "TestObjectStorageConnectionUseCase",
     "TestSchemaRegistryConnectionUseCase",
     "UpdateKafkaClusterUseCase",
     "UpdateKafkaConnectUseCase",
-    "UpdateObjectStorageUseCase",
     "UpdateSchemaRegistryUseCase",
 ]

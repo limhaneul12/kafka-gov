@@ -17,14 +17,6 @@ export interface SchemaRegistry {
   is_active: boolean;
 }
 
-export interface ObjectStorage {
-  storage_id: string;
-  name: string;
-  endpoint: string;
-  bucket: string;
-  is_active: boolean;
-}
-
 export interface KafkaConnect {
   connect_id: string;
   name: string;
@@ -32,4 +24,4 @@ export interface KafkaConnect {
   is_active: boolean;
 }
 
-export type ConnectionType = "kafka" | "registry" | "storage" | "connect";
+export type ConnectionType = "kafka" | "registry" | "connect";

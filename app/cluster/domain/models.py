@@ -148,59 +148,6 @@ class SchemaRegistry:
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
-class ObjectStorage:
-    """Object Storage (MinIO/S3) 연결 정보 - Entity
-
-    Note:
-        ConnectionManager가 이 정보를 사용하여 Minio Client를 동적 생성
-    """
-
-    storage_id: str
-    name: str
-    endpoint_url: str  # "localhost:9000" (프로토콜 제외)
-    description: str | None = None
-
-    # 인증 설정
-    access_key: str
-    secret_key: str  # 암호화된 값
-
-    # 버킷 설정
-    bucket_name: str
-    region: str = "us-east-1"
-
-    # SSL 설정
-    use_ssl: bool = False
-
-    # 메타데이터
-    is_active: bool = True
-    created_at: datetime
-    updated_at: datetime
-
-    def to_minio_config(self) -> dict[str, str | bool]:
-        """MinIO Client 설정 딕셔너리 생성
-
-        Returns:
-            Minio 클라이언트에 전달할 설정
-        """
-        # endpoint에서 프로토콜 제거 (MinIO는 프로토콜 없이 받음)
-        endpoint = self.endpoint_url.replace("http://", "").replace("https://", "")
-
-        return {
-            "endpoint": endpoint,
-            "access_key": self.access_key,
-            "secret_key": self.secret_key,
-            "secure": self.use_ssl,
-            "region": self.region,
-        }
-
-    @property
-    def base_url(self) -> str:
-        """외부 접근용 URL (프로토콜 포함)"""
-        protocol = "https" if self.use_ssl else "http"
-        return f"{protocol}://{self.endpoint_url}"
-
-
-@dataclass(frozen=True, slots=True, kw_only=True)
 class KafkaConnect:
     """Kafka Connect 연결 정보 - Entity
 

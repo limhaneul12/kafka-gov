@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 
-from .models import KafkaCluster, KafkaConnect, ObjectStorage, SchemaRegistry
+from .models import KafkaCluster, KafkaConnect, SchemaRegistry
 
 
 class IKafkaClusterRepository(ABC):
@@ -62,35 +62,6 @@ class ISchemaRegistryRepository(ABC):
     @abstractmethod
     async def delete(self, registry_id: str) -> bool:
         """레지스트리 삭제 (소프트 삭제: is_active=False)"""
-        ...
-
-
-class IObjectStorageRepository(ABC):
-    """Object Storage 리포지토리 인터페이스"""
-
-    @abstractmethod
-    async def create(self, storage: ObjectStorage) -> ObjectStorage:
-        """스토리지 생성"""
-        ...
-
-    @abstractmethod
-    async def get_by_id(self, storage_id: str) -> ObjectStorage | None:
-        """ID로 스토리지 조회"""
-        ...
-
-    @abstractmethod
-    async def list_all(self, active_only: bool = True) -> list[ObjectStorage]:
-        """전체 스토리지 목록 조회"""
-        ...
-
-    @abstractmethod
-    async def update(self, storage: ObjectStorage) -> ObjectStorage:
-        """스토리지 정보 수정"""
-        ...
-
-    @abstractmethod
-    async def delete(self, storage_id: str) -> bool:
-        """스토리지 삭제 (소프트 삭제: is_active=False)"""
         ...
 
 

@@ -2,13 +2,12 @@ import { useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 import { clustersAPI } from "../../../services/api";
-import type { KafkaCluster, SchemaRegistry, ObjectStorage, KafkaConnect } from "../Connections.types";
+import type { KafkaCluster, SchemaRegistry, KafkaConnect } from "../Connections.types";
 
 export function useConnections() {
   const { t } = useTranslation();
   const [clusters, setClusters] = useState<KafkaCluster[]>([]);
   const [registries, setRegistries] = useState<SchemaRegistry[]>([]);
-  const [storages, setStorages] = useState<ObjectStorage[]>([]);
   const [connects, setConnects] = useState<KafkaConnect[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -20,15 +19,13 @@ export function useConnections() {
   const loadConnections = async () => {
     try {
       setLoading(true);
-      const [clustersRes, registriesRes, storagesRes, connectsRes] = await Promise.all([
+      const [clustersRes, registriesRes, connectsRes] = await Promise.all([
         clustersAPI.listKafka(),
         clustersAPI.listRegistries(),
-        clustersAPI.listStorages(),
         clustersAPI.listConnects(),
       ]);
       setClusters(clustersRes.data);
       setRegistries(registriesRes.data);
-      setStorages(storagesRes.data);
       setConnects(connectsRes.data);
     } catch (error) {
       console.error("Failed to load connections:", error);
@@ -46,9 +43,6 @@ export function useConnections() {
           break;
         case "registry":
           await clustersAPI.createRegistry(data);
-          break;
-        case "storage":
-          await clustersAPI.createStorage(data);
           break;
         case "connect":
           await clustersAPI.createConnect(data);
@@ -70,9 +64,6 @@ export function useConnections() {
           break;
         case "registry":
           await clustersAPI.updateRegistry(id, data);
-          break;
-        case "storage":
-          await clustersAPI.updateStorage(id, data);
           break;
         case "connect":
           await clustersAPI.updateConnect(id, data);
@@ -102,9 +93,6 @@ export function useConnections() {
         case "registry":
           await clustersAPI.deleteRegistry(id);
           break;
-        case "storage":
-          await clustersAPI.deleteStorage(id);
-          break;
         case "connect":
           await clustersAPI.deleteConnect(id);
           break;
@@ -126,9 +114,6 @@ export function useConnections() {
           break;
         case "registry":
           response = await clustersAPI.testRegistry(id);
-          break;
-        case "storage":
-          response = await clustersAPI.testStorage(id);
           break;
         case "connect":
           response = await clustersAPI.testConnect(id);
@@ -165,9 +150,6 @@ export function useConnections() {
         case "registry":
           await clustersAPI.activateRegistry(id);
           break;
-        case "storage":
-          await clustersAPI.activateStorage(id);
-          break;
         case "connect":
           await clustersAPI.activateConnect(id);
           break;
@@ -188,7 +170,6 @@ export function useConnections() {
   return {
     clusters,
     registries,
-    storages,
     connects,
     loading,
     loadConnections,

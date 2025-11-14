@@ -8,11 +8,10 @@ import AddConnectionModal from "../../components/connection/AddConnectionModal";
 import { useConnections } from "./hooks/useConnections";
 import { KafkaClusterList } from "./components/KafkaClusterList";
 import { SchemaRegistryList } from "./components/SchemaRegistryList";
-import { StorageList } from "./components/StorageList";
 import { KafkaConnectList } from "./components/KafkaConnectList";
 import type { ConnectionType } from "./Connections.types";
 
-type TabType = "kafka" | "registry" | "storage" | "connect";
+type TabType = "kafka" | "registry" | "connect";
 
 export default function Connections() {
   const { t } = useTranslation();
@@ -25,7 +24,6 @@ export default function Connections() {
   const {
     clusters,
     registries,
-    storages,
     connects,
     loading,
     addConnection,
@@ -52,7 +50,6 @@ export default function Connections() {
   const tabs = [
     { id: "kafka" as TabType, label: t("connection.broker"), count: clusters.length },
     { id: "registry" as TabType, label: t("connection.registry"), count: registries.length },
-    { id: "storage" as TabType, label: t("connection.storage"), count: storages.length },
     { id: "connect" as TabType, label: t("connection.connect"), count: connects.length },
   ];
 
@@ -125,16 +122,6 @@ export default function Connections() {
             onDelete={(id, name) => deleteConnection("registry", id, name)}
             onTest={(id, name) => testConnection("registry", id, name)}
             onActivate={(id) => activateConnection("registry", id)}
-          />
-        )}
-
-        {activeTab === "storage" && (
-          <StorageList
-            storages={storages}
-            onEdit={(storage) => handleEdit("storage", storage)}
-            onDelete={(id, name) => deleteConnection("storage", id, name)}
-            onTest={(id, name) => testConnection("storage", id, name)}
-            onActivate={(id) => activateConnection("storage", id)}
           />
         )}
 

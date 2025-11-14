@@ -9,17 +9,9 @@ from abc import ABC, abstractmethod
 from confluent_kafka.admin import AdminClient
 from confluent_kafka.schema_registry import AsyncSchemaRegistryClient
 from kafka import KafkaAdminClient
-from minio import Minio
 
-from .models import (
-    ConnectionTestResult,
-    ObjectStorage,
-)
-from .repositories import (
-    IKafkaClusterRepository,
-    IObjectStorageRepository,
-    ISchemaRegistryRepository,
-)
+from .models import ConnectionTestResult
+from .repositories import IKafkaClusterRepository, ISchemaRegistryRepository
 
 logger = logging.getLogger(__name__)
 
@@ -40,24 +32,6 @@ class IConnectionManager(ABC):
         """Schema Registry Client 획득 (동적 생성/캐싱)"""
 
     @abstractmethod
-    async def get_minio_client(self, storage_id: str) -> tuple[Minio, str]:
-        """MinIO Client 획득 (동적 생성/캐싱)
-
-        Returns:
-            (Minio 클라이언트, bucket_name) 튜플
-        """
-        ...
-
-    @abstractmethod
-    async def get_storage_info(self, storage_id: str) -> ObjectStorage:
-        """Object Storage 정보 조회
-
-        Returns:
-            ObjectStorage 도메인 모델
-        """
-        ...
-
-    @abstractmethod
     async def test_kafka_connection(self, cluster_id: str) -> ConnectionTestResult:
         """Kafka 연결 테스트"""
         ...
@@ -65,11 +39,6 @@ class IConnectionManager(ABC):
     @abstractmethod
     async def test_schema_registry_connection(self, registry_id: str) -> ConnectionTestResult:
         """Schema Registry 연결 테스트"""
-        ...
-
-    @abstractmethod
-    async def test_storage_connection(self, storage_id: str) -> ConnectionTestResult:
-        """Object Storage 연결 테스트"""
         ...
 
     @abstractmethod
@@ -107,17 +76,14 @@ class ConnectionManager(IConnectionManager):
         self,
         kafka_cluster_repo: IKafkaClusterRepository,
         schema_registry_repo: ISchemaRegistryRepository,
-        storage_repo: IObjectStorageRepository,
     ) -> None:
         self.kafka_cluster_repo = kafka_cluster_repo
         self.schema_registry_repo = schema_registry_repo
-        self.storage_repo = storage_repo
 
         # 클라이언트 캐시 (resource_id -> client)
         self._kafka_clients: dict[str, AdminClient] = {}
         self._kafka_py_clients: dict[str, KafkaAdminClient] = {}
         self._schema_registry_clients: dict[str, AsyncSchemaRegistryClient] = {}
-        self._minio_clients: dict[str, tuple[Minio, str]] = {}  # (client, bucket_name)
 
         # 캐시 락 (동시 생성 방지) - 이벤트 루프별로 관리
         self._locks: dict[str, tuple[asyncio.AbstractEventLoop, asyncio.Lock]] = {}
@@ -272,79 +238,6 @@ class ConnectionManager(IConnectionManager):
 
             return client
 
-    async def get_minio_client(self, storage_id: str) -> tuple[Minio, str]:
-        """MinIO Client 획득 (동적 생성/캐싱)
-
-        Args:
-            storage_id: 스토리지 ID
-
-        Returns:
-            (Minio 클라이언트, bucket_name) 튜플
-
-        Raises:
-            ValueError: 스토리지가 존재하지 않거나 비활성 상태
-        """
-        # 캐시 확인
-        if storage_id in self._minio_clients:
-            logger.debug(f"MinIO Client cache hit: {storage_id}")
-            return self._minio_clients[storage_id]
-
-        # Lock 획득
-        lock_key = f"storage_{storage_id}"
-        lock = self._get_loop_scoped_lock(lock_key)
-
-        async with lock:
-            # Double-check
-            if storage_id in self._minio_clients:
-                return self._minio_clients[storage_id]
-
-            # DB에서 스토리지 정보 조회
-            storage = await self.storage_repo.get_by_id(storage_id)
-            if not storage:
-                raise ValueError(f"Object Storage not found: {storage_id}")
-            if not storage.is_active:
-                raise ValueError(f"Object Storage is inactive: {storage_id}")
-
-            # Client 생성
-            logger.info(f"Creating new MinIO Client: {storage_id}")
-            config = storage.to_minio_config()
-
-            # 타입 안전성을 위한 명시적 변환
-            endpoint: str = str(config["endpoint"])
-            access_key: str | None = str(config["access_key"]) if config["access_key"] else None
-            secret_key: str | None = str(config["secret_key"]) if config["secret_key"] else None
-            secure: bool = bool(config["secure"])
-
-            client = Minio(
-                endpoint=endpoint,
-                access_key=access_key,
-                secret_key=secret_key,
-                secure=secure,
-            )
-
-            # 캐시 저장 (bucket_name과 함께)
-            result = (client, storage.bucket_name)
-            self._minio_clients[storage_id] = result
-
-            return result
-
-    async def get_storage_info(self, storage_id: str) -> ObjectStorage:
-        """Object Storage 정보 조회
-
-        Args:
-            storage_id: 스토리지 ID
-
-        Returns:
-            ObjectStorage 도메인 모델
-        """
-        storage = await self.storage_repo.get_by_id(storage_id)
-        if not storage:
-            raise ValueError(f"Object Storage not found: {storage_id}")
-        if not storage.is_active:
-            raise ValueError(f"Object Storage is inactive: {storage_id}")
-
-        return storage
-
     async def test_kafka_connection(self, cluster_id: str) -> ConnectionTestResult:
         """Kafka 연결 테스트
 
@@ -423,48 +316,6 @@ class ConnectionManager(IConnectionManager):
                 message=f"Connection failed: {e!s}",
             )
 
-    async def test_storage_connection(self, storage_id: str) -> ConnectionTestResult:
-        """Object Storage 연결 테스트
-
-        Args:
-            storage_id: 스토리지 ID
-
-        Returns:
-            연결 테스트 결과
-        """
-        import time
-
-        try:
-            start_time = time.time()
-
-            # Client 획득
-            client, bucket_name = await self.get_minio_client(storage_id)
-
-            # 버킷 존재 확인
-            def _check():
-                return client.bucket_exists(bucket_name)
-
-            bucket_exists = await asyncio.to_thread(_check)
-
-            latency_ms = (time.time() - start_time) * 1000
-
-            return ConnectionTestResult(
-                success=True,
-                message=f"Connected to Object Storage: bucket '{bucket_name}' {'exists' if bucket_exists else 'not found'}",
-                latency_ms=latency_ms,
-                metadata={
-                    "bucket_name": bucket_name,
-                    "bucket_exists": bucket_exists,
-                },
-            )
-
-        except Exception as e:
-            logger.error(f"Object Storage connection test failed for {storage_id}: {e}")
-            return ConnectionTestResult(
-                success=False,
-                message=f"Connection failed: {e!s}",
-            )
-
     def invalidate_cache(self, resource_type: str, resource_id: str) -> None:
         """캐시 무효화 (설정 변경 시 호출)
 
@@ -484,10 +335,6 @@ class ConnectionManager(IConnectionManager):
             del self._schema_registry_clients[resource_id]
             logger.info(f"Schema Registry Client cache invalidated: {resource_id}")
 
-        elif resource_type == "storage" and resource_id in self._minio_clients:
-            del self._minio_clients[resource_id]
-            logger.info(f"MinIO Client cache invalidated: {resource_id}")
-
         # Lock도 제거
         lock_key = f"{resource_type}_{resource_id}"
         if lock_key in self._locks:
@@ -498,7 +345,6 @@ class ConnectionManager(IConnectionManager):
         self._kafka_clients.clear()
         self._kafka_py_clients.clear()
         self._schema_registry_clients.clear()
-        self._minio_clients.clear()
         self._locks.clear()
         logger.info("All connection locks cleared")
 

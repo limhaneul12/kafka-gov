@@ -16,7 +16,6 @@ import orjson
 
 from app.cluster.domain.services import IConnectionManager
 from app.schema.infrastructure.schema_registry_adapter import ConfluentSchemaRegistryAdapter
-from app.schema.infrastructure.storage.minio_adapter import MinIOObjectStorageAdapter
 from app.shared.constants import AuditAction, AuditStatus, AuditTarget
 from app.shared.domain.events import SchemaRegisteredEvent
 from app.shared.infrastructure.event_bus import get_event_bus
@@ -44,7 +43,6 @@ class UploadContext:
     """업로드 작업의 공통 컨텍스트 정보"""
 
     registry_repository: ConfluentSchemaRegistryAdapter
-    storage_repository: MinIOObjectStorageAdapter | None
     env: DomainEnvironment
     change_id: ChangeId
     upload_id: str
@@ -98,33 +96,12 @@ class SchemaUploadUseCase:
             registry_client = await self.connection_manager.get_schema_registry_client(registry_id)
             registry_repository = ConfluentSchemaRegistryAdapter(registry_client)
 
-            # Object Storage는 optional
-            storage_repository = None
-            if storage_id:
-                minio_client, bucket_name = await self.connection_manager.get_minio_client(
-                    storage_id
-                )
-                # ObjectStorage 정보에서 base_url 가져오기
-                storage_info = await self.connection_manager.get_storage_info(storage_id)
-                base_url = (
-                    storage_info.get_base_url()
-                    if hasattr(storage_info, "get_base_url")
-                    else f"http://{storage_info.endpoint_url}"
-                )
-
-                storage_repository = MinIOObjectStorageAdapter(
-                    client=minio_client,
-                    bucket_name=bucket_name,
-                    base_url=base_url,
-                )
-
             # 2. 파일 검증
             validated_files = await self._validate_files(files)
 
             # 3. 업로드 컨텍스트 생성
             context = UploadContext(
                 registry_repository=registry_repository,
-                storage_repository=storage_repository,
                 env=env,
                 change_id=change_id,
                 upload_id=upload_id,
@@ -262,27 +239,10 @@ class SchemaUploadUseCase:
                 if not schema_files:
                     raise ValueError(f"No schema files found in ZIP: {filename}")
 
-                # MinIO 저장 (optional)
-                storage_url = None
-                if context.storage_repository:
-                    key = f"{context.env.value}/uploads/{context.upload_id}/{filename}"
-                    metadata = {
-                        "change_id": context.change_id,
-                        "upload_id": context.upload_id,
-                        "file_type": "zip_bundle",
-                        "schema_count": str(len(schema_files)),
-                    }
-
-                    storage_url = await context.storage_repository.put_object(
-                        key=key,
-                        data=content,
-                        metadata=metadata,
-                    )
-
                 artifact = DomainSchemaArtifact(
                     subject=f"bundle.{Path(filename).stem}",
                     version=1,
-                    storage_url=storage_url,
+                    storage_url=None,
                     checksum=self._calculate_checksum(content),
                 )
 
@@ -309,23 +269,6 @@ class SchemaUploadUseCase:
                 orjson.loads(content_str)
         except (UnicodeDecodeError, orjson.JSONDecodeError) as e:
             raise ValueError(f"Invalid schema file {filename}: {e}") from e
-
-        # 1. MinIO 저장 (optional)
-        storage_url = None
-        if context.storage_repository:
-            key = f"{context.env.value}/uploads/{context.upload_id}/{filename}"
-            metadata = {
-                "change_id": context.change_id,
-                "upload_id": context.upload_id,
-                "file_type": "schema",
-                "schema_type": schema_type,
-            }
-
-            storage_url = await context.storage_repository.put_object(
-                key=key,
-                data=content,
-                metadata=metadata,
-            )
 
         # 1.5. Generate subject name using Naming Policy
         subject_name = self._build_subject_name(
@@ -395,25 +338,20 @@ class SchemaUploadUseCase:
             artifact = DomainSchemaArtifact(
                 subject=subject_name,
                 version=version,
-                storage_url=storage_url,
+                storage_url=None,
                 checksum=self._calculate_checksum(content),
                 schema_type=DomainSchemaType(schema_type),
                 compatibility_mode=final_compatibility,
             )
 
         except Exception as e:
-            # Schema Registry 등록 실패 시에도 MinIO 저장은 유지하고 경고 로그
             logger = logging.getLogger(__name__)
-            logger.warning(
-                f"Schema Registry registration failed for {subject_name}: {e}. "
-                f"File saved to MinIO but not registered."
-            )
+            logger.warning(f"Schema Registry registration failed for {subject_name}: {e}.")
 
-            # MinIO만 저장된 artifact 반환 (호환성 모드 포함)
             artifact = DomainSchemaArtifact(
                 subject=subject_name,
                 version=1,
-                storage_url=storage_url,
+                storage_url=None,
                 checksum=self._calculate_checksum(content),
                 schema_type=DomainSchemaType(schema_type),
                 compatibility_mode=final_compatibility,

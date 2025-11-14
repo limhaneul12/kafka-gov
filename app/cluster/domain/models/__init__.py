@@ -4,7 +4,6 @@ from .entities import (
     ConnectionTestResult,
     KafkaCluster,
     KafkaConnect,
-    ObjectStorage,
     SchemaRegistry,
 )
 from .types_enum import (
@@ -17,7 +16,6 @@ __all__ = [
     "ConnectionTestResult",
     "KafkaCluster",
     "KafkaConnect",
-    "ObjectStorage",
     # Enums
     "SaslMechanism",
     "SchemaRegistry",

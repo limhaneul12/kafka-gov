@@ -1,6 +1,6 @@
 import { useState } from "react";
 import Button from "../ui/Button";
-import { X, Server, Database, HardDrive } from "lucide-react";
+import { X, Server, Database } from "lucide-react";
 
 interface AddConnectionModalProps {
   isOpen: boolean;
@@ -12,7 +12,7 @@ interface AddConnectionModalProps {
   initialData?: Record<string, unknown>;
 }
 
-type ConnectionType = "kafka" | "registry" | "storage" | "connect";
+type ConnectionType = "kafka" | "registry" | "connect";
 
 export default function AddConnectionModal({
   isOpen,
@@ -40,10 +40,11 @@ export default function AddConnectionModal({
       setLoading(true);
       if (editMode && onUpdate) {
         // Edit 모드: update API 호출
-        const idField = connectionType === 'kafka' ? 'cluster_id' 
-          : connectionType === 'registry' ? 'registry_id'
-          : connectionType === 'storage' ? 'storage_id'
-          : 'connect_id';
+        const idField = connectionType === "kafka"
+          ? "cluster_id"
+          : connectionType === "registry"
+            ? "registry_id"
+            : "connect_id";
         const id = formData[idField] as string;
         await onUpdate(connectionType, id, formData);
       } else {
@@ -68,7 +69,6 @@ export default function AddConnectionModal({
   const connectionTypes = [
     { value: "kafka", label: "Kafka Cluster", icon: Server },
     { value: "registry", label: "Schema Registry", icon: Database },
-    { value: "storage", label: "Object Storage", icon: HardDrive },
     { value: "connect", label: "Kafka Connect", icon: Server },
   ];
 
@@ -210,98 +210,6 @@ export default function AddConnectionModal({
                 className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
                 rows={3}
                 placeholder="Optional description"
-              />
-            </div>
-          </>
-        );
-
-      case "storage":
-        return (
-          <>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Storage ID *
-              </label>
-              <input
-                type="text"
-                value={formData.storage_id || ""}
-                onChange={(e) =>
-                  setFormData({ ...formData, storage_id: e.target.value })
-                }
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                placeholder="local-minio"
-                required
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Name *
-              </label>
-              <input
-                type="text"
-                value={formData.name || ""}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                placeholder="Local MinIO"
-                required
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Endpoint URL *
-              </label>
-              <input
-                type="url"
-                value={formData.endpoint_url || ""}
-                onChange={(e) =>
-                  setFormData({ ...formData, endpoint_url: e.target.value })
-                }
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                placeholder="http://localhost:9000"
-                required
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Bucket Name *
-              </label>
-              <input
-                type="text"
-                value={formData.bucket_name || ""}
-                onChange={(e) =>
-                  setFormData({ ...formData, bucket_name: e.target.value })
-                }
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                placeholder="kafka-schemas"
-                required
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Access Key
-              </label>
-              <input
-                type="text"
-                value={formData.access_key || ""}
-                onChange={(e) =>
-                  setFormData({ ...formData, access_key: e.target.value })
-                }
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                placeholder="minioadmin"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Secret Key
-              </label>
-              <input
-                type="password"
-                value={formData.secret_key || ""}
-                onChange={(e) =>
-                  setFormData({ ...formData, secret_key: e.target.value })
-                }
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                placeholder="••••••••"
               />
             </div>
           </>

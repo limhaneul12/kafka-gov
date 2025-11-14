@@ -103,20 +103,3 @@ class ISchemaAuditRepository(ABC):
         snapshot: dict[str, Any] | None = None,
     ) -> str:
         """감사 로그 기록"""
-
-
-class IObjectStorageRepository(ABC):
-    """스키마 아티팩트 저장소 인터페이스"""
-
-    @abstractmethod
-    async def put_object(
-        self,
-        key: str,
-        data: bytes,
-        metadata: dict[str, str] | None = None,
-    ) -> str:
-        """객체 저장 후 접근 URL 반환"""
-
-    @abstractmethod
-    async def delete_prefix(self, prefix: str) -> None:
-        """prefix로 객체 삭제"""

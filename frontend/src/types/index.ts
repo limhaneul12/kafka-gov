@@ -55,17 +55,6 @@ export interface SchemaRegistry {
   updated_at: string;
 }
 
-export interface ObjectStorage {
-  storage_id: string;
-  name: string;
-  endpoint_url: string;
-  description: string | null;
-  bucket_name: string;
-  is_active: boolean;
-  created_at: string;
-  updated_at: string;
-}
-
 export interface KafkaConnect {
   connect_id: string;
   cluster_id: string;

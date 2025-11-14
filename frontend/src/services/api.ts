@@ -163,20 +163,7 @@ export const clustersAPI = {
   activateRegistry: (registryId: string) => api.patch(`/v1/clusters/schema-registries/${registryId}/activate`),
   testRegistry: (registryId: string) =>
     api.post(`/v1/clusters/schema-registries/${registryId}/test`),
-  
-  // Object Storages
-  listStorages: () => api.get("/v1/clusters/storages"),
-  getStorage: (storageId: string) => api.get(`/v1/clusters/storages/${storageId}`),
-  createStorage: (data: Record<string, string>) => 
-    api.post("/v1/clusters/storages", data),
-  updateStorage: (storageId: string, data: Record<string, unknown>) => 
-    api.put(`/v1/clusters/storages/${storageId}`, data),
-  deleteStorage: (storageId: string) => 
-    api.delete(`/v1/clusters/storages/${storageId}`),
-  activateStorage: (storageId: string) => api.patch(`/v1/clusters/storages/${storageId}/activate`),
-  testStorage: (storageId: string) =>
-    api.post(`/v1/clusters/storages/${storageId}/test`),
-  
+
   // Kafka Connects
   listConnects: () => api.get("/v1/clusters/connects"),
   getConnect: (connectId: string) => api.get(`/v1/clusters/connects/${connectId}`),

@@ -9,13 +9,11 @@ import pytest
 
 from app.cluster.domain.models import (
     KafkaCluster,
-    ObjectStorage,
     SchemaRegistry,
     SecurityProtocol,
 )
 from app.cluster.domain.repositories import (
     IKafkaClusterRepository,
-    IObjectStorageRepository,
     ISchemaRegistryRepository,
 )
 
@@ -48,22 +46,6 @@ def sample_schema_registry() -> SchemaRegistry:
 
 
 @pytest.fixture
-def sample_object_storage() -> ObjectStorage:
-    """테스트용 Object Storage"""
-    return ObjectStorage(
-        storage_id="test-storage-1",
-        name="Test MinIO",
-        endpoint_url="localhost:9000",
-        access_key="minioadmin",
-        secret_key="minioadmin",
-        bucket_name="test-bucket",
-        description="Test storage",
-        created_at=datetime.now(),
-        updated_at=datetime.now(),
-    )
-
-
-@pytest.fixture
 def mock_kafka_cluster_repo() -> IKafkaClusterRepository:
     """Mock Kafka Cluster Repository"""
     mock = AsyncMock(spec=IKafkaClusterRepository)
@@ -79,16 +61,6 @@ def mock_kafka_cluster_repo() -> IKafkaClusterRepository:
 def mock_schema_registry_repo() -> ISchemaRegistryRepository:
     """Mock Schema Registry Repository"""
     mock = AsyncMock(spec=ISchemaRegistryRepository)
-    mock.get_by_id.return_value = None
-    mock.list_all.return_value = []
-    mock.create.return_value = None
-    return mock
-
-
-@pytest.fixture
-def mock_object_storage_repo() -> IObjectStorageRepository:
-    """Mock Object Storage Repository"""
-    mock = AsyncMock(spec=IObjectStorageRepository)
     mock.get_by_id.return_value = None
     mock.list_all.return_value = []
     mock.create.return_value = None
