@@ -12,7 +12,6 @@ from fastapi.responses import ORJSONResponse
 
 from .celery_app import celery_app
 from .cluster.interface.router import router as cluster_router
-from .connect.interface.router import router as connect_router
 from .consumer.interface.routers import (
     router as consumer_router,
     topic_router as consumer_topic_router,
@@ -143,7 +142,6 @@ def create_app() -> FastAPI:
     app.state.topic_container = container.topic_container()
     app.state.consumer_container = container.consumer_container()
     app.state.schema_container = container.schema_container()
-    app.state.connect_container = container.connect_container()
 
     # ✅ (중요) 와이어링 - wiring_config가 있으면 생략 가능하지만,
     # 명시적으로 호출하면 import 타이밍 이슈를 줄일 수 있음
@@ -155,14 +153,12 @@ def create_app() -> FastAPI:
             "app.consumer.interface",
             "app.schema.interface",
             "app.shared.interface",
-            "app.connect.interface",
         ]
     )
 
     # 라우터 등록
     app.include_router(shared_router, prefix="/api")
     app.include_router(cluster_router, prefix="/api")  # Cluster API
-    app.include_router(connect_router, prefix="/api")  # Connect API
     app.include_router(topic_router, prefix="/api")
     app.include_router(metrics_router, prefix="/api")
     app.include_router(policy_router, prefix="/api")  # Policy API

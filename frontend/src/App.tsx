@@ -9,8 +9,6 @@ import Schemas from "./pages/Schemas";
 import SchemaPolicies from "./pages/SchemaPolicies";
 import IncidentPolicies from "./pages/IncidentPolicies";
 import IncidentPolicyComposer from "./pages/IncidentPolicyComposer";
-import Connect from "./pages/Connect/index";
-import Connections from "./pages/Connections/index";
 import Consumers from "./pages/Consumers";
 import ConsumerDetail from "./pages/ConsumerDetail";
 import Analysis from "./pages/Analysis";
@@ -38,8 +36,6 @@ function App() {
             <Route path="schemas/policies" element={<SchemaPolicies />} />
             <Route path="policies/incidents" element={<IncidentPolicies />} />
             <Route path="policies/incidents/:policyId" element={<IncidentPolicyComposer />} />
-            <Route path="connect" element={<Connect />} />
-            <Route path="connections" element={<Connections />} />
             <Route path="consumers" element={<Consumers />} />
             <Route path="consumers/:groupId" element={<ConsumerDetail />} />
             <Route path="analysis" element={<Analysis />} />

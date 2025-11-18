@@ -1,7 +1,6 @@
 from dependency_injector import containers, providers
 
 from app.cluster.container import ClusterContainer
-from app.connect.container import ConnectContainer
 from app.consumer.container import ConsumerContainer
 from app.schema.container import SchemaContainer
 from app.shared.container import InfrastructureContainer
@@ -17,7 +16,6 @@ class AppContainer(containers.DeclarativeContainer):
             "app.schema.interface",
             "app.shared.interface",
             "app.cluster.interface.routers",
-            "app.connect.interface.routers",
             "app.consumer.interface.routers",
         ]
     )
@@ -59,9 +57,4 @@ class AppContainer(containers.DeclarativeContainer):
         cluster=cluster_container,  # ConnectionManager 전달
     )
 
-    # ConnectContainer - Kafka Connect 관리
-    connect_container = providers.Container(
-        ConnectContainer,
-        connect_repository=cluster_container.kafka_connect_repository,
-        database_manager=infrastructure_container.database_manager,
-    )
+    # ConnectContainer 제거됨 (Kafka Connect 지원 중단)

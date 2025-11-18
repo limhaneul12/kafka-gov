@@ -33,7 +33,6 @@ from app.cluster.infrastructure.models import (
     KafkaConnectModel,
     SchemaRegistryModel,
 )
-from app.connect.infrastructure.models import ConnectorMetadataModel
 from app.consumer.infrastructure.models import (
     ConsumerGroupSnapshotModel,
     ConsumerMemberSnapshotModel,

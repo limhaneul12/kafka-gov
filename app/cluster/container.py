@@ -6,28 +6,21 @@ from dependency_injector import containers, providers
 
 from app.cluster.application.use_cases import (
     CreateKafkaClusterUseCase,
-    CreateKafkaConnectUseCase,
     CreateSchemaRegistryUseCase,
     DeleteKafkaClusterUseCase,
-    DeleteKafkaConnectUseCase,
     DeleteSchemaRegistryUseCase,
     GetKafkaClusterUseCase,
-    GetKafkaConnectUseCase,
     GetSchemaRegistryUseCase,
     ListKafkaClustersUseCase,
-    ListKafkaConnectsUseCase,
     ListSchemaRegistriesUseCase,
-    TestKafkaConnectConnectionUseCase,
     TestKafkaConnectionUseCase,
     TestSchemaRegistryConnectionUseCase,
     UpdateKafkaClusterUseCase,
-    UpdateKafkaConnectUseCase,
     UpdateSchemaRegistryUseCase,
 )
 from app.cluster.domain.services import ConnectionManager
 from app.cluster.infrastructure.repositories import (
     MySQLKafkaClusterRepository,
-    MySQLKafkaConnectRepository,
     MySQLSchemaRegistryRepository,
 )
 
@@ -51,10 +44,6 @@ class ClusterContainer(containers.DeclarativeContainer):
 
     schema_registry_repository = providers.Factory(
         MySQLSchemaRegistryRepository,
-        session_factory=infrastructure.database_manager.provided.get_db_session,
-    )
-    kafka_connect_repository = providers.Factory(
-        MySQLKafkaConnectRepository,
         session_factory=infrastructure.database_manager.provided.get_db_session,
     )
 
@@ -138,38 +127,4 @@ class ClusterContainer(containers.DeclarativeContainer):
     test_schema_registry_connection_use_case = providers.Factory(
         TestSchemaRegistryConnectionUseCase,
         connection_manager=connection_manager,
-    )
-
-    # ========================================================================
-    # Kafka Connect Use Cases
-    # ========================================================================
-
-    create_kafka_connect_use_case = providers.Factory(
-        CreateKafkaConnectUseCase,
-        connect_repo=kafka_connect_repository,
-    )
-
-    list_kafka_connects_use_case = providers.Factory(
-        ListKafkaConnectsUseCase,
-        connect_repo=kafka_connect_repository,
-    )
-
-    get_kafka_connect_use_case = providers.Factory(
-        GetKafkaConnectUseCase,
-        connect_repo=kafka_connect_repository,
-    )
-
-    update_kafka_connect_use_case = providers.Factory(
-        UpdateKafkaConnectUseCase,
-        connect_repo=kafka_connect_repository,
-    )
-
-    delete_kafka_connect_use_case = providers.Factory(
-        DeleteKafkaConnectUseCase,
-        connect_repo=kafka_connect_repository,
-    )
-
-    test_kafka_connect_connection_use_case = providers.Factory(
-        TestKafkaConnectConnectionUseCase,
-        connect_repo=kafka_connect_repository,
     )

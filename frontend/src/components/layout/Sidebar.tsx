@@ -4,7 +4,6 @@ import {
   LayoutDashboard,
   List,
   FileCode,
-  Plug,
   Server,
   Shield,
   Activity,
@@ -23,12 +22,10 @@ export default function Sidebar() {
     { name: t("nav.consumerGroups"), to: "/consumers", icon: Users, indent: true },
     { name: t("nav.schemas"), to: "/schemas", icon: FileCode },
     { name: t("nav.schemaAnalysis"), to: "/analysis", icon: Activity, indent: true },
-    { name: t("nav.kafkaConnect"), to: "/connect", icon: Plug },
     { name: t("nav.policies"), to: "/topics/policies", icon: Shield },
     { name: t("nav.policyTopic"), to: "/topics/policies", icon: Shield, indent: true },
     { name: t("nav.policySchema"), to: "/schemas/policies", icon: Shield, indent: true },
     { name: t("nav.policyIncident"), to: "/policies/incidents", icon: Shield, indent: true },
-    { name: t("nav.connections"), to: "/connections", icon: Server },
     { name: t("nav.history"), to: "/history", icon: HistoryIcon },
   ];
   return (
