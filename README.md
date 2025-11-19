@@ -105,9 +105,7 @@ Kafka-Gov transforms Kafka from a simple message broker into a **governed enterp
 
 ### 프로젝트 방향성
 
-거버넌스를 위해서 다가갔는데 제작할 수록 운영에 초점이 맞춰지는 느낌이 있어서  
-프로젝트의 방향성인 거버넌스에 집중하기 위해서  
-Topic과 시나리오 기반 정책 알림에 집중하겠다.
+Although we initially approached this project from a governance perspective, over time it started to drift toward operational concerns. To realign with its original direction — governance — we are refocusing on **topics** and **scenario-based policy alerts** as the core of the project.
 
 ---
 
