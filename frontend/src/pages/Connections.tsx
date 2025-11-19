@@ -6,23 +6,22 @@ import Loading from "../components/ui/Loading";
 import AddConnectionModal from "../components/connection/AddConnectionModal";
 import EditConnectionModal from "../components/connection/EditConnectionModal";
 import { clustersAPI } from "../services/api";
-import { Plus, Server, Database, Link, Edit, Trash2, CheckCircle } from "lucide-react";
-import type { KafkaCluster, SchemaRegistry, KafkaConnect } from "../types";
+import { Plus, Server, Database, Edit, Trash2, CheckCircle } from "lucide-react";
+import type { KafkaCluster, SchemaRegistry } from "../types";
 import { toast } from "sonner";
 
 export default function Connections() {
   const [clusters, setClusters] = useState<KafkaCluster[]>([]);
   const [registries, setRegistries] = useState<SchemaRegistry[]>([]);
-  const [connects, setConnects] = useState<KafkaConnect[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
-  const [editType, setEditType] = useState<"kafka" | "registry" | "connect">("kafka");
+  const [editType, setEditType] = useState<"kafka" | "registry">("kafka");
   const [editId, setEditId] = useState<string>("");
-  const [editData, setEditData] = useState<KafkaCluster | SchemaRegistry | KafkaConnect | null>(null);
+  const [editData, setEditData] = useState<KafkaCluster | SchemaRegistry | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<{
     isOpen: boolean;
-    type: "kafka" | "registry" | "connect";
+    type: "kafka" | "registry";
     id: string;
     name: string;
   }>({ isOpen: false, type: "kafka", id: "", name: "" });
@@ -53,22 +52,19 @@ export default function Connections() {
     try {
       setLoading(true);
       console.log('[Connections] Loading connections...');
-      const [clustersRes, registriesRes, connectsRes] = await Promise.all([
+      const [clustersRes, registriesRes] = await Promise.all([
         clustersAPI.listKafka(),
         clustersAPI.listRegistries(),
-        clustersAPI.listConnects(),
       ]);
       
       console.log('[Connections] API responses:', {
         clusters: clustersRes.data.length,
         registries: registriesRes.data.length,
-        connects: connectsRes.data.length,
       });
       console.log('[Connections] Registry list:', registriesRes.data);
       
       setClusters(clustersRes.data);
       setRegistries(registriesRes.data);
-      setConnects(connectsRes.data);
       
       console.log('[Connections] State updated successfully');
     } catch (error) {
@@ -89,9 +85,6 @@ export default function Connections() {
           break;
         case "registry":
           await clustersAPI.createRegistry(data);
-          break;
-        case "connect":
-          await clustersAPI.createConnect(data);
           break;
       }
       await loadConnections();
@@ -156,11 +149,6 @@ export default function Connections() {
           console.log('[Connections] Schema Registry deleted successfully');
           toast.success('삭제 완료', { description: 'Schema Registry가 삭제되었습니다.' });
           break;
-        case "connect":
-          console.log('[Connections] Deleting Kafka Connect:', id);
-          await clustersAPI.deleteConnect(id);
-          toast.success('삭제 완료', { description: 'Kafka Connect가 삭제되었습니다.' });
-          break;
       }
       
       console.log('[Connections] Reloading connections after delete...');
@@ -200,33 +188,6 @@ export default function Connections() {
     });
   };
 
-  // Kafka Connect handlers
-  const handleDeleteConnect = (connectId: string, name: string) => {
-    setDeleteConfirm({
-      isOpen: true,
-      type: "connect",
-      id: connectId,
-      name,
-    });
-  };
-
-  const handleTestConnect = async (connectId: string, name: string) => {
-    try {
-      await clustersAPI.testConnect(connectId);
-      toast.success('연결 테스트 성공', { description: `"${name}" Kafka Connect 연결이 정상입니다.` });
-    } catch (error) {
-      console.error("Failed to test connect:", error);
-      toast.error('연결 테스트 실패', { description: `"${name}" Kafka Connect 연결에 실패했습니다. URL을 확인하세요.` });
-    }
-  };
-
-  const handleEditConnect = (connect: KafkaConnect) => {
-    setEditType("connect");
-    setEditId(connect.connect_id);
-    setEditData(connect);
-    setShowEditModal(true);
-  };
-
   const handleUpdateConnection = async (data: Record<string, string>) => {
     try {
       switch (editType) {
@@ -235,9 +196,6 @@ export default function Connections() {
           break;
         case "registry":
           await clustersAPI.updateRegistry(editId, data);
-          break;
-        case "connect":
-          await clustersAPI.updateConnect(editId, data);
           break;
       }
       await loadConnections();
@@ -431,73 +389,6 @@ export default function Connections() {
                 </div>
               </div>
             ))}
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Kafka Connect */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Link className="h-5 w-5" />
-            Kafka Connect ({connects.length})
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-3">
-            {connects.length === 0 ? (
-              <p className="text-center text-sm text-gray-500 py-4">
-                No Kafka Connect instances found
-              </p>
-            ) : (
-              connects.map((connect) => (
-                <div
-                  key={connect.connect_id}
-                  className="flex items-center justify-between rounded-lg border border-gray-200 p-4"
-                >
-                  <div className="flex-1">
-                    <h4 className="font-medium text-gray-900">{connect.name}</h4>
-                    <p className="text-sm text-gray-600">
-                      {connect.url}
-                    </p>
-                    {connect.description && (
-                      <p className="text-xs text-gray-500 mt-1">
-                        {connect.description}
-                      </p>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Badge variant={connect.is_active ? "success" : "default"}>
-                      {connect.is_active ? "Active" : "Inactive"}
-                    </Badge>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => handleTestConnect(connect.connect_id, connect.name)}
-                      title="Test Connection"
-                    >
-                      <CheckCircle className="h-4 w-4 text-blue-600" />
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => handleEditConnect(connect)}
-                      title="Edit"
-                    >
-                      <Edit className="h-4 w-4 text-gray-600" />
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => handleDeleteConnect(connect.connect_id, connect.name)}
-                      title="Delete"
-                    >
-                      <Trash2 className="h-4 w-4 text-red-600" />
-                    </Button>
-                  </div>
-                </div>
-              ))
-            )}
           </div>
         </CardContent>
       </Card>

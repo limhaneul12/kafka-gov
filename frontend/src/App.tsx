@@ -15,6 +15,7 @@ import Analysis from "./pages/Analysis";
 import Settings from "./pages/Settings";
 import History from "./pages/History";
 import TeamAnalytics from "./pages/TeamAnalytics";
+import Connections from "./pages/Connections";
 
 function App() {
   return (
@@ -42,6 +43,7 @@ function App() {
             <Route path="team-analytics" element={<TeamAnalytics />} />
             <Route path="history" element={<History />} />
             <Route path="settings" element={<Settings />} />
+            <Route path="connections" element={<Connections />} />
           </Route>
         </Routes>
       </BrowserRouter>

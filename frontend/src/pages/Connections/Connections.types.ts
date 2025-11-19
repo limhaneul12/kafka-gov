@@ -17,11 +17,4 @@ export interface SchemaRegistry {
   is_active: boolean;
 }
 
-export interface KafkaConnect {
-  connect_id: string;
-  name: string;
-  url: string;
-  is_active: boolean;
-}
-
-export type ConnectionType = "kafka" | "registry" | "connect";
+export type ConnectionType = "kafka" | "registry";

@@ -7,7 +7,7 @@ interface EditConnectionModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSubmit: (data: Record<string, string>) => Promise<void>;
-  type: "kafka" | "registry" | "connect";
+  type: "kafka" | "registry";
   initialData: {
     name: string;
     url?: string;
@@ -157,51 +157,6 @@ export default function EditConnectionModal({
           </>
         );
 
-      case "connect":
-        return (
-          <>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Connect Name *
-              </label>
-              <input
-                type="text"
-                value={formData.name || ""}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                required
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                URL *
-              </label>
-              <input
-                type="text"
-                value={formData.url || ""}
-                onChange={(e) => setFormData({ ...formData, url: e.target.value })}
-                required
-                placeholder="http://kafka-connect:8083"
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-              />
-              <p className="mt-1 text-xs text-gray-500">
-                Make sure the port is correct (usually 8083)
-              </p>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Description
-              </label>
-              <textarea
-                value={formData.description || ""}
-                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                rows={2}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-              />
-            </div>
-          </>
-        );
-
     }
   };
 
@@ -211,8 +166,6 @@ export default function EditConnectionModal({
         return "Edit Kafka Cluster";
       case "registry":
         return "Edit Schema Registry";
-      case "connect":
-        return "Edit Kafka Connect";
     }
   };
 

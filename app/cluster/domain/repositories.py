@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 
-from .models import KafkaCluster, KafkaConnect, SchemaRegistry
+from .models import KafkaCluster, SchemaRegistry
 
 
 class IKafkaClusterRepository(ABC):
@@ -62,38 +62,4 @@ class ISchemaRegistryRepository(ABC):
     @abstractmethod
     async def delete(self, registry_id: str) -> bool:
         """레지스트리 삭제 (소프트 삭제: is_active=False)"""
-        ...
-
-
-class IKafkaConnectRepository(ABC):
-    """Kafka Connect 리포지토리 인터페이스"""
-
-    @abstractmethod
-    async def create(self, connect: KafkaConnect) -> KafkaConnect:
-        """Connect 생성"""
-        ...
-
-    @abstractmethod
-    async def get_by_id(self, connect_id: str) -> KafkaConnect | None:
-        """ID로 Connect 조회"""
-        ...
-
-    @abstractmethod
-    async def list_by_cluster(self, cluster_id: str) -> list[KafkaConnect]:
-        """클러스터별 Connect 목록 조회"""
-        ...
-
-    @abstractmethod
-    async def list_all(self, active_only: bool = True) -> list[KafkaConnect]:
-        """전체 Connect 목록 조회"""
-        ...
-
-    @abstractmethod
-    async def update(self, connect: KafkaConnect) -> KafkaConnect:
-        """Connect 정보 수정"""
-        ...
-
-    @abstractmethod
-    async def delete(self, connect_id: str) -> bool:
-        """Connect 삭제 (소프트 삭제: is_active=False)"""
         ...

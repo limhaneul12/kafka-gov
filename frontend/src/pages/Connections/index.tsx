@@ -8,10 +8,9 @@ import AddConnectionModal from "../../components/connection/AddConnectionModal";
 import { useConnections } from "./hooks/useConnections";
 import { KafkaClusterList } from "./components/KafkaClusterList";
 import { SchemaRegistryList } from "./components/SchemaRegistryList";
-import { KafkaConnectList } from "./components/KafkaConnectList";
 import type { ConnectionType } from "./Connections.types";
 
-type TabType = "kafka" | "registry" | "connect";
+type TabType = "kafka" | "registry";
 
 export default function Connections() {
   const { t } = useTranslation();
@@ -24,7 +23,6 @@ export default function Connections() {
   const {
     clusters,
     registries,
-    connects,
     loading,
     addConnection,
     updateConnection,
@@ -50,7 +48,6 @@ export default function Connections() {
   const tabs = [
     { id: "kafka" as TabType, label: t("connection.broker"), count: clusters.length },
     { id: "registry" as TabType, label: t("connection.registry"), count: registries.length },
-    { id: "connect" as TabType, label: t("connection.connect"), count: connects.length },
   ];
 
   if (loading) {
@@ -125,15 +122,7 @@ export default function Connections() {
           />
         )}
 
-        {activeTab === "connect" && (
-          <KafkaConnectList
-            connects={connects}
-            onEdit={(connect) => handleEdit("connect", connect)}
-            onDelete={(id, name) => deleteConnection("connect", id, name)}
-            onTest={(id, name) => testConnection("connect", id, name)}
-            onActivate={(id) => activateConnection("connect", id)}
-          />
-        )}
+        {/* Kafka Connect 탭 및 목록은 기능 제거로 인해 더 이상 표시하지 않습니다. */}
       </Card>
 
       {/* Add/Edit Modal */}

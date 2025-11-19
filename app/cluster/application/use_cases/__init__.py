@@ -8,22 +8,6 @@ from .broker import (
     TestKafkaConnectionUseCase,
     UpdateKafkaClusterUseCase,
 )
-from .connect import (
-    CreateConnectorUseCase,
-    CreateKafkaConnectUseCase,
-    DeleteConnectorUseCase,
-    DeleteKafkaConnectUseCase,
-    GetConnectorDetailsUseCase,
-    GetConnectorStatusUseCase,
-    GetKafkaConnectUseCase,
-    ListConnectorsUseCase,
-    ListKafkaConnectsUseCase,
-    PauseConnectorUseCase,
-    RestartConnectorUseCase,
-    ResumeConnectorUseCase,
-    TestKafkaConnectConnectionUseCase,
-    UpdateKafkaConnectUseCase,
-)
 from .registry import (
     CreateSchemaRegistryUseCase,
     DeleteSchemaRegistryUseCase,
@@ -34,34 +18,18 @@ from .registry import (
 )
 
 __all__ = [
-    "CreateConnectorUseCase",
     # Kafka Cluster
     "CreateKafkaClusterUseCase",
-    # Kafka Connect
-    "CreateKafkaConnectUseCase",
+    "DeleteKafkaClusterUseCase",
+    "GetKafkaClusterUseCase",
+    "ListKafkaClustersUseCase",
+    "TestKafkaConnectionUseCase",
+    "UpdateKafkaClusterUseCase",
     # Schema Registry
     "CreateSchemaRegistryUseCase",
-    "DeleteConnectorUseCase",
-    "DeleteKafkaClusterUseCase",
-    "DeleteKafkaConnectUseCase",
     "DeleteSchemaRegistryUseCase",
-    "GetConnectorDetailsUseCase",
-    "GetConnectorStatusUseCase",
-    "GetKafkaClusterUseCase",
-    "GetKafkaConnectUseCase",
     "GetSchemaRegistryUseCase",
-    # Connectors
-    "ListConnectorsUseCase",
-    "ListKafkaClustersUseCase",
-    "ListKafkaConnectsUseCase",
     "ListSchemaRegistriesUseCase",
-    "PauseConnectorUseCase",
-    "RestartConnectorUseCase",
-    "ResumeConnectorUseCase",
-    "TestKafkaConnectConnectionUseCase",
-    "TestKafkaConnectionUseCase",
     "TestSchemaRegistryConnectionUseCase",
-    "UpdateKafkaClusterUseCase",
-    "UpdateKafkaConnectUseCase",
     "UpdateSchemaRegistryUseCase",
 ]

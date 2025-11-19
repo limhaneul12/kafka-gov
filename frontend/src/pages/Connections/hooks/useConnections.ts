@@ -2,13 +2,12 @@ import { useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 import { clustersAPI } from "../../../services/api";
-import type { KafkaCluster, SchemaRegistry, KafkaConnect } from "../Connections.types";
+import type { KafkaCluster, SchemaRegistry } from "../Connections.types";
 
 export function useConnections() {
   const { t } = useTranslation();
   const [clusters, setClusters] = useState<KafkaCluster[]>([]);
   const [registries, setRegistries] = useState<SchemaRegistry[]>([]);
-  const [connects, setConnects] = useState<KafkaConnect[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -19,14 +18,12 @@ export function useConnections() {
   const loadConnections = async () => {
     try {
       setLoading(true);
-      const [clustersRes, registriesRes, connectsRes] = await Promise.all([
+      const [clustersRes, registriesRes] = await Promise.all([
         clustersAPI.listKafka(),
         clustersAPI.listRegistries(),
-        clustersAPI.listConnects(),
       ]);
       setClusters(clustersRes.data);
       setRegistries(registriesRes.data);
-      setConnects(connectsRes.data);
     } catch (error) {
       console.error("Failed to load connections:", error);
       toast.error(t("error.general"));
@@ -43,9 +40,6 @@ export function useConnections() {
           break;
         case "registry":
           await clustersAPI.createRegistry(data);
-          break;
-        case "connect":
-          await clustersAPI.createConnect(data);
           break;
       }
       await loadConnections();
@@ -64,9 +58,6 @@ export function useConnections() {
           break;
         case "registry":
           await clustersAPI.updateRegistry(id, data);
-          break;
-        case "connect":
-          await clustersAPI.updateConnect(id, data);
           break;
       }
       await loadConnections();
@@ -93,9 +84,6 @@ export function useConnections() {
         case "registry":
           await clustersAPI.deleteRegistry(id);
           break;
-        case "connect":
-          await clustersAPI.deleteConnect(id);
-          break;
       }
       await loadConnections();
       toast.success(t("common.success"));
@@ -114,9 +102,6 @@ export function useConnections() {
           break;
         case "registry":
           response = await clustersAPI.testRegistry(id);
-          break;
-        case "connect":
-          response = await clustersAPI.testConnect(id);
           break;
       }
 
@@ -150,9 +135,6 @@ export function useConnections() {
         case "registry":
           await clustersAPI.activateRegistry(id);
           break;
-        case "connect":
-          await clustersAPI.activateConnect(id);
-          break;
       }
       
       await loadConnections();
@@ -170,7 +152,6 @@ export function useConnections() {
   return {
     clusters,
     registries,
-    connects,
     loading,
     loadConnections,
     addConnection,

@@ -12,7 +12,7 @@ interface AddConnectionModalProps {
   initialData?: Record<string, unknown>;
 }
 
-type ConnectionType = "kafka" | "registry" | "connect";
+type ConnectionType = "kafka" | "registry";
 
 export default function AddConnectionModal({
   isOpen,
@@ -40,11 +40,7 @@ export default function AddConnectionModal({
       setLoading(true);
       if (editMode && onUpdate) {
         // Edit 모드: update API 호출
-        const idField = connectionType === "kafka"
-          ? "cluster_id"
-          : connectionType === "registry"
-            ? "registry_id"
-            : "connect_id";
+        const idField = connectionType === "kafka" ? "cluster_id" : "registry_id";
         const id = formData[idField] as string;
         await onUpdate(connectionType, id, formData);
       } else {
@@ -69,7 +65,6 @@ export default function AddConnectionModal({
   const connectionTypes = [
     { value: "kafka", label: "Kafka Cluster", icon: Server },
     { value: "registry", label: "Schema Registry", icon: Database },
-    { value: "connect", label: "Kafka Connect", icon: Server },
   ];
 
   const renderForm = () => {
@@ -195,82 +190,6 @@ export default function AddConnectionModal({
                 onChange={(e) => setFormData({ ...formData, url: e.target.value })}
                 className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
                 placeholder="http://localhost:8081"
-                required
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Description
-              </label>
-              <textarea
-                value={formData.description || ""}
-                onChange={(e) =>
-                  setFormData({ ...formData, description: e.target.value })
-                }
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                rows={3}
-                placeholder="Optional description"
-              />
-            </div>
-          </>
-        );
-
-      case "connect":
-        return (
-          <>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Connect ID *
-              </label>
-              <input
-                type="text"
-                value={formData.connect_id || ""}
-                onChange={(e) =>
-                  setFormData({ ...formData, connect_id: e.target.value })
-                }
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                placeholder="local-connect"
-                required
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Cluster ID *
-              </label>
-              <input
-                type="text"
-                value={formData.cluster_id || ""}
-                onChange={(e) =>
-                  setFormData({ ...formData, cluster_id: e.target.value })
-                }
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                placeholder="local-kafka"
-                required
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Name *
-              </label>
-              <input
-                type="text"
-                value={formData.name || ""}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                placeholder="Local Kafka Connect"
-                required
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                URL *
-              </label>
-              <input
-                type="url"
-                value={formData.url || ""}
-                onChange={(e) => setFormData({ ...formData, url: e.target.value })}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                placeholder="http://localhost:8083"
                 required
               />
             </div>

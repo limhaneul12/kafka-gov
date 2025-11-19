@@ -56,5 +56,3 @@ class AppContainer(containers.DeclarativeContainer):
         infrastructure=infrastructure_container,
         cluster=cluster_container,  # ConnectionManager 전달
     )
-
-    # ConnectContainer 제거됨 (Kafka Connect 지원 중단)

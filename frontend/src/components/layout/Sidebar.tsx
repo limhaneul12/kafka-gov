@@ -9,6 +9,7 @@ import {
   Activity,
   History as HistoryIcon,
   Users,
+  Link,
 } from "lucide-react";
 import { cn } from "../../utils/cn";
 
@@ -27,6 +28,7 @@ export default function Sidebar() {
     { name: t("nav.policySchema"), to: "/schemas/policies", icon: Shield, indent: true },
     { name: t("nav.policyIncident"), to: "/policies/incidents", icon: Shield, indent: true },
     { name: t("nav.history"), to: "/history", icon: HistoryIcon },
+    { name: t("nav.connections"), to: "/connections", icon: Link },
   ];
   return (
     <div className="flex h-screen w-64 flex-col fixed left-0 top-0 bg-gray-900 text-white">

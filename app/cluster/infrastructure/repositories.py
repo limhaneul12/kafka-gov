@@ -11,20 +11,17 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.cluster.domain.models import (
     KafkaCluster,
-    KafkaConnect,
     SaslMechanism,
     SchemaRegistry,
     SecurityProtocol,
 )
 from app.cluster.domain.repositories import (
     IKafkaClusterRepository,
-    IKafkaConnectRepository,
     ISchemaRegistryRepository,
 )
 
 from .models import (
     KafkaClusterModel,
-    KafkaConnectModel,
     SchemaRegistryModel,
 )
 
@@ -329,150 +326,6 @@ class MySQLSchemaRegistryRepository(ISchemaRegistryRepository):
             ssl_cert_location=model.ssl_cert_location,
             ssl_key_location=model.ssl_key_location,
             timeout=model.timeout,
-            is_active=model.is_active,
-            created_at=model.created_at,
-            updated_at=model.updated_at,
-        )
-
-
-class MySQLKafkaConnectRepository(IKafkaConnectRepository):
-    """MySQL 기반 Kafka Connect 리포지토리 (Session Factory 패턴)"""
-
-    def __init__(self, session_factory: SessionFactory) -> None:
-        self.session_factory = session_factory
-
-    async def create(self, connect: KafkaConnect) -> KafkaConnect:
-        """Connect 생성 (또는 재활성화)"""
-        async with self.session_factory() as session:
-            # 기존 레코드 확인
-            result = await session.execute(
-                select(KafkaConnectModel).where(KafkaConnectModel.connect_id == connect.connect_id)
-            )
-            existing_model = result.scalar_one_or_none()
-
-            if existing_model:
-                # 재활성화
-                existing_model.cluster_id = connect.cluster_id
-                existing_model.name = connect.name
-                existing_model.url = connect.url
-                existing_model.description = connect.description
-                existing_model.auth_username = connect.auth_username
-                existing_model.auth_password = connect.auth_password
-                existing_model.is_active = True
-                await session.commit()
-                await session.refresh(existing_model)
-                logger.info(f"Kafka Connect reactivated: {connect.connect_id}")
-                return self._model_to_domain(existing_model)
-            else:
-                # 새 레코드 생성
-                model = KafkaConnectModel(
-                    connect_id=connect.connect_id,
-                    cluster_id=connect.cluster_id,
-                    name=connect.name,
-                    url=connect.url,
-                    description=connect.description,
-                    auth_username=connect.auth_username,
-                    auth_password=connect.auth_password,
-                    is_active=connect.is_active,
-                )
-
-                session.add(model)
-                await session.commit()
-                await session.refresh(model)
-
-                logger.info(f"Kafka Connect created: {connect.connect_id}")
-                return self._model_to_domain(model)
-
-    async def get_by_id(self, connect_id: str) -> KafkaConnect | None:
-        """ID로 Connect 조회"""
-        async with self.session_factory() as session:
-            result = await session.execute(
-                select(KafkaConnectModel).where(KafkaConnectModel.connect_id == connect_id)
-            )
-            model = result.scalar_one_or_none()
-
-            return self._model_to_domain(model) if model else None
-
-    async def list_by_cluster(self, cluster_id: str) -> list[KafkaConnect]:
-        """클러스터별 Connect 목록 조회"""
-        async with self.session_factory() as session:
-            result = await session.execute(
-                select(KafkaConnectModel)
-                .where(KafkaConnectModel.cluster_id == cluster_id)
-                .where(KafkaConnectModel.is_active == True)  # noqa: E712
-                .order_by(KafkaConnectModel.created_at.desc())
-            )
-            models = result.scalars().all()
-
-            return [self._model_to_domain(model) for model in models]
-
-    async def list_all(self, active_only: bool = True) -> list[KafkaConnect]:
-        """전체 Connect 목록 조회"""
-        async with self.session_factory() as session:
-            query = select(KafkaConnectModel)
-            if active_only:
-                query = query.where(KafkaConnectModel.is_active == True)  # noqa: E712
-            query = query.order_by(KafkaConnectModel.created_at.desc())
-
-            result = await session.execute(query)
-            models = result.scalars().all()
-
-            return [self._model_to_domain(model) for model in models]
-
-    async def update(self, connect: KafkaConnect) -> KafkaConnect:
-        """Connect 정보 수정"""
-        async with self.session_factory() as session:
-            result = await session.execute(
-                select(KafkaConnectModel).where(KafkaConnectModel.connect_id == connect.connect_id)
-            )
-            model = result.scalar_one_or_none()
-
-            if not model:
-                raise ValueError(f"Kafka Connect not found: {connect.connect_id}")
-
-            # 필드 업데이트
-            model.cluster_id = connect.cluster_id
-            model.name = connect.name
-            model.url = connect.url
-            model.description = connect.description
-            model.auth_username = connect.auth_username
-            model.auth_password = connect.auth_password
-            model.is_active = connect.is_active
-
-            await session.commit()
-            await session.refresh(model)
-
-            logger.info(f"Kafka Connect updated: {connect.connect_id}")
-            return self._model_to_domain(model)
-
-    async def delete(self, connect_id: str) -> bool:
-        """Connect 삭제 (소프트 삭제)"""
-        async with self.session_factory() as session:
-            result = await session.execute(
-                select(KafkaConnectModel).where(KafkaConnectModel.connect_id == connect_id)
-            )
-            model = result.scalar_one_or_none()
-
-            if not model:
-                return False
-
-            model.is_active = False
-            await session.commit()
-
-            logger.info(f"Kafka Connect deleted (soft): {connect_id}")
-            return True
-
-    @staticmethod
-    def _model_to_domain(model: KafkaConnectModel) -> KafkaConnect:
-        """SQLAlchemy 모델 → Domain 모델 변환"""
-        return KafkaConnect(
-            connect_id=model.connect_id,
-            cluster_id=model.cluster_id,
-            name=model.name,
-            url=model.url,
-            description=model.description,
-            auth_username=model.auth_username,
-            auth_password=model.auth_password,
             is_active=model.is_active,
             created_at=model.created_at,
             updated_at=model.updated_at,

@@ -130,30 +130,6 @@ class SchemaRegistry:
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
-class KafkaConnect:
-    """Kafka Connect 연결 정보 - Entity
-
-    Note:
-        향후 Kafka Connect REST API 연동 시 사용
-    """
-
-    connect_id: str
-    cluster_id: str  # 연관된 Kafka Cluster
-    name: str
-    url: str  # "http://localhost:8083"
-    description: str | None = None
-
-    # 인증 설정 (선택적)
-    auth_username: str | None = None
-    auth_password: str | None = None  # 암호화된 값
-
-    # 메타데이터
-    is_active: bool = True
-    created_at: datetime
-    updated_at: datetime
-
-
-@dataclass(frozen=True, slots=True, kw_only=True)
 class ConnectionTestResult:
     """연결 테스트 결과 - Value Object"""
 
