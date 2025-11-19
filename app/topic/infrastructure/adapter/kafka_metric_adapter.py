@@ -72,7 +72,7 @@ class BaseMetricsCollector:
         self._snapshot_time = time.time()
 
         # L2: Redis 저장 (워커 간 공유)
-        if self.redis:
+        if self.redis and self.ttl_seconds > 0:
             key = self._get_redis_key()
             value = pickle.dumps(self._snapshot)
             await self.redis.setex(key, self.ttl_seconds, value)

@@ -115,6 +115,7 @@ services:
     restart: unless-stopped
     volumes:
       - ./logs:/app/logs
+      - db_data:/app/data
 
   # Celery Beat (주기적 스케줄러)
   celery-beat:

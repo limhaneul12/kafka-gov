@@ -96,12 +96,18 @@ Kafka-Gov transforms Kafka from a simple message broker into a **governed enterp
 | ❌ No audit trail | ✅ Complete change history |
 | ❌ Separate schema tool | ✅ Integrated schema management |
 
-**Problems we solve:**
-- 🤔 **Who owns this topic?** → Track ownership across hundreds of topics
-- 📝 **What is it for?** → Required documentation links
-- ⚠️ **Policy violations?** → Auto-detect risky configs before deployment
-- 🚀 **Bulk operations?** → Create 50+ topics in one YAML file
-- 🔄 **Change history?** → Complete audit trail with before/after snapshots
+ **Problems we solve:**
+ - 🤔 **Who owns this topic?** → Track ownership across hundreds of topics
+ - 📝 **What is it for?** → Required documentation links
+ - ⚠️ **Policy violations?** → Auto-detect risky configs before deployment
+ - 🚀 **Bulk operations?** → Create 50+ topics in one YAML file
+ - 🔄 **Change history?** → Complete audit trail with before/after snapshots
+
+### 프로젝트 방향성
+
+거버넌스를 위해서 다가갔는데 제작할 수록 운영에 초점이 맞춰지는 느낌이 있어서  
+프로젝트의 방향성인 거버넌스에 집중하기 위해서  
+Topic과 시나리오 기반 정책 알림에 집중하겠다.
 
 ---
 
@@ -221,7 +227,6 @@ Environment-specific rules prevent production incidents:
 ### 📦 More Features
 
 - [Schema Registry Management](./docs/features/schema-registry.md)
-- [Kafka Connect Integration](./docs/features/kafka-connect.md)
 - [Multi-Cluster Support](./docs/features/multi-cluster.md)
 - [Team Analytics](./docs/features/team-analytics.md)
 - [Complete Audit Trail](./docs/operations/audit-trail.md)
@@ -259,7 +264,7 @@ Environment-specific rules prevent production incidents:
 
 **Backend:** Python 3.12+ • FastAPI • Pydantic v2 • SQLAlchemy 2.0 • Confluent Kafka  
 **Frontend:** React 19 • TypeScript • TailwindCSS • Rolldown  
-**Infrastructure:** SQLite (Lite Mode) • MySQL (Production) • Kafka • Schema Registry • MinIO • Kafka Connect
+**Infrastructure:** SQLite (Lite Mode) • MySQL (Production) • Kafka • Schema Registry • MinIO
 
 ---
 
@@ -273,7 +278,6 @@ Environment-specific rules prevent production incidents:
 **v1.1 (In Progress):**
 - 🔄 Enhanced frontend filters
 - 🔄 Preset management UI
-- 🔄 Kafka Connect UI
 
 **v2.0 (Planned):**
 - 📅 RBAC & multi-tenancy

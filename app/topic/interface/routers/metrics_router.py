@@ -49,13 +49,15 @@ async def get_topic_metrics_live(
     topic_name: str,
     cluster_id: str,
     connection_manager=Depends(Provide[AppContainer.cluster_container.connection_manager]),
-    metrics_collector_factory=Depends(Provide[AppContainer.topic_container.metrics_collector]),
+    metrics_collector_factory=Depends(
+        Provide[AppContainer.topic_container.metrics_collector.provider]
+    ),
 ) -> TopicMetricsResponse:
     """특정 토픽의 메트릭 실시간 조회 (Redis 멀티워커 캐싱)"""
     admin_client = await connection_manager.get_kafka_py_admin_client(cluster_id)
 
     # Factory를 통해 Collector 생성 (Redis 자동 주입됨)
-    collector = metrics_collector_factory(
+    collector = await metrics_collector_factory(
         admin_client=admin_client,
         cluster_id=cluster_id,
         ttl_seconds=0,  # 실시간 조회는 캐시 없이

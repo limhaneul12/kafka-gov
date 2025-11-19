@@ -20,16 +20,16 @@ from .registry import (
 __all__ = [
     # Kafka Cluster
     "CreateKafkaClusterUseCase",
-    "DeleteKafkaClusterUseCase",
-    "GetKafkaClusterUseCase",
-    "ListKafkaClustersUseCase",
-    "TestKafkaConnectionUseCase",
-    "UpdateKafkaClusterUseCase",
     # Schema Registry
     "CreateSchemaRegistryUseCase",
+    "DeleteKafkaClusterUseCase",
     "DeleteSchemaRegistryUseCase",
+    "GetKafkaClusterUseCase",
     "GetSchemaRegistryUseCase",
+    "ListKafkaClustersUseCase",
     "ListSchemaRegistriesUseCase",
+    "TestKafkaConnectionUseCase",
     "TestSchemaRegistryConnectionUseCase",
+    "UpdateKafkaClusterUseCase",
     "UpdateSchemaRegistryUseCase",
 ]
