@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import json
+from typing import Any
+
 from app.shared.domain.subject_utils import SubjectStrategy, extract_topics_from_subject
 
 from .models import (
@@ -32,18 +35,23 @@ class SchemaImpactAnalyzer:
     async def analyze_impact(
         self, subject: SubjectName, strategy: DomainSubjectStrategy
     ) -> DomainSchemaImpactRecord:
-        """스키마 변경이 미치는 영향도 분석
-
-        Note: 컨슈머 정보는 Schema Registry에서 알 수 없으므로 빈 튜플 반환
-        실제 컨슈머 관리는 애플리케이션 레벨에서 수행해야 함
-        """
-        topics = self._extract_topics_from_subject(subject, strategy)
-
-        return DomainSchemaImpactRecord(
-            subject=subject,
-            topics=tuple(topics),
-            consumers=(),  # 컨슈머 정보는 제공하지 않음
-        )
+        """스키마 변경이 미치는 영향도 분석"""
+        try:
+            topics = self._extract_topics_from_subject(subject, strategy)
+            return DomainSchemaImpactRecord(
+                subject=subject,
+                topics=tuple(topics),
+                consumers=(),  # 컨슈머 정보는 추후 구현
+                status="success",
+            )
+        except Exception as e:
+            return DomainSchemaImpactRecord(
+                subject=subject,
+                topics=(),
+                consumers=(),
+                status="failure",
+                error_message=str(e),
+            )
 
     def _extract_topics_from_subject(
         self, subject: SubjectName, strategy: DomainSubjectStrategy
@@ -186,6 +194,8 @@ class SchemaPlannerService:
                 current_version=current_version,
                 target_version=target_version,
                 diff=diff,
+                schema=spec.schema,
+                current_schema=current_info.schema if current_info else None,
             )
             plan_items.append(plan_item)
 
@@ -210,43 +220,94 @@ class SchemaPlannerService:
         current_info: SchemaVersionInfo | None,
         spec: DomainSchemaSpec,
     ) -> DomainSchemaDiff:
-        """스키마 변경 사항 계산
-
-        Args:
-            current_info: 현재 등록된 스키마 정보 (없으면 신규 등록)
-            spec: 등록하려는 스키마 명세
-
-        Returns:
-            DomainSchemaDiff: 변경 사항을 담은 Domain Model
-        """
+        """스키마 변경 사항 계산"""
         if not current_info:
-            # 신규 등록
             return DomainSchemaDiff(
                 type="new_registration",
                 changes=("New schema registration",),
                 current_version=None,
-                target_compatibility=spec.compatibility.value,
-                schema_type=spec.schema_type.value,
+                target_compatibility=spec.compatibility.value
+                if hasattr(spec.compatibility, "value")
+                else spec.compatibility,
+                schema_type=spec.schema_type.value
+                if hasattr(spec.schema_type, "value")
+                else spec.schema_type,
             )
 
-        # 기존 스키마 업데이트
-        changes: tuple[str, ...] = ("Schema definition updated",)  # 기본값
+        changes: list[str] = []
 
-        # 스키마 타입 변경 확인 (일반적으로 변경 불가하지만 체크)
-        if (
-            current_info.schema_type is not None
-            and current_info.schema_type != spec.schema_type.value
-        ):
-            changes = (f"Schema type: {current_info.schema_type} → {spec.schema_type.value}",)
+        # 1. 메타데이터/타입 변경 확인
+        # 1. 메타데이터/타입 변경 확인
+        schema_type_val = (
+            spec.schema_type.value if hasattr(spec.schema_type, "value") else spec.schema_type
+        )
+        if current_info.schema_type is not None and current_info.schema_type != schema_type_val:
+            changes.append(f"Type changed: {current_info.schema_type} → {schema_type_val}")
 
-        # 메타데이터 변경 확인 (우선순위 높음)
-        if spec.metadata is not None:
-            changes = (f"Metadata updated (owner: {spec.metadata.owner})",)
+        # 2. 필드 레벨 Diff (JSON/Avro인 경우)
+        if schema_type_val in ["AVRO", "JSON"]:
+            try:
+                old_raw = current_info.schema or "{}"
+                new_raw = spec.schema or "{}"
+                old_json = json.loads(old_raw)
+                new_json = json.loads(new_raw)
+
+                if old_raw != new_raw:
+
+                    def get_field_diff(old_json: Any, new_json: Any, prefix: str = "") -> list[str]:
+                        diffs = []
+                        old_fields = {f["name"]: f for f in old_json.get("fields", [])}
+                        new_fields = {f["name"]: f for f in new_json.get("fields", [])}
+
+                        added = set(new_fields.keys()) - set(old_fields.keys())
+                        removed = set(old_fields.keys()) - set(new_fields.keys())
+                        common = set(old_fields.keys()) & set(new_fields.keys())
+
+                        diffs.extend([f"Added field: {prefix}{name}" for name in added])
+                        diffs.extend([f"Removed field: {prefix}{name}" for name in removed])
+
+                        for name in common:
+                            old_f = old_fields[name]
+                            new_f = new_fields[name]
+                            if old_f != new_f:
+                                # If both are records, recurse
+                                if (
+                                    isinstance(old_f.get("type"), dict)
+                                    and old_f["type"].get("type") == "record"
+                                    and isinstance(new_f.get("type"), dict)
+                                    and new_f["type"].get("type") == "record"
+                                ):
+                                    diffs.extend(
+                                        get_field_diff(
+                                            old_f["type"], new_f["type"], f"{prefix}{name}."
+                                        )
+                                    )
+                                elif old_f.get("type") != new_f.get("type"):
+                                    diffs.append(
+                                        f"Changed type: {prefix}{name} ({old_f.get('type')} -> {new_f.get('type')})"
+                                    )
+                                else:
+                                    diffs.append(f"Modified field: {prefix}{name}")
+                        return diffs
+
+                    changes = get_field_diff(old_json, new_json)
+                    if not changes:
+                        changes.append("Schema structure changed (reordered or metadata updated)")
+            except Exception:
+                changes.append("Schema definition updated")
+        else:
+            changes.append("Schema updated")
+
+        if not changes:
+            changes.append("No changes detected")
 
         return DomainSchemaDiff(
             type="update",
-            changes=changes,
+            changes=tuple(changes),
             current_version=current_info.version,
-            target_compatibility=spec.compatibility.value,
-            schema_type=current_info.schema_type,
+            target_compatibility=spec.compatibility.value
+            if hasattr(spec.compatibility, "value")
+            else spec.compatibility,
+            schema_type=current_info.schema_type
+            or (spec.schema_type.value if hasattr(spec.schema_type, "value") else spec.schema_type),
         )

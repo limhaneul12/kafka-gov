@@ -91,13 +91,16 @@ class ConfluentSchemaRegistryAdapter(ISchemaRegistryRepository):  # type: ignore
     ) -> DomainSchemaCompatibilityReport:
         """호환성 검증"""
         try:
-            # 스키마 정의 추출
+            # 스키마 정의 추출 및 정규화
             schema_str: str = self._extract_schema_string(spec)
+            schema_str = self._normalize_schema_string(schema_str)
 
             # Schema 객체 생성
             schema_obj = Schema(
                 schema_str=schema_str,
-                schema_type=spec.schema_type.value,
+                schema_type=spec.schema_type.value
+                if hasattr(spec.schema_type, "value")
+                else spec.schema_type,
                 references=[ref.to_dict() for ref in references] if references else [],
             )
 
@@ -198,7 +201,9 @@ class ConfluentSchemaRegistryAdapter(ISchemaRegistryRepository):  # type: ignore
         # Schema 객체 생성
         schema_obj = Schema(
             schema_str=schema_str,
-            schema_type=spec.schema_type.value,
+            schema_type=spec.schema_type.value
+            if hasattr(spec.schema_type, "value")
+            else spec.schema_type,
             references=references_list,
         )
 
@@ -334,24 +339,25 @@ class ConfluentSchemaRegistryAdapter(ISchemaRegistryRepository):  # type: ignore
         - 앞뒤 공백 제거
         - 유니코드 이스케이프 (Content-Length 버그 해결)
         """
-        # BOM 제거
+        import json
+
+        # BOM 제거 및 줄바꿈 정규화
         if schema_str.startswith("\ufeff"):
             schema_str = schema_str[1:]
 
-        # 앞뒤 공백 제거
+        schema_str = schema_str.replace("\r\n", "\n").replace("\r", "\n")
         schema_str = schema_str.strip()
 
-        # JSON 파싱 후 ASCII로 재직렬화 (유니코드 이스케이프)
-        # 이렇게 하면 한글 등 멀티바이트 문자가 \uXXXX로 변환되어
-        # 문자 수 == 바이트 수가 되어 Content-Length 문제 해결
         try:
-            parsed = orjson.loads(schema_str)
-            # orjson으로 압축 후 ASCII로 인코딩 (유니코드 이스케이프)
-            compressed = orjson.dumps(parsed).decode("utf-8")
-            # UTF-8 문자를 유니코드 이스케이프로 변환
-            schema_str = compressed.encode("ascii", "backslashreplace").decode("ascii")
-        except (orjson.JSONDecodeError, TypeError):
-            # JSON이 아니면 그대로 반환 (Protobuf 등)
-            pass
+            # 1. JSON인 경우: 파싱 후 ASCII로 재직렬화 (유니코드 이스케이프)
+            parsed = json.loads(schema_str)
+            # separators=(",", ":")는 공백을 제거하여 크기를 최소화하고
+            # ensure_ascii=True는 멀티바이트 문자를 \uXXXX로 변환함
+            schema_str = json.dumps(parsed, ensure_ascii=True, separators=(",", ":"))
+        except Exception:
+            # 2. JSON이 아니거나 파싱 실패한 경우 (드래프트 상태 등):
+            # 문자열 내 모든 비ASCII 문자를 \uXXXX 형식으로 강제 변환
+            # 이렇게 하면 len(schema_str) == byte_length 가 되어 Content-Length 문제를 방지함
+            schema_str = schema_str.encode("ascii", "backslashreplace").decode("ascii")
 
         return schema_str

@@ -1,5 +1,4 @@
-"""Schema 모듈 라우터 - 단순하고 실용적인 구현"""
-
+from dataclasses import asdict
 from typing import Annotated
 
 from dependency_injector.wiring import Provide, inject
@@ -17,13 +16,19 @@ from app.schema.interface.adapters import (
     safe_convert_request_to_batch,
 )
 from app.schema.interface.schemas import (
+    DashboardResponse,
+    ImpactGraphResponse,
+    RollbackRequest,
     SchemaBatchApplyResponse,
     SchemaBatchDryRunResponse,
     SchemaBatchRequest,
+    SchemaChangeRequest,
     SchemaDeleteImpactResponse,
+    SchemaHistoryResponse,
     SchemaSyncResponse,
     SchemaUploadResponse,
 )
+from app.schema.interface.schemas.search import SchemaSearchResponse
 from app.schema.interface.types.enums import CompatibilityMode, Environment
 from app.schema.interface.types.type_hints import ChangeId
 from app.shared.error_handlers import handle_api_errors, handle_server_errors
@@ -301,3 +306,176 @@ async def sync_schemas(
     """Schema Registry → DB 동기화"""
     result = await sync_use_case.execute(registry_id=registry_id, actor=DEFAULT_USER)
     return SchemaSyncResponse.model_validate(result)
+
+
+@router.get(
+    "/detail/{subject}",
+    status_code=status.HTTP_200_OK,
+    summary="스키마 상세 단건 조회",
+    description="특정 Subject의 최신 버전 스키마와 메타데이터를 통합하여 조회합니다.",
+)
+@inject
+@handle_server_errors(error_message="Failed to load schema detail")
+async def get_schema_detail(
+    subject: str,
+    registry_id: str = Query(..., description="Schema Registry ID"),
+    governance_use_case=Depends(Provide[AppContainer.schema_container.governance_use_case]),
+) -> dict:
+    """스키마 상세 조회"""
+    detail = await governance_use_case.get_subject_detail(registry_id=registry_id, subject=subject)
+    return asdict(detail)
+
+
+# -----------------------------------------------------------------------------
+# Governance Dashboard APIs
+# -----------------------------------------------------------------------------
+
+
+@router.get(
+    "/governance/dashboard",
+    response_model=DashboardResponse,
+    status_code=status.HTTP_200_OK,
+    summary="거버넌스 대시보드 (통계 & 점수)",
+    description="전체 스키마의 거버넌스 점수, 호환성 현황, 오너십 상태 등을 종합하여 보여줍니다.",
+)
+@inject
+@handle_server_errors(error_message="Failed to load dashboard")
+async def get_governance_dashboard(
+    registry_id: str = Query(..., description="Schema Registry ID"),
+    governance_use_case=Depends(Provide[AppContainer.schema_container.governance_use_case]),
+) -> DashboardResponse:
+    """거버넌스 대시보드 조회"""
+    stats = await governance_use_case.get_dashboard_stats(registry_id=registry_id)
+    return DashboardResponse.model_validate(asdict(stats))
+
+
+@router.get(
+    "/history/{subject}",
+    response_model=SchemaHistoryResponse,
+    status_code=status.HTTP_200_OK,
+    summary="스키마 타임머신 (이력 조회)",
+    description="특정 Subject의 모든 변경 이력을 시간 순으로 조회합니다.",
+)
+@inject
+@handle_server_errors(error_message="Failed to load history")
+async def get_schema_history(
+    subject: str,
+    registry_id: str = Query(..., description="Schema Registry ID"),
+    governance_use_case=Depends(Provide[AppContainer.schema_container.governance_use_case]),
+) -> SchemaHistoryResponse:
+    """스키마 이력 조회"""
+    history = await governance_use_case.get_history(registry_id=registry_id, subject=subject)
+    return SchemaHistoryResponse.model_validate(asdict(history))
+
+
+@router.get(
+    "/impact/{subject}",
+    response_model=ImpactGraphResponse,
+    status_code=status.HTTP_200_OK,
+    summary="영향도 그래프 (Lineage)",
+    description="스키마(Subject) -> 토픽 -> 컨슈머로 이어지는 의존 관계를 그래프 데이터로 반환합니다.",
+)
+@inject
+@handle_server_errors(error_message="Failed to load impact graph")
+async def get_impact_graph(
+    subject: str,
+    registry_id: str = Query(..., description="Schema Registry ID"),
+    governance_use_case=Depends(Provide[AppContainer.schema_container.governance_use_case]),
+) -> ImpactGraphResponse:
+    """스키마 영향도 그래프 조회"""
+    graph = await governance_use_case.get_impact_graph(registry_id=registry_id, subject=subject)
+    return ImpactGraphResponse.model_validate(asdict(graph))
+
+
+@router.get(
+    "/search",
+    response_model=SchemaSearchResponse,
+    status_code=status.HTTP_200_OK,
+    summary="스키마 검색 (필터링 & 페이지네이션)",
+    description="메타데이터(Subject, Owner)를 기반으로 스키마를 검색합니다.",
+)
+@inject
+@handle_server_errors(error_message="Failed to search schemas")
+async def search_schemas(
+    query: str | None = Query(None, description="검색어 (Subject 포함)"),
+    owner: str | None = Query(None, description="소유자 (Owner) 일치 검색"),
+    page: int = Query(1, ge=1, description="페이지 번호"),
+    limit: int = Query(20, ge=1, le=100, description="페이지 당 항목 수"),
+    search_use_case=Depends(Provide[AppContainer.schema_container.search_use_case]),
+) -> SchemaSearchResponse:
+    """스키마 검색"""
+    result = await search_use_case.execute(query=query, owner=owner, page=page, limit=limit)
+
+    # DomainSchemaArtifact -> SchemaArtifactResponse 변환
+    items = [
+        {
+            "subject": item.subject,
+            "version": item.version,
+            "storage_url": item.storage_url,
+            "checksum": item.checksum,
+            "schema_type": item.schema_type.value if item.schema_type else None,
+            "compatibility_mode": item.compatibility_mode.value
+            if item.compatibility_mode
+            else None,
+            "owner": item.owner,
+        }
+        for item in result.items
+    ]
+
+    return SchemaSearchResponse(
+        items=items,
+        total=result.total,
+        page=page,
+        limit=limit,
+    )
+
+
+@router.post(
+    "/plan-change",
+    response_model=SchemaBatchDryRunResponse,
+    status_code=status.HTTP_200_OK,
+    summary="단건 스키마 변경 계획 수립",
+    description="편집된 스키마에 대해 변경 계획(Diff, 영향도)을 수립합니다.",
+)
+@inject
+@handle_api_errors(validation_error_message="Plan failed")
+async def plan_schema_change(
+    request: SchemaChangeRequest,
+    registry_id: str = Query(..., description="Schema Registry ID"),
+    governance_use_case=Depends(Provide[AppContainer.schema_container.governance_use_case]),
+) -> SchemaBatchDryRunResponse:
+    """단건 스키마 변경 계획 수립"""
+    plan = await governance_use_case.plan_change(
+        registry_id=registry_id,
+        subject=request.subject,
+        new_schema=request.new_schema,
+        compatibility=request.compatibility
+        if isinstance(request.compatibility, str)
+        else request.compatibility.value,
+        actor=DEFAULT_USER,
+    )
+    return safe_convert_plan_to_response(plan)
+
+
+@router.post(
+    "/rollback/plan",
+    response_model=SchemaBatchDryRunResponse,
+    status_code=status.HTTP_200_OK,
+    summary="스키마 롤백 계획 수립",
+    description="특정 버전으로의 롤백 계획을 수립합니다.",
+)
+@inject
+@handle_api_errors(validation_error_message="Rollback plan failed")
+async def plan_schema_rollback(
+    request: RollbackRequest,
+    registry_id: str = Query(..., description="Schema Registry ID"),
+    governance_use_case=Depends(Provide[AppContainer.schema_container.governance_use_case]),
+) -> SchemaBatchDryRunResponse:
+    """스키마 롤백 계획 수립"""
+    plan = await governance_use_case.rollback(
+        registry_id=registry_id,
+        subject=request.subject,
+        version=request.version,
+        actor=DEFAULT_USER,
+    )
+    return safe_convert_plan_to_response(plan)

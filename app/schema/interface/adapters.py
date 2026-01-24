@@ -154,7 +154,15 @@ class SchemaConverter:
                 action=item.action.value,
                 current_version=item.current_version,
                 target_version=item.target_version,
-                diff=item.diff,
+                diff={
+                    "type": item.diff.type,
+                    "changes": list(item.diff.changes),
+                    "current_version": item.diff.current_version,
+                    "target_compatibility": item.diff.target_compatibility,
+                    "schema_type": item.diff.schema_type,
+                },
+                schema_definition=item.schema,
+                current_schema=item.current_schema,
             )
             for item in plan.items
         ]
@@ -185,6 +193,8 @@ class SchemaConverter:
                 subject=impact.subject,
                 topics=list(impact.topics),
                 consumers=list(impact.consumers),
+                status=getattr(impact, "status", "success"),
+                error_message=getattr(impact, "error_message", None),
             )
             for impact in plan.impacts
         ]

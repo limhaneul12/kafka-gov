@@ -1,53 +1,36 @@
-import { BrowserRouter, Routes, Route } from "react-router-dom";
-import { Toaster } from "sonner";
-import Layout from "./components/layout/Layout";
-import Dashboard from "./pages/Dashboard";
-import Topics from "./pages/Topics";
-import TopicDetail from "./pages/TopicDetail";
-import TopicPolicies from "./pages/TopicPolicies";
-import Schemas from "./pages/Schemas";
-import SchemaPolicies from "./pages/SchemaPolicies";
-import IncidentPolicies from "./pages/IncidentPolicies";
-import IncidentPolicyComposer from "./pages/IncidentPolicyComposer";
-import Consumers from "./pages/Consumers";
-import ConsumerDetail from "./pages/ConsumerDetail";
-import Analysis from "./pages/Analysis";
-import Settings from "./pages/Settings";
-import History from "./pages/History";
-import TeamAnalytics from "./pages/TeamAnalytics";
-import Connections from "./pages/Connections";
+
+import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
+import Layout from './components/layout/Sidebar';
+import Connections from './pages/Connections';
+import GovernanceDashboard from './pages/governance/Dashboard';
+import Policies from './pages/Policies';
+import SchemaDetail from './pages/schemas/SchemaDetail';
+import SchemaList from './pages/schemas/SchemaList';
+import Topics from './pages/Topics';
+import TopicDetail from './pages/TopicDetail';
+
+import { Toaster } from 'sonner';
 
 function App() {
   return (
-    <>
-      <Toaster position="top-right" richColors closeButton />
-      <BrowserRouter
-        future={{
-          v7_startTransition: true,
-          v7_relativeSplatPath: true,
-        }}
-      >
-        <Routes>
-          <Route path="/" element={<Layout />}>
-            <Route index element={<Dashboard />} />
-            <Route path="topics" element={<Topics />} />
-            <Route path="topics/:topicName" element={<TopicDetail />} />
-            <Route path="topics/policies" element={<TopicPolicies />} />
-            <Route path="schemas" element={<Schemas />} />
-            <Route path="schemas/policies" element={<SchemaPolicies />} />
-            <Route path="policies/incidents" element={<IncidentPolicies />} />
-            <Route path="policies/incidents/:policyId" element={<IncidentPolicyComposer />} />
-            <Route path="consumers" element={<Consumers />} />
-            <Route path="consumers/:groupId" element={<ConsumerDetail />} />
-            <Route path="analysis" element={<Analysis />} />
-            <Route path="team-analytics" element={<TeamAnalytics />} />
-            <Route path="history" element={<History />} />
-            <Route path="settings" element={<Settings />} />
-            <Route path="connections" element={<Connections />} />
-          </Route>
-        </Routes>
-      </BrowserRouter>
-    </>
+    <BrowserRouter>
+      <Toaster position="top-right" richColors />
+      <Routes>
+        <Route element={<Layout />}>
+          <Route path="/" element={<Navigate to="/governance/dashboard" replace />} />
+          <Route path="/governance/dashboard" element={<GovernanceDashboard />} />
+          <Route path="/schemas" element={<SchemaList />} />
+          <Route path="/schemas/:subject" element={<SchemaDetail />} />
+          <Route path="/topics" element={<Topics />} />
+          <Route path="/topics/:topicName" element={<TopicDetail />} />
+          <Route path="/connections" element={<Connections />} />
+          <Route path="/policies" element={<Policies />} />
+
+          {/* Fallback */}
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Route>
+      </Routes>
+    </BrowserRouter>
   );
 }
 

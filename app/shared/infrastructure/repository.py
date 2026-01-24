@@ -82,12 +82,10 @@ class MySQLAuditActivityRepository(IAuditActivityRepository):
         """최근 활동 조회 (Topic + Schema 통합) - UNION 쿼리 최적화"""
         async with self.session_factory() as session:
             # Topic 로그 서브쿼리
-            topic_query = _subquery_log_model(AuditLogModel, ActivityType.TOPIC).limit(limit)
+            topic_query = _subquery_log_model(AuditLogModel, ActivityType.TOPIC)
 
             # Schema 로그 서브쿼리
-            schema_query = _subquery_log_model(SchemaAuditLogModel, ActivityType.SCHEMA).limit(
-                limit
-            )
+            schema_query = _subquery_log_model(SchemaAuditLogModel, ActivityType.SCHEMA)
 
             # UNION ALL로 통합하고 timestamp 기준 정렬
             combined_query = (
@@ -196,4 +194,4 @@ class MySQLAuditActivityRepository(IAuditActivityRepository):
         if actor:
             query = query.where(model.actor.like(f"%{actor}%"))
 
-        return query.limit(limit)
+        return query

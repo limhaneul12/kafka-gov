@@ -6,6 +6,18 @@
 
 # Enums and Types
 # Internal Models (for infrastructure)
+# Governance Models
+from .governance import (
+    GovernanceDashboardStats,
+    GovernanceScore,
+    GraphLink,
+    GraphNode,
+    ImpactGraph,
+    SchemaHistoryItem,
+    SubjectDetail,
+    SubjectHistory,
+    SubjectStat as DomainSubjectStat,
+)
 from .internal import (
     Reference,
     SchemaVersionInfo,
@@ -67,48 +79,48 @@ from .value_objects import (
 )
 
 __all__ = [
-    # Type Aliases
     "Actor",
     "ChangeId",
-    # Utilities
     "CompatibilityResult",
     "DescribeResult",
-    # Enums
     "DomainCompatibilityMode",
     "DomainEnvironment",
     "DomainPlanAction",
-    # Policy Models
     "DomainPolicyViolation",
-    # Result Models
     "DomainSchemaApplyResult",
     "DomainSchemaArtifact",
     "DomainSchemaBatch",
     "DomainSchemaCompatibilityIssue",
     "DomainSchemaCompatibilityReport",
     "DomainSchemaDeleteImpact",
-    # Plan Models
     "DomainSchemaDiff",
     "DomainSchemaImpactRecord",
-    # Value Objects
     "DomainSchemaMetadata",
     "DomainSchemaPlan",
     "DomainSchemaPlanItem",
     "DomainSchemaReference",
     "DomainSchemaSource",
     "DomainSchemaSourceType",
-    # Specs and Batch
     "DomainSchemaSpec",
     "DomainSchemaType",
     "DomainSchemaUploadResult",
+    "DomainSubjectStat",
     "DomainSubjectStrategy",
     "FileReference",
+    "GovernanceDashboardStats",
+    "GovernanceScore",
+    "GraphLink",
+    "GraphNode",
+    "ImpactGraph",
     "ReasonText",
-    # Internal Models
     "Reference",
     "SchemaDefinition",
     "SchemaHash",
+    "SchemaHistoryItem",
     "SchemaVersionInfo",
     "SchemaYamlText",
+    "SubjectDetail",
+    "SubjectHistory",
     "SubjectName",
     "ensure_unique_subjects",
 ]

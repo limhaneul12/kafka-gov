@@ -4,11 +4,14 @@ from __future__ import annotations
 
 from dependency_injector import containers, providers
 
+from .application.services.schema_lint import SchemaLintService
 from .application.use_cases import (
+    GovernanceUseCase,
     SchemaBatchApplyUseCase,
     SchemaBatchDryRunUseCase,
     SchemaDeleteUseCase,
     SchemaPlanUseCase,
+    SchemaSearchUseCase,
     SchemaSyncUseCase,
     SchemaUploadUseCase,
 )
@@ -33,6 +36,9 @@ class SchemaContainer(containers.DeclarativeContainer):
 
     # Cluster 컨테이너 참조 (ConnectionManager 사용)
     cluster = providers.DependenciesContainer()
+
+    # Consumer 컨테이너 참조 (GetTopicConsumersUseCase 사용)
+    consumer = providers.DependenciesContainer()
 
     # MySQL 기반 구현체들 (Session Factory 패턴)
     metadata_repository: providers.Provider[ISchemaMetadataRepository] = providers.Factory(
@@ -85,4 +91,20 @@ class SchemaContainer(containers.DeclarativeContainer):
         connection_manager=cluster.connection_manager,  # ConnectionManager 주입
         metadata_repository=metadata_repository,
         audit_repository=audit_repository,
+    )
+
+    lint_service: providers.Provider[SchemaLintService] = providers.Factory(SchemaLintService)
+
+    governance_use_case: providers.Provider[GovernanceUseCase] = providers.Factory(
+        GovernanceUseCase,
+        connection_manager=cluster.connection_manager,  # ConnectionManager에서 Registry Client 획득
+        metadata_repository=metadata_repository,
+        audit_repository=audit_repository,
+        lint_service=lint_service,
+        get_topic_consumers_use_case=consumer.get_topic_consumers_use_case,
+    )
+
+    search_use_case: providers.Provider[SchemaSearchUseCase] = providers.Factory(
+        SchemaSearchUseCase,
+        metadata_repository=metadata_repository,
     )

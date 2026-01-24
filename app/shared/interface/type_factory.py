@@ -20,7 +20,7 @@ document_url_adapter = TypeAdapter(DocumentUrl)
 error_severity_adapter = TypeAdapter(ErrorSeverity)
 team_name_adapter = TypeAdapter(TeamName)
 
-COMMON_CHANGE_ID_PATTERN: Final[str] = r"^[a-zA-Z0-9_-]+$"
+COMMON_CHANGE_ID_PATTERN: Final[str] = r"^[a-zA-Z0-9_.-]+$"
 COMMON_TAG_NAME_PATTERN: Final[str] = r"^[a-z0-9_-]+$"
 COMMON_DOCUMENT_URL_PATTERN: Final[str] = r"^https?://.*"
 COMMON_ERROR_SEVERITY_PATTERN: Final[str] = r"^(error|warning)$"

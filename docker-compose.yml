@@ -10,7 +10,7 @@ services:
       retries: 5
       start_period: 10s
     networks:
-      - kafka-network
+      - kafka-gov-internal
     restart: unless-stopped
     volumes:
       - redis_data:/data
@@ -39,7 +39,7 @@ services:
           echo "[migration] Running Alembic upgrade to head..."
           uv run alembic -c alembic.ini upgrade head
     networks:
-      - kafka-network
+      - kafka-gov-internal
     restart: "no"  # 한 번만 실행
 
   app:
@@ -80,6 +80,7 @@ services:
       retries: 3
       start_period: 40s
     networks:
+      - kafka-gov-internal
       - kafka-network
     restart: unless-stopped
     volumes:
@@ -111,6 +112,7 @@ services:
       redis:
         condition: service_healthy
     networks:
+      - kafka-gov-internal
       - kafka-network
     restart: unless-stopped
     volumes:
@@ -141,6 +143,7 @@ services:
       redis:
         condition: service_healthy
     networks:
+      - kafka-gov-internal
       - kafka-network
     restart: unless-stopped
     volumes:
@@ -150,20 +153,20 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
-    # nginx를 통해서만 접근
+    # nginx를 통해서만 접근 (내부 포트 80)
     expose:
       - "80"
     depends_on:
       app:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost/"]
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost/health"]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 30s
     networks:
-      - kafka-network
+      - kafka-gov-internal
 
   # Nginx 리버스 프록시
   nginx:
@@ -171,12 +174,10 @@ services:
       context: ./nginx
       dockerfile: Dockerfile
       args:
-        # API 문서 Basic Auth 설정 (선택적)
-        # 프로덕션에서는 FastAPI가 문서를 비활성화하므로 불필요
         DOCS_AUTH_USER: ${DOCS_AUTH_USER:-admin}
         DOCS_AUTH_PASSWORD: ${DOCS_AUTH_PASSWORD:-changeme}
     ports:
-      - "80:80"
+      - "90:80"
     depends_on:
       app:
         condition: service_healthy
@@ -189,7 +190,7 @@ services:
       retries: 3
       start_period: 10s
     networks:
-      - kafka-network
+      - kafka-gov-internal
     restart: unless-stopped
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
@@ -202,5 +203,7 @@ volumes:
   db_data:
 
 networks:
+  kafka-gov-internal:
+    driver: bridge
   kafka-network:
     external: true

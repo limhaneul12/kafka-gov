@@ -19,6 +19,18 @@ logger = logging.getLogger(__name__)
 class IConnectionManager(ABC):
     """연결 관리자 인터페이스 (다른 모듈에서 주입받아 사용)"""
 
+    @property
+    @abstractmethod
+    def kafka_cluster_repo(self) -> IKafkaClusterRepository:
+        """Kafka 클러스터 리포지토리"""
+        ...
+
+    @property
+    @abstractmethod
+    def schema_registry_repo(self) -> ISchemaRegistryRepository:
+        """Schema Registry 리포지토리"""
+        ...
+
     @abstractmethod
     async def get_kafka_admin_client(self, cluster_id: str) -> AdminClient:
         """Kafka AdminClient 획득 (동적 생성/캐싱)"""
@@ -77,8 +89,8 @@ class ConnectionManager(IConnectionManager):
         kafka_cluster_repo: IKafkaClusterRepository,
         schema_registry_repo: ISchemaRegistryRepository,
     ) -> None:
-        self.kafka_cluster_repo = kafka_cluster_repo
-        self.schema_registry_repo = schema_registry_repo
+        self._kafka_cluster_repo = kafka_cluster_repo
+        self._schema_registry_repo = schema_registry_repo
 
         # 클라이언트 캐시 (resource_id -> client)
         self._kafka_clients: dict[str, AdminClient] = {}
@@ -87,6 +99,14 @@ class ConnectionManager(IConnectionManager):
 
         # 캐시 락 (동시 생성 방지) - 이벤트 루프별로 관리
         self._locks: dict[str, tuple[asyncio.AbstractEventLoop, asyncio.Lock]] = {}
+
+    @property
+    def kafka_cluster_repo(self) -> IKafkaClusterRepository:
+        return self._kafka_cluster_repo
+
+    @property
+    def schema_registry_repo(self) -> ISchemaRegistryRepository:
+        return self._schema_registry_repo
 
     async def get_kafka_admin_client(self, cluster_id: str) -> AdminClient:
         """Kafka AdminClient 획득 (동적 생성/캐싱)

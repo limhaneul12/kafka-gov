@@ -55,4 +55,5 @@ class AppContainer(containers.DeclarativeContainer):
         SchemaContainer,
         infrastructure=infrastructure_container,
         cluster=cluster_container,  # ConnectionManager 전달
+        consumer=consumer_container,
     )

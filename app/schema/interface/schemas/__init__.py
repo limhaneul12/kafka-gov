@@ -11,7 +11,17 @@ from .common import (
     SchemaReference,
     SchemaSource,
 )
-from .request import SchemaBatchItem, SchemaBatchRequest
+from .governance import (
+    DashboardResponse,
+    GovernanceScore,
+    GraphLink,
+    GraphNode,
+    ImpactGraphResponse,
+    SchemaHistoryItem,
+    SchemaHistoryResponse,
+    SubjectStat,
+)
+from .request import RollbackRequest, SchemaBatchItem, SchemaBatchRequest, SchemaChangeRequest
 from .response import (
     SchemaBatchApplyResponse,
     SchemaBatchDryRunResponse,
@@ -20,23 +30,36 @@ from .response import (
     SchemaSyncResponse,
     SchemaUploadResponse,
 )
+from .search import SchemaSearchResponse
 
 __all__ = [
+    "DashboardResponse",
+    "GovernanceScore",
+    "GraphLink",
+    "GraphNode",
+    "ImpactGraphResponse",
     "PolicyViolation",
+    "RollbackRequest",
     "SchemaArtifact",
+    "SchemaArtifactResponse",
     "SchemaBatchApplyResponse",
     "SchemaBatchDryRunResponse",
     "SchemaBatchItem",
     "SchemaBatchRequest",
+    "SchemaChangeRequest",
     "SchemaCompatibilityIssue",
     "SchemaCompatibilityReport",
     "SchemaDeleteImpactResponse",
+    "SchemaHistoryItem",
+    "SchemaHistoryResponse",
     "SchemaImpactRecord",
     "SchemaMetadata",
     "SchemaPlanItem",
     "SchemaReference",
+    "SchemaSearchResponse",
     "SchemaSource",
     "SchemaSyncCatalogMetrics",
     "SchemaSyncResponse",
     "SchemaUploadResponse",
+    "SubjectStat",
 ]
