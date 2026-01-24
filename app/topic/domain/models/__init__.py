@@ -53,37 +53,29 @@ from .types_enum import (
 )
 
 __all__ = [
-    # Type Aliases
     "ChangeId",
+    "ClusterMetrics",
     "DBMetadata",
     "DocumentUrl",
-    # Enums
     "DomainCleanupPolicy",
     "DomainEnvironment",
     "DomainPlanAction",
     "DomainTopicAction",
-    # Result
     "DomainTopicApplyResult",
     "DomainTopicBatch",
-    # Config and Metadata
     "DomainTopicConfig",
     "DomainTopicMetadata",
-    # Metrics
-    "ClusterMetrics",
-    "PartitionDetails",
-    "TopicMeta",
-    "TopicMetrics",
-    # Plan
     "DomainTopicPlan",
     "DomainTopicPlanItem",
-    # Spec and Batch
     "DomainTopicSpec",
-    # Report
     "DryRunItemReport",
     "DryRunReport",
     "DryRunSummary",
     "KafkaMetadata",
+    "PartitionDetails",
     "TeamName",
+    "TopicMeta",
+    "TopicMetrics",
     "TopicName",
     "ViolationDetail",
 ]

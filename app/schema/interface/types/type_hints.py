@@ -20,7 +20,7 @@ from app.shared.interface.type_factory import (
 SCHEMA_SUBJECT_PATTERN: Final[str] = r"^[a-z0-9._-]+(-key|-value)?$"
 SCHEMA_REFERENCE_NAME_PATTERN: Final[str] = r"^[A-Za-z_][A-Za-z0-9_.-]*$"
 SCHEMA_PLAN_ACTION_PATTERN: Final[str] = r"^(REGISTER|UPDATE|DELETE|NONE)$"
-SCHEMA_URL_PATTERN: Final[str] = r"^https?://.+$"
+SCHEMA_URL_PATTERN: Final[str] = r"^[a-zA-Z0-9+.-]+://.+$"
 
 
 # ===== 공통 타입 =====

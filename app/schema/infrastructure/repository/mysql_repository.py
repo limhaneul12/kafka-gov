@@ -9,6 +9,7 @@ from typing import Any
 
 from sqlalchemy import select
 from sqlalchemy.dialects.mysql import insert as mysql_insert
+from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.schema.domain.models import (
@@ -20,6 +21,7 @@ from app.schema.domain.models import (
     DomainSchemaArtifact,
     DomainSchemaCompatibilityIssue,
     DomainSchemaCompatibilityReport,
+    DomainSchemaDiff,
     DomainSchemaImpactRecord,
     DomainSchemaPlan,
     DomainSchemaPlanItem,
@@ -63,7 +65,13 @@ class MySQLSchemaMetadataRepository(ISchemaMetadataRepository):
                             "action": item.action.value,
                             "current_version": item.current_version,
                             "target_version": item.target_version,
-                            "diff": item.diff,
+                            "diff": {
+                                "type": item.diff.type,
+                                "changes": list(item.diff.changes),
+                                "current_version": item.diff.current_version,
+                                "target_compatibility": item.diff.target_compatibility,
+                                "schema_type": item.diff.schema_type,
+                            },
                         }
                         for item in plan.items
                     ],
@@ -95,23 +103,41 @@ class MySQLSchemaMetadataRepository(ISchemaMetadataRepository):
                     ],
                 }
 
-                # UPSERT: 동일 change_id가 있으면 업데이트
-                insert_stmt = mysql_insert(SchemaPlanModel).values(
-                    change_id=plan.change_id,
-                    env=plan.env.value,
-                    plan_data=plan_data,
-                    can_apply=plan.can_apply,
-                    created_by=created_by,
-                )
-
-                # ON DUPLICATE KEY UPDATE
-                upsert_stmt = insert_stmt.on_duplicate_key_update(
-                    env=insert_stmt.inserted.env,
-                    plan_data=insert_stmt.inserted.plan_data,
-                    can_apply=insert_stmt.inserted.can_apply,
-                    status="pending",  # 다시 pending으로 초기화
-                    updated_by=created_by,
-                )
+                # Dialect에 따른 UPSERT 처리
+                dialect = session.bind.dialect.name
+                if dialect == "mysql":
+                    insert_stmt = mysql_insert(SchemaPlanModel).values(
+                        change_id=plan.change_id,
+                        env=plan.env.value,
+                        plan_data=plan_data,
+                        can_apply=plan.can_apply,
+                        created_by=created_by,
+                    )
+                    upsert_stmt = insert_stmt.on_duplicate_key_update(
+                        env=insert_stmt.inserted.env,
+                        plan_data=insert_stmt.inserted.plan_data,
+                        can_apply=insert_stmt.inserted.can_apply,
+                        status="pending",
+                        updated_by=created_by,
+                    )
+                else:  # sqlite
+                    insert_stmt = sqlite_insert(SchemaPlanModel).values(
+                        change_id=plan.change_id,
+                        env=plan.env.value,
+                        plan_data=plan_data,
+                        can_apply=plan.can_apply,
+                        created_by=created_by,
+                    )
+                    upsert_stmt = insert_stmt.on_conflict_do_update(
+                        index_elements=["change_id"],
+                        set_={
+                            "env": insert_stmt.excluded.env,
+                            "plan_data": insert_stmt.excluded.plan_data,
+                            "can_apply": insert_stmt.excluded.can_apply,
+                            "status": "pending",
+                            "updated_by": created_by,
+                        },
+                    )
 
                 await session.execute(upsert_stmt)
                 await session.flush()
@@ -144,7 +170,13 @@ class MySQLSchemaMetadataRepository(ISchemaMetadataRepository):
                         action=DomainPlanAction(item["action"]),
                         current_version=item["current_version"],
                         target_version=item["target_version"],
-                        diff=item["diff"],
+                        diff=DomainSchemaDiff(
+                            type=item["diff"]["type"],
+                            changes=tuple(item["diff"]["changes"]),
+                            current_version=item["diff"]["current_version"],
+                            target_compatibility=item["diff"]["target_compatibility"],
+                            schema_type=item["diff"].get("schema_type"),
+                        ),
                     )
                     for item in plan_data["items"]
                 ]
@@ -245,23 +277,45 @@ class MySQLSchemaMetadataRepository(ISchemaMetadataRepository):
         """아티팩트 기록 (Upsert 패턴)"""
         async with self.session_factory() as session:
             try:
-                # MySQL INSERT ... ON DUPLICATE KEY UPDATE
-                stmt = mysql_insert(SchemaArtifactModel).values(
-                    subject=artifact.subject,
-                    version=artifact.version,
-                    storage_url=artifact.storage_url,
-                    checksum=artifact.checksum,
-                    change_id=change_id,
-                    schema_type=artifact.schema_type.value if artifact.schema_type else "UNKNOWN",
-                )
-
-                # 중복 시 업데이트
-                stmt = stmt.on_duplicate_key_update(
-                    storage_url=artifact.storage_url,
-                    checksum=artifact.checksum,
-                    change_id=change_id,
-                    schema_type=artifact.schema_type.value if artifact.schema_type else "UNKNOWN",
-                )
+                # Dialect에 따른 UPSERT 처리
+                dialect = session.bind.dialect.name
+                if dialect == "mysql":
+                    stmt = mysql_insert(SchemaArtifactModel).values(
+                        subject=artifact.subject,
+                        version=artifact.version,
+                        storage_url=artifact.storage_url,
+                        checksum=artifact.checksum,
+                        change_id=change_id,
+                        schema_type=artifact.schema_type.value
+                        if artifact.schema_type
+                        else "UNKNOWN",
+                    )
+                    stmt = stmt.on_duplicate_key_update(
+                        storage_url=stmt.inserted.storage_url,
+                        checksum=stmt.inserted.checksum,
+                        change_id=stmt.inserted.change_id,
+                        schema_type=stmt.inserted.schema_type,
+                    )
+                else:  # sqlite
+                    stmt = sqlite_insert(SchemaArtifactModel).values(
+                        subject=artifact.subject,
+                        version=artifact.version,
+                        storage_url=artifact.storage_url,
+                        checksum=artifact.checksum,
+                        change_id=change_id,
+                        schema_type=artifact.schema_type.value
+                        if artifact.schema_type
+                        else "UNKNOWN",
+                    )
+                    stmt = stmt.on_conflict_do_update(
+                        index_elements=["subject", "version"],
+                        set_={
+                            "storage_url": stmt.excluded.storage_url,
+                            "checksum": stmt.excluded.checksum,
+                            "change_id": stmt.excluded.change_id,
+                            "schema_type": stmt.excluded.schema_type,
+                        },
+                    )
 
                 await session.execute(stmt)
                 await session.flush()
@@ -433,3 +487,145 @@ class MySQLSchemaMetadataRepository(ISchemaMetadataRepository):
             except Exception as e:
                 logger.error(f"Failed to save schema metadata {subject}: {e}")
                 raise
+
+    async def search_artifacts(
+        self,
+        query: str | None = None,
+        owner: str | None = None,
+        limit: int = 20,
+        offset: int = 0,
+    ) -> tuple[list[DomainSchemaArtifact], int]:
+        """아티팩트 검색 (필터링 및 페이지네이션)"""
+        async with self.session_factory() as session:
+            try:
+                # Base Query: Metadata와 Artifact 조인
+                # (Subject별 최신 버전을 찾기 위해 서브쿼리나 Window Function이 필요할 수 있으나,
+                #  여기서는 단순화를 위해 모든 아티팩트를 대상으로 하거나, Metadata 기준 검색 후 최신 아티팩트 매핑)
+
+                # 전략: Metadata 기준으로 검색 후, 각 Subject의 최신 Artifact 조회
+
+                # 1. Metadata 필터링 Query
+                stmt = select(SchemaMetadataModel)
+
+                if query:
+                    stmt = stmt.where(SchemaMetadataModel.subject.contains(query))
+
+                if owner:
+                    stmt = stmt.where(SchemaMetadataModel.owner == owner)
+
+                # 전체 개수 조회
+                from sqlalchemy import func
+
+                count_stmt = select(func.count()).select_from(stmt.subquery())
+                total_result = await session.execute(count_stmt)
+                total_count = total_result.scalar() or 0
+
+                # 페이지네이션 적용
+                stmt = stmt.order_by(SchemaMetadataModel.subject).limit(limit).offset(offset)
+                result = await session.execute(stmt)
+                metadata_list = result.scalars().all()
+
+                if not metadata_list:
+                    return [], 0
+
+                # 2. 검색된 Subject들의 최신 Artifact 조회
+                subjects = [m.subject for m in metadata_list]
+
+                # 각 Subject별 최신 버전 Artifact 조회
+                # (MySQL/SQLite 호환 및 단순화를 위해 IN 절 사용 후 애플리케이션 레벨에서 그룹핑)
+                stmt_artifacts = (
+                    select(SchemaArtifactModel)
+                    .where(SchemaArtifactModel.subject.in_(subjects))
+                    .order_by(SchemaArtifactModel.subject, SchemaArtifactModel.version.desc())
+                )
+                result_artifacts = await session.execute(stmt_artifacts)
+                all_artifacts = result_artifacts.scalars().all()
+
+                # Subject별 최신 Artifact 추출
+                latest_artifacts_map = {}
+                for artifact in all_artifacts:
+                    if artifact.subject not in latest_artifacts_map:
+                        latest_artifacts_map[artifact.subject] = artifact
+
+                # 3. Domain Model로 변환
+                domain_artifacts = []
+                for meta in metadata_list:
+                    artifact = latest_artifacts_map.get(meta.subject)
+
+                    # 호환성 모드 파싱
+                    compat_mode = None
+                    if meta.description and "Compatibility:" in meta.description:
+                        try:
+                            mode_str = meta.description.split("Compatibility:")[1].strip()
+                            compat_mode = DomainCompatibilityMode(mode_str)
+                        except ValueError:
+                            pass
+
+                    domain_artifacts.append(
+                        DomainSchemaArtifact(
+                            subject=meta.subject,
+                            owner=meta.owner,
+                            compatibility_mode=compat_mode,
+                            # 아티팩트 정보가 있으면 채우고, 없으면(메타만 존재) None/Default
+                            version=artifact.version if artifact else None,
+                            storage_url=artifact.storage_url if artifact else None,
+                            checksum=artifact.checksum if artifact else None,
+                            schema_type=None,  # DB 모델에 스키마 타입이 있다면 추가
+                        )
+                    )
+
+                return domain_artifacts, total_count
+
+            except Exception as e:
+                logger.error(f"Failed to search artifacts: {e}")
+                return [], 0
+
+    async def get_latest_artifact(self, subject: str) -> DomainSchemaArtifact | None:
+        """Subject의 최신 아티팩트 및 메타데이터 조회"""
+        async with self.session_factory() as session:
+            try:
+                # 1. 최신 Artifact 조회
+                stmt_artifact = (
+                    select(SchemaArtifactModel)
+                    .where(SchemaArtifactModel.subject == subject)
+                    .order_by(SchemaArtifactModel.version.desc())
+                    .limit(1)
+                )
+                result_artifact = await session.execute(stmt_artifact)
+                artifact_model = result_artifact.scalar_one_or_none()
+
+                # 2. Metadata 조회
+                stmt_metadata = select(SchemaMetadataModel).where(
+                    SchemaMetadataModel.subject == subject
+                )
+                result_metadata = await session.execute(stmt_metadata)
+                metadata_model = result_metadata.scalar_one_or_none()
+
+                if not artifact_model and not metadata_model:
+                    return None
+
+                # 3. 호환성 모드 파싱
+                compat_mode = None
+                if (
+                    metadata_model
+                    and metadata_model.description
+                    and "Compatibility:" in metadata_model.description
+                ):
+                    try:
+                        mode_str = metadata_model.description.split("Compatibility:")[1].strip()
+                        compat_mode = DomainCompatibilityMode(mode_str)
+                    except ValueError:
+                        pass
+
+                return DomainSchemaArtifact(
+                    subject=subject,
+                    version=artifact_model.version if artifact_model else None,
+                    storage_url=artifact_model.storage_url if artifact_model else None,
+                    checksum=artifact_model.checksum if artifact_model else None,
+                    compatibility_mode=compat_mode,
+                    owner=metadata_model.owner if metadata_model else None,
+                )
+
+            except Exception as e:
+                logger.error(f"Failed to get latest artifact for {subject}: {e}")
+                return None

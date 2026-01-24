@@ -200,3 +200,18 @@ class SchemaBatchRequest(BaseModel):
                 adjusted_items.append(item)
 
         return self.model_copy(update={"items": adjusted_items})
+
+
+class SchemaChangeRequest(BaseModel):
+    """단건 스키마 변경 요청"""
+
+    subject: str
+    new_schema: str
+    compatibility: CompatibilityMode = CompatibilityMode.BACKWARD
+
+
+class RollbackRequest(BaseModel):
+    """스키마 롤백 요청"""
+
+    subject: str
+    version: int

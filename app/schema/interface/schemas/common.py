@@ -210,6 +210,8 @@ class SchemaImpactRecord(BaseModel):
     subject: SubjectName
     topics: list[StrictStr] = Field(default_factory=list, max_length=50)
     consumers: list[StrictStr] = Field(default_factory=list, max_length=50)
+    status: StrictStr = Field(default="success")
+    error_message: StrictStr | None = Field(default=None)
 
 
 class SchemaPlanItem(BaseModel):
@@ -225,6 +227,7 @@ class SchemaPlanItem(BaseModel):
                 "current_version": 6,
                 "target_version": 7,
                 "diff": {"fields": {"email": "added with default ''"}},
+                "schema_definition": {"type": "record", "name": "Order", "fields": []},
             }
         },
     )
@@ -234,6 +237,8 @@ class SchemaPlanItem(BaseModel):
     current_version: SchemaVersion | None = None
     target_version: SchemaVersion | None = None
     diff: dict[str, Any] = Field(default_factory=dict)
+    schema_definition: SchemaDefinition | None = None
+    current_schema: SchemaDefinition | None = None
 
 
 class SchemaArtifact(BaseModel):
@@ -256,3 +261,26 @@ class SchemaArtifact(BaseModel):
     version: SchemaVersion
     storage_url: StorageUrl | None = None  # Optional when no Object Storage
     checksum: SchemaHash | None = None
+
+
+class SchemaArtifactResponse(SchemaArtifact):
+    """스키마 아티팩트 응답 (검색용)"""
+
+    # 부모 설정 상속
+    model_config = ConfigDict(
+        frozen=True,
+        json_schema_extra={
+            "example": {
+                "subject": "prod.orders.created-value",
+                "version": 7,
+                "storage_url": "https://minio.local/schemas/prod/orders/7/schema.avsc",
+                "checksum": "5b2c3a9f",
+                "owner": "team-order",
+                "compatibility_mode": "BACKWARD",
+            }
+        },
+    )
+
+    owner: TeamName | None = Field(None, description="소유 팀")
+    compatibility_mode: CompatibilityMode | None = Field(None, description="호환성 모드")
+    schema_type: str | None = Field(None, description="스키마 타입 (AVRO, PROTOBUF 등)")

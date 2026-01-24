@@ -28,6 +28,11 @@ from app.schema.infrastructure.models import (
     SchemaUploadResultModel,
     SchemaAuditLogModel,
 )
+from app.schema.infrastructure.catalog_models import (
+    SchemaSubjectModel,
+    SchemaVersionModel,
+    ObservedUsageModel,
+)
 from app.cluster.infrastructure.models import (
     KafkaClusterModel,
     SchemaRegistryModel,

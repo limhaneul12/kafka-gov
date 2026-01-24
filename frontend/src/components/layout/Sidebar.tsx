@@ -1,78 +1,85 @@
-import { NavLink } from "react-router-dom";
-import { useTranslation } from "react-i18next";
-import {
-  LayoutDashboard,
-  List,
-  FileCode,
-  Server,
-  Shield,
-  Activity,
-  History as HistoryIcon,
-  Users,
-  Link,
-} from "lucide-react";
-import { cn } from "../../utils/cn";
+import React from 'react';
+import { NavLink, Outlet } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
+import { Database, LayoutDashboard, MessageSquare, Settings, Link as LinkIcon, ShieldCheck, Languages } from 'lucide-react';
 
-export default function Sidebar() {
-  const { t } = useTranslation();
-  
-  const navigation = [
-    { name: t("nav.dashboard"), to: "/", icon: LayoutDashboard },
-    { name: t("nav.topics"), to: "/topics", icon: List },
-    { name: t("nav.teamAnalysis"), to: "/team-analytics", icon: Activity, indent: true },
-    { name: t("nav.consumerGroups"), to: "/consumers", icon: Users, indent: true },
-    { name: t("nav.schemas"), to: "/schemas", icon: FileCode },
-    { name: t("nav.schemaAnalysis"), to: "/analysis", icon: Activity, indent: true },
-    { name: t("nav.policies"), to: "/topics/policies", icon: Shield },
-    { name: t("nav.policyTopic"), to: "/topics/policies", icon: Shield, indent: true },
-    { name: t("nav.policySchema"), to: "/schemas/policies", icon: Shield, indent: true },
-    { name: t("nav.policyIncident"), to: "/policies/incidents", icon: Shield, indent: true },
-    { name: t("nav.history"), to: "/history", icon: HistoryIcon },
-    { name: t("nav.connections"), to: "/connections", icon: Link },
-  ];
+// ... inside Sidebar ...
+const Sidebar = () => {
+  const { i18n } = useTranslation();
+  const toggleLanguage = () => {
+    i18n.changeLanguage(i18n.language === 'ko' ? 'en' : 'ko');
+  };
+
   return (
-    <div className="flex h-screen w-64 flex-col fixed left-0 top-0 bg-gray-900 text-white">
-      {/* Logo */}
-      <div className="flex h-16 items-center justify-center border-b border-gray-800">
-        <div className="flex items-center gap-2">
-          <div className="rounded-lg bg-blue-600 p-2">
-            <Server className="h-6 w-6" />
-          </div>
-          <span className="text-xl font-bold">Kafka Gov</span>
+    <aside className="w-64 bg-white border-r border-slate-200 min-h-screen flex flex-col fixed left-0 top-0 z-10">
+      <div className="p-6 border-b border-slate-100 flex items-center gap-3">
+        <div className="bg-indigo-600 p-2 rounded-lg">
+          <Database className="w-6 h-6 text-white" />
         </div>
+        <span className="font-bold text-xl text-slate-800 tracking-tight">Kafka Gov</span>
       </div>
 
-      {/* Navigation */}
-      <nav className="flex-1 space-y-1 p-4 overflow-y-auto">
-        {navigation.map((item) => (
-          <NavLink
-            key={item.to}
-            to={item.to}
-            end={item.to === "/"}
-            className={({ isActive }) =>
-              cn(
-                "flex items-center gap-3 rounded-lg px-4 py-3 text-sm font-medium transition-colors",
-                item.indent && "pl-8 py-2 text-xs",
-                isActive
-                  ? "bg-blue-600 text-white"
-                  : "text-gray-300 hover:bg-gray-800 hover:text-white"
-              )
-            }
-          >
-            <item.icon className={item.indent ? "h-4 w-4" : "h-5 w-5"} />
-            {item.indent && <span className="mr-1">↳</span>}
-            {item.name}
-          </NavLink>
-        ))}
+      <nav className="flex-1 p-4 space-y-1">
+        <NavItem to="/" icon={LayoutDashboard} label="Dashboard" />
+        <NavItem to="/topics" icon={MessageSquare} label="Topics" />
+        <NavItem to="/schemas" icon={Database} label="Schema Registry" />
+        <NavItem to="/policies" icon={ShieldCheck} label="Policies" />
+        <NavItem to="/connections" icon={LinkIcon} label="Connections" />
+        <NavItem to="/settings" icon={Settings} label="Settings" />
       </nav>
 
-      {/* Footer */}
-      <div className="border-t border-gray-800 p-4">
-        <div className="text-xs text-gray-400">
-          <div>Kafka Governance</div>
-          <div className="mt-1">v0.1.0</div>
+      <div className="p-4 border-t border-slate-100 space-y-2">
+        <button
+          onClick={toggleLanguage}
+          className="flex items-center gap-3 px-4 py-2 w-full text-sm font-medium text-slate-600 hover:bg-slate-50 rounded-lg transition-colors"
+        >
+          <Languages className="w-5 h-5" />
+          {i18n.language === 'ko' ? 'English' : '한국어'}
+        </button>
+        <div className="flex items-center gap-3 px-4 py-2">
+          <div className="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center font-bold text-slate-500 text-xs">
+            AD
+          </div>
+          <div>
+            <p className="text-sm font-medium text-slate-700">Admin User</p>
+            <p className="text-xs text-slate-400">admin@example.com</p>
+          </div>
         </div>
       </div>
+    </aside>
+  );
+};
+
+const NavItem = ({
+  to,
+  icon: Icon,
+  label,
+}: {
+  to: string;
+  icon: React.ElementType;
+  label: string;
+}) => (
+  <NavLink
+    to={to}
+    className={({ isActive }) =>
+      `flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors ${isActive
+        ? 'bg-indigo-50 text-indigo-700'
+        : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
+      }`
+    }
+  >
+    <Icon className="w-5 h-5" />
+    {label}
+  </NavLink>
+);
+
+export default function Layout() {
+  return (
+    <div className="min-h-screen bg-slate-50 flex">
+      <Sidebar />
+      <main className="flex-1 ml-64 p-8">
+        <Outlet />
+      </main>
     </div>
   );
 }

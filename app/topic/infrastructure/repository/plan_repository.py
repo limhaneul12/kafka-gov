@@ -10,6 +10,7 @@ from typing import Any
 
 from sqlalchemy import select
 from sqlalchemy.dialects.mysql import insert as mysql_insert
+from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.shared.domain.policy_types import (
@@ -78,23 +79,41 @@ class PlanRepository:
                     ],
                 }
 
-                # UPSERT: 동일 change_id가 있으면 업데이트
-                insert_stmt = mysql_insert(TopicPlanModel).values(
-                    change_id=plan.change_id,
-                    env=plan.env.value,
-                    plan_data=plan_data,
-                    can_apply=plan.can_apply,
-                    created_by=created_by,
-                )
-
-                # ON DUPLICATE KEY UPDATE
-                upsert_stmt = insert_stmt.on_duplicate_key_update(
-                    env=insert_stmt.inserted.env,
-                    plan_data=insert_stmt.inserted.plan_data,
-                    can_apply=insert_stmt.inserted.can_apply,
-                    status="pending",  # 다시 pending으로 초기화
-                    updated_by=created_by,
-                )
+                # Dialect에 따른 UPSERT 처리
+                dialect = session.bind.dialect.name
+                if dialect == "mysql":
+                    insert_stmt = mysql_insert(TopicPlanModel).values(
+                        change_id=plan.change_id,
+                        env=plan.env.value,
+                        plan_data=plan_data,
+                        can_apply=plan.can_apply,
+                        created_by=created_by,
+                    )
+                    upsert_stmt = insert_stmt.on_duplicate_key_update(
+                        env=insert_stmt.inserted.env,
+                        plan_data=insert_stmt.inserted.plan_data,
+                        can_apply=insert_stmt.inserted.can_apply,
+                        status="pending",
+                        updated_by=created_by,
+                    )
+                else:  # sqlite (and potentially postgres)
+                    insert_stmt = sqlite_insert(TopicPlanModel).values(
+                        change_id=plan.change_id,
+                        env=plan.env.value,
+                        plan_data=plan_data,
+                        can_apply=plan.can_apply,
+                        created_by=created_by,
+                    )
+                    upsert_stmt = insert_stmt.on_conflict_do_update(
+                        index_elements=["change_id"],
+                        set_={
+                            "env": insert_stmt.excluded.env,
+                            "plan_data": insert_stmt.excluded.plan_data,
+                            "can_apply": insert_stmt.excluded.can_apply,
+                            "status": "pending",
+                            "updated_by": created_by,
+                        },
+                    )
 
                 await session.execute(upsert_stmt)
                 await session.flush()

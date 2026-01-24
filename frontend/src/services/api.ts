@@ -1,7 +1,7 @@
 import axios from "axios";
 
 const api = axios.create({
-  baseURL: "/api",
+  baseURL: "/api/",
   headers: {
     "Content-Type": "application/json",
   },
@@ -53,8 +53,8 @@ export const testAPIConnection = async () => {
   } catch (error: unknown) {
     const err = error as { message?: string; response?: { data?: unknown }; config?: { url?: string; baseURL?: string }; request?: unknown };
     console.error("❌ API Connection Failed:", err.message);
-    return { 
-      success: false, 
+    return {
+      success: false,
       error: err.response?.data || err.message,
       details: {
         url: err.config?.url,
@@ -70,9 +70,9 @@ export default api;
 
 // API 엔드포인트 함수들
 export const topicsAPI = {
-  list: (clusterId: string, page: number = 1, size: number = 20) => 
+  list: (clusterId: string, page: number = 1, size: number = 20) =>
     api.get(`/v1/topics?cluster_id=${clusterId}&page=${page}&size=${size}`),
-  listAll: (clusterId: string) => 
+  listAll: (clusterId: string) =>
     api.get(`/v1/topics/all?cluster_id=${clusterId}`),
   uploadAndDryRun: (clusterId: string, file: File) => {
     const formData = new FormData();
@@ -137,6 +137,14 @@ export const schemasAPI = {
     api.post(`/v1/schemas/delete/analyze?registry_id=${registryId}`, null, {
       params: { subject },
     }),
+  dryRun: (registryId: string, data: any) =>
+    api.post(`/v1/schemas/batch/dry-run?registry_id=${registryId}`, data),
+  apply: (registryId: string, data: any) =>
+    api.post(`/v1/schemas/batch/apply?registry_id=${registryId}`, data),
+  planChange: (registryId: string, data: { subject: string; new_schema: string; compatibility: string }) =>
+    api.post(`/v1/schemas/plan-change?registry_id=${registryId}`, data),
+  planRollback: (registryId: string, data: { subject: string; version: number }) =>
+    api.post(`/v1/schemas/rollback/plan?registry_id=${registryId}`, data),
 };
 
 export const clustersAPI = {
@@ -144,21 +152,21 @@ export const clustersAPI = {
   listKafka: () => api.get("/v1/clusters/brokers"),
   getKafka: (clusterId: string) => api.get(`/v1/clusters/brokers/${clusterId}`),
   createKafka: (data: Record<string, string>) => api.post("/v1/clusters/brokers", data),
-  updateKafka: (clusterId: string, data: Record<string, unknown>) => 
+  updateKafka: (clusterId: string, data: Record<string, unknown>) =>
     api.put(`/v1/clusters/brokers/${clusterId}`, data),
   deleteKafka: (clusterId: string) => api.delete(`/v1/clusters/brokers/${clusterId}`),
   activateKafka: (clusterId: string) => api.patch(`/v1/clusters/brokers/${clusterId}/activate`),
   testKafka: (clusterId: string) =>
     api.post(`/v1/clusters/brokers/${clusterId}/test`),
-  
+
   // Schema Registries
   listRegistries: () => api.get("/v1/clusters/schema-registries"),
   getRegistry: (registryId: string) => api.get(`/v1/clusters/schema-registries/${registryId}`),
-  createRegistry: (data: Record<string, string>) => 
+  createRegistry: (data: Record<string, string>) =>
     api.post("/v1/clusters/schema-registries", data),
-  updateRegistry: (registryId: string, data: Record<string, unknown>) => 
+  updateRegistry: (registryId: string, data: Record<string, unknown>) =>
     api.put(`/v1/clusters/schema-registries/${registryId}`, data),
-  deleteRegistry: (registryId: string) => 
+  deleteRegistry: (registryId: string) =>
     api.delete(`/v1/clusters/schema-registries/${registryId}`),
   activateRegistry: (registryId: string) => api.patch(`/v1/clusters/schema-registries/${registryId}/activate`),
   testRegistry: (registryId: string) =>
@@ -209,31 +217,31 @@ export const consumerAPI = {
   // Consumer Groups 목록
   listGroups: (clusterId: string) =>
     api.get(`/v1/consumers/groups?cluster_id=${clusterId}`),
-  
+
   // Consumer Group 메트릭
   getMetrics: (clusterId: string, groupId: string) =>
     api.get(`/v1/consumers/groups/${groupId}/metrics?cluster_id=${clusterId}`),
-  
+
   // Consumer Group 상세 요약
   getSummary: (clusterId: string, groupId: string) =>
     api.get(`/v1/consumers/groups/${groupId}/summary?cluster_id=${clusterId}`),
-  
+
   // 멤버 목록
   getMembers: (clusterId: string, groupId: string) =>
     api.get(`/v1/consumers/groups/${groupId}/members?cluster_id=${clusterId}`),
-  
+
   // 파티션 목록
   getPartitions: (clusterId: string, groupId: string) =>
     api.get(`/v1/consumers/groups/${groupId}/partitions?cluster_id=${clusterId}`),
-  
+
   // 리밸런스 이벤트
   getRebalanceEvents: (clusterId: string, groupId: string, limit = 10) =>
     api.get(`/v1/consumers/groups/${groupId}/rebalance?cluster_id=${clusterId}&limit=${limit}`),
-  
+
   // 정책 어드바이저
   getAdvice: (clusterId: string, groupId: string) =>
     api.get(`/v1/consumers/groups/${groupId}/advice?cluster_id=${clusterId}`),
-  
+
   // 토픽별 컨슈머 매핑
   getTopicConsumers: (clusterId: string, topic: string) =>
     api.get(`/v1/topics/${topic}/consumers?cluster_id=${clusterId}`),

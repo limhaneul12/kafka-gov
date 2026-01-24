@@ -48,6 +48,8 @@ class DomainSchemaImpactRecord:
     subject: SubjectName
     topics: tuple[str, ...] = ()
     consumers: tuple[str, ...] = ()
+    status: str = "success"  # success, failure
+    error_message: str | None = None
 
 
 @dataclass(frozen=True, slots=True)

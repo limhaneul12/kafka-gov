@@ -87,6 +87,24 @@ class ISchemaMetadataRepository(ABC):
     async def save_schema_metadata(self, subject: SubjectName, metadata: dict[str, Any]) -> None:
         """스키마 메타데이터 저장"""
 
+    @abstractmethod
+    async def search_artifacts(
+        self,
+        query: str | None = None,
+        owner: str | None = None,
+        limit: int = 20,
+        offset: int = 0,
+    ) -> tuple[list[DomainSchemaArtifact], int]:
+        """아티팩트 검색 (필터링 및 페이지네이션)
+
+        Returns:
+            (artifacts, total_count)
+        """
+
+    @abstractmethod
+    async def get_latest_artifact(self, subject: SubjectName) -> DomainSchemaArtifact | None:
+        """Subject의 최신 아티팩트 조회"""
+
 
 class ISchemaAuditRepository(ABC):
     """감사 로그 리포지토리"""

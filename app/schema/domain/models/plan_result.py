@@ -36,6 +36,8 @@ class DomainSchemaPlanItem:
     current_version: int | None
     target_version: int | None
     diff: DomainSchemaDiff
+    schema: str | None = None  # New schema
+    current_schema: str | None = None  # Current schema for diff
 
 
 @dataclass(frozen=True, slots=True)

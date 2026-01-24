@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import ORJSONResponse
@@ -196,9 +196,46 @@ def create_app() -> FastAPI:
             content={"detail": friendly_message},
         )
 
+    @app.exception_handler(HTTPException)
+    async def http_exception_handler(request: Request, exc: HTTPException):
+        """HTTPException 핸들러 - 5xx 에러인 경우 상세 메시지 마스킹"""
+        if exc.status_code >= 500:
+            logger.error(
+                "internal_server_error",
+                status_code=exc.status_code,
+                detail=str(exc.detail),
+                exc_info=True,
+            )
+            return ORJSONResponse(
+                status_code=exc.status_code,
+                content={
+                    "detail": "An unexpected server error occurred. Please contact the administrator."
+                },
+            )
+        return ORJSONResponse(
+            status_code=exc.status_code,
+            content={"detail": exc.detail},
+        )
+
+    @app.exception_handler(Exception)
+    async def global_exception_handler(request: Request, exc: Exception):
+        """Unhandled Exception 핸들러 - 상세 로깅 후 사용자에게는 일반 메시지 반환"""
+        logger.error(
+            "unhandled_exception",
+            error_type=exc.__class__.__name__,
+            error_message=str(exc),
+            exc_info=True,
+        )
+        return ORJSONResponse(
+            status_code=500,
+            content={
+                "detail": "An internal server error occurred. The technical details have been logged."
+            },
+        )
+
     @app.exception_handler(404)
     async def not_found_exception_handler(request: Request, exc: Exception):
-        return ORJSONResponse(status_code=404, content={"message": "Not Found"})
+        return ORJSONResponse(status_code=404, content={"detail": "Resource not found"})
 
     return app
 

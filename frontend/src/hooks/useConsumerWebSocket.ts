@@ -71,15 +71,15 @@ export function useConsumerWebSocket({
   const getWebSocketUrl = useCallback(() => {
     // 환경 변수에서 WebSocket URL 가져오기 (있으면 사용, 없으면 자동 감지)
     const wsBaseUrl = import.meta.env.VITE_WS_BASE_URL;
-    
+
     if (wsBaseUrl) {
       return `${wsBaseUrl}/ws/consumers/groups/${groupId}/live?cluster_id=${clusterId}&interval=${interval}`;
     }
-    
+
     // Fallback: 자동 감지
     const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
     let host = window.location.host;
-    
+
     // Vite dev server (포트 5173) → Backend (포트 8000)
     if (host.includes(":5173")) {
       host = host.replace(":5173", ":8000");
@@ -88,7 +88,7 @@ export function useConsumerWebSocket({
     else if (!host.includes(":")) {
       host = `${host}:8000`;
     }
-    
+
     return `${protocol}//${host}/ws/consumers/groups/${groupId}/live?cluster_id=${clusterId}&interval=${interval}`;
   }, [clusterId, groupId, interval]);
 
@@ -148,12 +148,12 @@ export function useConsumerWebSocket({
       if (autoConnect && reconnectAttempts.current < maxReconnectAttempts) {
         const delay = Math.min(1000 * Math.pow(2, reconnectAttempts.current), 30000);
         reconnectAttempts.current += 1;
-        
+
         console.log(
           `Reconnecting in ${delay / 1000}s (attempt ${reconnectAttempts.current}/${maxReconnectAttempts})`
         );
 
-        reconnectTimeoutRef.current = setTimeout(() => {
+        reconnectTimeoutRef.current = window.setTimeout(() => {
           connect();
         }, delay);
       } else if (reconnectAttempts.current >= maxReconnectAttempts) {
