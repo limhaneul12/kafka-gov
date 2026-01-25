@@ -210,17 +210,21 @@ Environment-specific rules prevent production incidents:
 | Min ISR | ≥ 1 | ≥ 2 ⚠️ |
 | 'tmp' prefix | ✅ | 🚫 |
 
-### �️ Schema Governance (New)
+### 🛡️ Schema Governance (New)
 
-Advanced schema quality control and life-cycle management:
+Advanced schema quality control and life-cycle management to ensure data consistency across the enterprise:
 
-- **📊 Governance Dashboard**: Real-time health scoring based on compatibility, documentation, and linting quality.
-- **🛡️ Custom Guardrails**: Define your own linting rules and environment-specific compliance policies (e.g., mandatory 'doc' fields, forbidden naming patterns).
-- **🕒 Schema Time Machine**: Complete history of every schema version with 1-click rollback plans.
-- **📈 Impact Analysis**: Visual graph showing which topics and consumers are affected by a schema change.
+- **📊 Governance Dashboard**: Real-time health scoring for every schema. Scores are calculated based on compatibility levels, documentation coverage, and compliance with organizational linting rules.
+- **🛡️ Custom Guardrails (Policies)**: Define and enforce your own linting rules (e.g., mandatory 'doc' fields, naming conventions) and environment-specific compliance policies to prevent breaking changes.
+- **🕒 Schema Time Machine**: Access the complete history of every schema version. Track who changed what and when, with automated rollback plans to quickly revert to a stable state.
+- **📈 Impact Analysis**: A visual dependency graph that identifies exactly which topics and consumers will be affected by a schema change, reducing the risk of downstream failures.
 
 <div align="center">
-  <img src="./image/governance_dashboard.png" alt="Governance Dashboard" width="750"/>
+  <img src="./image/schema_linting.png" alt="Schema Linting & Violations" width="750"/>
+  <p><i>Real-time Schema Linting and Policy Violation Detection</i></p>
+  <br/>
+  <img src="./image/impact_analysis.png" alt="Schema Impact Analysis" width="750"/>
+  <p><i>Visualizing Schema-Topic Dependencies and Impact</i></p>
 </div>
 
 ### 📊 Real-time Monitoring
