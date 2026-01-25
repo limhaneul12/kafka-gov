@@ -5,6 +5,7 @@ from .batch_dry_run import SchemaBatchDryRunUseCase
 from .delete import SchemaDeleteUseCase
 from .governance import GovernanceUseCase
 from .plan import SchemaPlanUseCase
+from .policy_management import SchemaPolicyUseCase
 from .search import SchemaSearchUseCase
 from .sync import SchemaSyncUseCase
 from .upload import SchemaUploadUseCase
@@ -15,6 +16,7 @@ __all__ = [
     "SchemaBatchDryRunUseCase",
     "SchemaDeleteUseCase",
     "SchemaPlanUseCase",
+    "SchemaPolicyUseCase",
     "SchemaSearchUseCase",
     "SchemaSyncUseCase",
     "SchemaUploadUseCase",

@@ -18,6 +18,7 @@ from ..models import (
     Reference,
     SubjectName,
 )
+from ..models.policy_management import DomainSchemaPolicy, SchemaPolicyStatus, SchemaPolicyType
 
 
 class ISchemaRegistryRepository(ABC):
@@ -121,3 +122,37 @@ class ISchemaAuditRepository(ABC):
         snapshot: dict[str, Any] | None = None,
     ) -> str:
         """감사 로그 기록"""
+
+
+class ISchemaPolicyRepository(ABC):
+    """스키마 정책 리포지토리 인터페이스"""
+
+    @abstractmethod
+    async def save(self, policy: DomainSchemaPolicy) -> None:
+        """정책 저장 (버전 관리 포함)"""
+
+    @abstractmethod
+    async def get_by_id(
+        self, policy_id: str, version: int | None = None
+    ) -> DomainSchemaPolicy | None:
+        """특정 ID와 버전의 정책 조회 (버전 생략 시 최신 버전)"""
+
+    @abstractmethod
+    async def list_active_policies(
+        self, env: str | None = None, policy_type: SchemaPolicyType | None = None
+    ) -> list[DomainSchemaPolicy]:
+        """활성화된 정책 목록 조회"""
+
+    @abstractmethod
+    async def list_all_policies(
+        self, env: str | None = None, policy_type: SchemaPolicyType | None = None
+    ) -> list[DomainSchemaPolicy]:
+        """모든 정책 목록 조회 (상태 무관)"""
+
+    @abstractmethod
+    async def get_history(self, policy_id: str) -> list[DomainSchemaPolicy]:
+        """정책의 모든 버전 이력 조회"""
+
+    @abstractmethod
+    async def update_status(self, policy_id: str, version: int, status: SchemaPolicyStatus) -> None:
+        """정책 상태 업데이트"""

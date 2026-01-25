@@ -27,9 +27,11 @@ from app.schema.domain.models import (
     SubjectHistory,
     SubjectName,
 )
+from app.schema.domain.policies.dynamic_engine import DynamicSchemaPolicyEngine
 from app.schema.domain.repositories.interfaces import (
     ISchemaAuditRepository,
     ISchemaMetadataRepository,
+    ISchemaPolicyRepository,
 )
 from app.schema.domain.services import SchemaPlannerService
 from app.schema.infrastructure.schema_registry_adapter import ConfluentSchemaRegistryAdapter
@@ -46,12 +48,14 @@ class GovernanceUseCase:
         audit_repository: ISchemaAuditRepository,
         lint_service: SchemaLintService,
         get_topic_consumers_use_case: GetTopicConsumersUseCase,
+        policy_repository: ISchemaPolicyRepository | None = None,
     ) -> None:
         self.connection_manager = connection_manager
         self.metadata_repository = metadata_repository
         self.audit_repository = audit_repository
         self.lint_service = lint_service
         self.get_topic_consumers_use_case = get_topic_consumers_use_case
+        self.policy_repository = policy_repository
 
     async def plan_change(
         self,
@@ -154,9 +158,27 @@ class GovernanceUseCase:
 
     async def get_dashboard_stats(self, registry_id: str) -> GovernanceDashboardStats:
         """거버넌스 대시보드 통계 조회"""
-        # ConnectionManager로 Registry Client 획득
-        registry_client = await self.connection_manager.get_schema_registry_client(registry_id)
-        registry_repository = ConfluentSchemaRegistryAdapter(registry_client)
+        try:
+            # ConnectionManager로 Registry Client 획득
+            registry_client = await self.connection_manager.get_schema_registry_client(registry_id)
+            registry_repository = ConfluentSchemaRegistryAdapter(registry_client)
+        except Exception:
+            # logger가 GovernanceUseCase 클래스의 멤버로 정의되어 있지 않을 수 있으므로,
+            # 만약 logger 변수가 file-level에서 정의되어 있다면 그것을 사용함.
+            # get_dashboard_stats가 GovernanceUseCase 내부에 있으므로, self.logger를 쓰거나
+            # 해당 파일 상단에 정의된 logger를 사용해야 함.
+            return GovernanceDashboardStats(
+                total_subjects=0,
+                total_versions=0,
+                orphan_subjects=0,
+                scores=GovernanceScore(
+                    compatibility_pass_rate=0.0,
+                    documentation_coverage=0.0,
+                    average_lint_score=0.0,
+                    total_score=0.0,
+                ),
+                top_subjects=[],
+            )
 
         # 1. 모든 Subject 조회
         all_subjects = await registry_repository.list_all_subjects()
@@ -172,10 +194,17 @@ class GovernanceUseCase:
             if artifact.subject in all_subjects
         }
 
+        # 활성화된 정책 로드 (거버넌스 점수 계산용)
+        active_policies = []
+        if self.policy_repository:
+            active_policies = await self.policy_repository.list_active_policies(env="total")
+
+        policy_engine = DynamicSchemaPolicyEngine(active_policies)
+
         # 3. 통계 계산
         orphan_count = 0
         doc_count = 0
-        total_lint_score = 0.0
+        total_policy_score = 0.0
 
         # 상위 Subject 목록
         top_subjects = []
@@ -183,7 +212,7 @@ class GovernanceUseCase:
         # 샘플링 검사 (최대 50개) - 성능 고려
         target_subjects = all_subjects[:50]
 
-        # 병렬로 스키마 조회 및 린트 수행
+        # 병렬로 스키마 조회
         tasks = [registry_repository.describe_subjects([sub]) for sub in target_subjects]
         schema_results = await asyncio.gather(*tasks, return_exceptions=True)
 
@@ -206,13 +235,32 @@ class GovernanceUseCase:
             if not owner:
                 orphan_count += 1
 
-            # Lint 수행
-            lint_score = 0.0
+            # Policy 검증 (Lint + Guardrails)
+            violations = []
+            policy_score = 1.0
             if schema_info.schema:
-                report = self.lint_service.lint_avro_schema(schema_info.schema)
-                lint_score = report.risk_score
-                lint_score = 1.0 - lint_score
-                total_lint_score += lint_score
+                # Mock spec for evaluation
+                spec_mock = DomainSchemaSpec(
+                    subject=subject,
+                    schema=schema_info.schema,
+                    schema_type=DomainSchemaType(schema_info.schema_type)
+                    if schema_info.schema_type
+                    else DomainSchemaType.AVRO,
+                    compatibility=DomainCompatibilityMode(
+                        (
+                            meta.compatibility_mode.value
+                            if hasattr(meta.compatibility_mode, "value")
+                            else meta.compatibility_mode
+                        )
+                        if meta and meta.compatibility_mode
+                        else "NONE"
+                    ),
+                )
+                violations = policy_engine.evaluate(spec_mock, env="total")
+
+                # 감점 방식 (간단히 위반 개수당 0.1 차감, 0.5 하한)
+                policy_score = max(0.5, 1.0 - (len(violations) * 0.1))
+                total_policy_score += policy_score
 
             # Doc 체크
             has_doc = bool(meta)
@@ -232,17 +280,21 @@ class GovernanceUseCase:
                     )
                     if meta and meta.compatibility_mode
                     else None,
-                    lint_score=lint_score,
+                    lint_score=policy_score,
                     has_doc=has_doc,
+                    violations=[
+                        {"rule": v.rule, "message": v.message, "severity": v.severity}
+                        for v in violations
+                    ],
                 )
             )
 
         # 점수 집계
-        avg_lint = total_lint_score / len(target_subjects) if target_subjects else 0.0
+        avg_policy = total_policy_score / len(target_subjects) if target_subjects else 0.0
         doc_rate = doc_count / len(target_subjects) if target_subjects else 0.0
         compat_rate = 0.95
 
-        total_score = (avg_lint + doc_rate + compat_rate) / 3
+        total_score = (avg_policy + doc_rate + compat_rate) / 3
 
         return GovernanceDashboardStats(
             total_subjects=total_subjects,
@@ -251,7 +303,7 @@ class GovernanceUseCase:
             scores=GovernanceScore(
                 compatibility_pass_rate=compat_rate,
                 documentation_coverage=doc_rate,
-                average_lint_score=avg_lint,
+                average_lint_score=avg_policy,
                 total_score=total_score,
             ),
             top_subjects=top_subjects,
@@ -269,6 +321,31 @@ class GovernanceUseCase:
         info = describe_res[subject]
         artifact = await self.metadata_repository.get_latest_artifact(subject)
 
+        # Policy 검증 수행
+        env_str = subject.split(".")[0] if "." in subject else "dev"
+        active_policies = []
+        if self.policy_repository:
+            # 해당 환경 및 전체 정책 로드
+            active_policies = await self.policy_repository.list_active_policies(env=env_str)
+
+        policy_engine = DynamicSchemaPolicyEngine(active_policies)
+
+        violations = []
+        policy_score = 1.0
+        if info.schema:
+            spec_mock = DomainSchemaSpec(
+                subject=subject,
+                schema=info.schema,
+                schema_type=DomainSchemaType(info.schema_type)
+                if info.schema_type
+                else DomainSchemaType.AVRO,
+                compatibility=DomainCompatibilityMode(
+                    artifact.compatibility_mode if artifact else "NONE"
+                ),
+            )
+            violations = policy_engine.evaluate(spec_mock, env=env_str)
+            policy_score = max(0.5, 1.0 - (len(violations) * 0.1))
+
         return SubjectDetail(
             subject=subject,
             version=info.version or 0,
@@ -284,6 +361,10 @@ class GovernanceUseCase:
             else "NONE",
             owner=artifact.owner if artifact else None,
             updated_at=datetime.now().isoformat(),
+            violations=[
+                {"rule": v.rule, "message": v.message, "severity": v.severity} for v in violations
+            ],
+            policy_score=policy_score,
         )
 
     async def get_history(self, registry_id: str, subject: SubjectName) -> SubjectHistory:
@@ -293,22 +374,50 @@ class GovernanceUseCase:
 
         versions = await registry_repository.get_schema_versions(subject)
 
+        # DB에서 아티팩트 및 감사 로그 조회 (작성자, 시간 등)
+        async with self.metadata_repository.session_factory() as session:
+            from sqlalchemy import select
+
+            from app.schema.infrastructure.models import SchemaArtifactModel, SchemaAuditLogModel
+
+            # 아티팩트 조회
+            stmt_art = select(SchemaArtifactModel).where(SchemaArtifactModel.subject == subject)
+            res_art = await session.execute(stmt_art)
+            artifact_models = {a.version: a for a in res_art.scalars().all()}
+
+            # 감사 로그 조회 (작성자 추론용)
+            # version 정보가 직접 없으므로 change_id로 매핑
+            stmt_audit = select(SchemaAuditLogModel).where(SchemaAuditLogModel.target == subject)
+            res_audit = await session.execute(stmt_audit)
+            audit_logs = {log.change_id: log.actor for log in res_audit.scalars().all()}
+
         # 각 버전별 상세 조회 (병렬)
         tasks = [registry_repository.get_schema_by_version(subject, v) for v in versions]
         results = await asyncio.gather(*tasks, return_exceptions=True)
 
-        history_items = [
-            SchemaHistoryItem(
-                version=result.version,
-                schema_id=result.schema_id,
-                created_at=None,
-                diff_type="UPDATE" if i > 0 else "CREATE",
-                author="system",
-                commit_message=f"Schema update v{result.version}",
+        history_items = []
+        for result in results:
+            if isinstance(result, Exception):
+                continue
+
+            # DB 정보 매핑
+            db_info = artifact_models.get(result.version)
+            author = "system"
+            if db_info and db_info.change_id in audit_logs:
+                author = audit_logs[db_info.change_id]
+
+            history_items.append(
+                SchemaHistoryItem(
+                    version=result.version,
+                    schema_id=result.schema_id,
+                    created_at=db_info.created_at.isoformat()
+                    if db_info and db_info.created_at
+                    else None,
+                    diff_type="UPDATE" if result.version > 1 else "CREATE",
+                    author=author,
+                    commit_message=f"Schema update v{result.version}",
+                )
             )
-            for i, result in enumerate(results)
-            if not isinstance(result, Exception)
-        ]
 
         return SubjectHistory(
             subject=subject, history=sorted(history_items, key=lambda x: x.version, reverse=True)

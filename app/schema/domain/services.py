@@ -9,6 +9,7 @@ from app.shared.domain.subject_utils import SubjectStrategy, extract_topics_from
 
 from .models import (
     DomainPlanAction,
+    DomainPolicyViolation,
     DomainSchemaBatch,
     DomainSchemaDeleteImpact,
     DomainSchemaDiff,
@@ -20,7 +21,9 @@ from .models import (
     SchemaVersionInfo,
     SubjectName,
 )
-from .repositories.interfaces import ISchemaRegistryRepository
+from .policies.compatibility import CompatibilityGuardrail
+from .policies.dynamic_engine import DynamicSchemaPolicyEngine
+from .repositories.interfaces import ISchemaPolicyRepository, ISchemaRegistryRepository
 
 # 스키마 버전 임계값
 HIGH_VERSION_COUNT_THRESHOLD = 10  # 버전이 이 개수를 초과하면 경고
@@ -158,9 +161,15 @@ class SchemaDeleteAnalyzer:
 class SchemaPlannerService:
     """스키마 배치 계획 생성 서비스"""
 
-    def __init__(self, registry_repository: ISchemaRegistryRepository) -> None:
+    def __init__(
+        self,
+        registry_repository: ISchemaRegistryRepository,
+        policy_repository: ISchemaPolicyRepository | None = None,
+    ) -> None:
         self.registry_repository = registry_repository
+        self.policy_repository = policy_repository
         self.impact_analyzer = SchemaImpactAnalyzer(registry_repository)
+        self.compat_guardrail = CompatibilityGuardrail()
 
     async def create_plan(self, batch: DomainSchemaBatch) -> DomainSchemaPlan:
         """배치 계획 및 정책 검증 실행"""
@@ -169,14 +178,22 @@ class SchemaPlannerService:
             spec.subject for spec in batch.specs
         )
 
+        # 활성화된 정책 로드 (커스텀 정책 지원)
+        active_policies = []
+        if self.policy_repository:
+            active_policies = await self.policy_repository.list_active_policies(env=batch.env.value)
+
+        policy_engine = DynamicSchemaPolicyEngine(active_policies)
+
         compatibility_reports = []
         plan_items: list[DomainSchemaPlanItem] = []
         impacts: list[DomainSchemaImpactRecord] = []
+        all_violations: list[DomainPolicyViolation] = []
 
         for spec in batch.specs:
             current_info = current_subjects.get(spec.subject)
 
-            # 계획 아이템 생성
+            # 1. 계획 아이템 생성
             action = DomainPlanAction.UPDATE if current_info else DomainPlanAction.REGISTER
             current_version = current_info.version if current_info else None
             target_version = (
@@ -199,11 +216,22 @@ class SchemaPlannerService:
             )
             plan_items.append(plan_item)
 
-            # 호환성 검증
+            # 2. 호환성 검증 (Registry 레벨)
             report = await self.registry_repository.check_compatibility(spec)
             compatibility_reports.append(report)
 
-            # 영향도 분석
+            # 3. 거버넌스 정책 검사 (Guardrails & Linting - Dynamic Engine)
+            # 3.1 호환성 가드레일 (기본 내장 - 선택사항)
+            hardcoded_violations = self.compat_guardrail.check(
+                spec.subject, spec.compatibility, batch.env
+            )
+            all_violations.extend(hardcoded_violations)
+
+            # 3.2 다이내믹 엔진 (사용자 정의 정책)
+            dynamic_violations = policy_engine.evaluate(spec, batch.env.value)
+            all_violations.extend(dynamic_violations)
+
+            # 4. 영향도 분석
             impact = await self.impact_analyzer.analyze_impact(spec.subject, batch.subject_strategy)
             impacts.append(impact)
 
@@ -213,6 +241,7 @@ class SchemaPlannerService:
             items=tuple(plan_items),
             compatibility_reports=tuple(compatibility_reports),
             impacts=tuple(impacts),
+            violations=tuple(all_violations),
         )
 
     def _calculate_schema_diff(

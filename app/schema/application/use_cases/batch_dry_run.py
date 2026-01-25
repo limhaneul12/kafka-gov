@@ -10,6 +10,7 @@ from ...domain.models import DomainSchemaBatch, DomainSchemaPlan
 from ...domain.repositories.interfaces import (
     ISchemaAuditRepository,
     ISchemaMetadataRepository,
+    ISchemaPolicyRepository,
 )
 from ...domain.services import SchemaPlannerService
 
@@ -22,10 +23,12 @@ class SchemaBatchDryRunUseCase:
         connection_manager: IConnectionManager,
         metadata_repository: ISchemaMetadataRepository,
         audit_repository: ISchemaAuditRepository,
+        policy_repository: ISchemaPolicyRepository | None = None,
     ) -> None:
         self.connection_manager = connection_manager
         self.metadata_repository = metadata_repository
         self.audit_repository = audit_repository
+        self.policy_repository = policy_repository
 
     async def execute(
         self, registry_id: str, batch: DomainSchemaBatch, actor: str
@@ -45,7 +48,9 @@ class SchemaBatchDryRunUseCase:
             registry_repository = ConfluentSchemaRegistryAdapter(registry_client)
 
             # 2. Planner Service 생성 및 계획 수립
-            planner_service = SchemaPlannerService(registry_repository)  # type: ignore[arg-type]
+            planner_service = SchemaPlannerService(
+                registry_repository, policy_repository=self.policy_repository
+            )  # type: ignore[arg-type]
             plan = await planner_service.create_plan(batch)
 
             await self.metadata_repository.save_plan(plan, actor)

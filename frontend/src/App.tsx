@@ -8,6 +8,7 @@ import SchemaDetail from './pages/schemas/SchemaDetail';
 import SchemaList from './pages/schemas/SchemaList';
 import Topics from './pages/Topics';
 import TopicDetail from './pages/TopicDetail';
+import SchemaPolicies from './pages/SchemaPolicies';
 
 import { Toaster } from 'sonner';
 
@@ -25,6 +26,7 @@ function App() {
           <Route path="/topics/:topicName" element={<TopicDetail />} />
           <Route path="/connections" element={<Connections />} />
           <Route path="/policies" element={<Policies />} />
+          <Route path="/schemas/policies" element={<SchemaPolicies />} />
 
           {/* Fallback */}
           <Route path="*" element={<Navigate to="/" replace />} />

@@ -26,6 +26,7 @@ class SubjectStat:
     compatibility_mode: str | None = None
     lint_score: float = 0.0
     has_doc: bool = False
+    violations: list[Any] = field(default_factory=list)
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -51,6 +52,8 @@ class SubjectDetail:
     compatibility_mode: str
     owner: str | None = None
     updated_at: str = field(default_factory=lambda: datetime.now().isoformat())
+    violations: list[Any] = field(default_factory=list)
+    policy_score: float = 1.0
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)

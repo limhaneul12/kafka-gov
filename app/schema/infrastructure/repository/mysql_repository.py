@@ -25,6 +25,7 @@ from app.schema.domain.models import (
     DomainSchemaImpactRecord,
     DomainSchemaPlan,
     DomainSchemaPlanItem,
+    DomainSchemaType,
     DomainSchemaUploadResult,
 )
 from app.schema.domain.repositories.interfaces import ISchemaMetadataRepository
@@ -570,7 +571,13 @@ class MySQLSchemaMetadataRepository(ISchemaMetadataRepository):
                             version=artifact.version if artifact else None,
                             storage_url=artifact.storage_url if artifact else None,
                             checksum=artifact.checksum if artifact else None,
-                            schema_type=None,  # DB 모델에 스키마 타입이 있다면 추가
+                            schema_type=next(
+                                (t for t in DomainSchemaType if t.value == artifact.schema_type),
+                                None,
+                            )
+                            if artifact and artifact.schema_type
+                            else None,
+                            created_at=artifact.created_at if artifact else None,
                         )
                     )
 
@@ -622,8 +629,14 @@ class MySQLSchemaMetadataRepository(ISchemaMetadataRepository):
                     version=artifact_model.version if artifact_model else None,
                     storage_url=artifact_model.storage_url if artifact_model else None,
                     checksum=artifact_model.checksum if artifact_model else None,
+                    schema_type=next(
+                        (t for t in DomainSchemaType if t.value == artifact_model.schema_type), None
+                    )
+                    if artifact_model and artifact_model.schema_type
+                    else None,
                     compatibility_mode=compat_mode,
                     owner=metadata_model.owner if metadata_model else None,
+                    created_at=artifact_model.created_at if artifact_model else None,
                 )
 
             except Exception as e:

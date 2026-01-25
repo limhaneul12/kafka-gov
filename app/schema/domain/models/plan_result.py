@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime
 
-from .policy import DomainSchemaCompatibilityReport, DomainSchemaImpactRecord
+from .policy import DomainPolicyViolation, DomainSchemaCompatibilityReport, DomainSchemaImpactRecord
 from .types_enum import (
     ChangeId,
     DomainCompatibilityMode,
@@ -49,6 +50,7 @@ class DomainSchemaPlan:
     items: tuple[DomainSchemaPlanItem, ...]
     compatibility_reports: tuple[DomainSchemaCompatibilityReport, ...] = ()
     impacts: tuple[DomainSchemaImpactRecord, ...] = ()
+    violations: tuple[DomainPolicyViolation, ...] = ()
 
     def summary(self) -> dict[str, int]:
         """계획 요약 정보"""
@@ -70,11 +72,16 @@ class DomainSchemaPlan:
             "incompatible_count": sum(
                 1 for report in self.compatibility_reports if not report.is_compatible
             ),
+            "violation_count": len(self.violations),
         }
 
     @property
     def can_apply(self) -> bool:
-        return all(report.is_compatible for report in self.compatibility_reports)
+        """적용 가능 여부 - 호환성 문제가 없고, Error 등급 위반이 없어야 함"""
+        if not all(report.is_compatible for report in self.compatibility_reports):
+            return False
+
+        return not any(v.is_error for v in self.violations)
 
 
 @dataclass(frozen=True, slots=True)
@@ -88,6 +95,7 @@ class DomainSchemaArtifact:
     schema_type: DomainSchemaType | None = None
     compatibility_mode: DomainCompatibilityMode | None = None
     owner: str | None = None
+    created_at: datetime | None = None
 
     def __post_init__(self) -> None:
         if self.version is not None and self.version < 1:
