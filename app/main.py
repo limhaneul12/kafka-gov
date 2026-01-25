@@ -19,6 +19,7 @@ from .consumer.interface.routers import (
 from .consumer.interface.routers.websocket_routes import router as consumer_websocket_router
 from .container import AppContainer
 from .schema.interface.router import router as schema_router
+from .schema.interface.routers.policy_router import router as schema_policy_router
 from .shared.error_handlers import format_validation_error
 from .shared.interface.router import router as shared_router
 from .shared.logging_config import configure_structlog, get_logger
@@ -152,6 +153,7 @@ def create_app() -> FastAPI:
             "app.topic.interface",
             "app.consumer.interface",
             "app.schema.interface",
+            "app.schema.interface.routers",
             "app.shared.interface",
         ]
     )
@@ -163,6 +165,7 @@ def create_app() -> FastAPI:
     app.include_router(metrics_router, prefix="/api")
     app.include_router(policy_router, prefix="/api")  # Policy API
     app.include_router(schema_router, prefix="/api")
+    app.include_router(schema_policy_router, prefix="/api")
     # Consumer REST routes (already prefixed with /api)
     app.include_router(consumer_router)
     app.include_router(consumer_topic_router)

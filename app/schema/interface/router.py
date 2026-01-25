@@ -418,6 +418,7 @@ async def search_schemas(
             if item.compatibility_mode
             else None,
             "owner": item.owner,
+            "created_at": item.created_at.isoformat() if item.created_at else None,
         }
         for item in result.items
     ]

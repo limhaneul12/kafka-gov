@@ -15,32 +15,6 @@ services:
     volumes:
       - redis_data:/data
 
-  # 마이그레이션 전용 서비스
-  migration:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    user: "0:0"
-    environment:
-      - KAFKA_GOV_DATABASE_URL=sqlite+aiosqlite:////app/data/kafka_gov.db
-    volumes:
-      - db_data:/app/data
-    command:
-      - sh
-      - -c
-      - |
-          set -e
-          if [ -z "$(ls -A migrations/versions 2>/dev/null || true)" ]; then
-            echo "[migration] No Alembic revisions found, generating initial schema via autogenerate..."
-            uv run alembic -c alembic.ini revision -m "initial schema" --autogenerate
-          else
-            echo "[migration] Alembic revisions already exist, skipping autogenerate."
-          fi
-          echo "[migration] Running Alembic upgrade to head..."
-          uv run alembic -c alembic.ini upgrade head
-    networks:
-      - kafka-gov-internal
-    restart: "no"  # 한 번만 실행
 
   app:
     build:
@@ -49,6 +23,15 @@ services:
     user: "0:0"
     ports:
       - "8000:8000"
+    command:
+      - sh
+      - -c
+      - |
+          echo "[startup] Checking database migration state..."
+          # 마이그레이션 정보가 꼬였을 경우(f5a8b35897bf 등)를 대비해 강제로 최신으로 스탬프를 찍거나 업그레이드 시도
+          uv run alembic upgrade head || (echo "[startup] Migration failed, trying to stamp current state..." && uv run alembic stamp head && uv run alembic upgrade head)
+          echo "[startup] Starting FastAPI server..."
+          uv run uvicorn app.main:app --host 0.0.0.0 --port 8000
     environment:
       # App 설정
       - APP_DEBUG=true
@@ -86,6 +69,7 @@ services:
     volumes:
       - ./logs:/app/logs
       - db_data:/app/data
+      - ./migrations:/app/migrations
 
   # Celery Worker (메트릭 수집 작업 실행)
   celery-worker:
@@ -118,6 +102,7 @@ services:
     volumes:
       - ./logs:/app/logs
       - db_data:/app/data
+      - ./migrations:/app/migrations
 
   # Celery Beat (주기적 스케줄러)
   celery-beat:

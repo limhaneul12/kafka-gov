@@ -19,6 +19,7 @@ import { Badge } from '../../components/common/Badge';
 import { useSchemaDetail } from '../../hooks/schema/useSchemaDetail';
 import { toast } from 'sonner';
 import { schemasAPI, clustersAPI } from '../../services/api';
+import { formatDistanceToNow } from 'date-fns';
 
 // --- Tab Navigation ---
 
@@ -243,7 +244,7 @@ const PlanResultView = ({ item, report, impact, onApply, onCancel }: any) => {
             </div>
 
             <div className="space-y-4">
-                {/* Diff Analysis Section */}
+                {/* Diff Analysis Section --- */}
                 <div className="border border-[#d0d7de] rounded-lg overflow-hidden bg-white shadow-sm">
                     <div className="px-4 py-2 bg-[#f6f8fa] border-b border-[#d0d7de] flex items-center justify-between">
                         <div className="flex items-center gap-2">
@@ -280,7 +281,7 @@ const PlanResultView = ({ item, report, impact, onApply, onCancel }: any) => {
                     )}
                 </div>
 
-                {/* Compatibility Details (if failed) */}
+                {/* Compatibility Details (if failed) --- */}
                 {!report.is_compatible && report.issues.length > 0 && (
                     <div className="border border-[#cf222e]/30 rounded-lg overflow-hidden bg-[#fffbfa]">
                         <div className="px-4 py-2 bg-[#ffebe9] border-b border-[#cf222e]/20 flex items-center gap-2">
@@ -298,7 +299,7 @@ const PlanResultView = ({ item, report, impact, onApply, onCancel }: any) => {
                     </div>
                 )}
 
-                {/* Impact Analysis */}
+                {/* Impact Analysis --- */}
                 <div className="border border-[#d0d7de] rounded-lg overflow-hidden bg-white shadow-sm">
                     <div className="px-4 py-2 bg-[#f6f8fa] border-b border-[#d0d7de] flex items-center justify-between">
                         <div className="flex items-center gap-2">
@@ -512,7 +513,7 @@ export default function SchemaDetail() {
 
     return (
         <div className="min-h-screen bg-[#f6f8fa]">
-            {/* Header / Breadcrumbs */}
+            {/* Header / Breadcrumbs --- */}
             <div className="bg-white border-b border-[#d0d7de] pt-4 px-8 pb-4">
                 <nav className="flex items-center gap-2 text-sm text-[#57606a] mb-4">
                     <span className="hover:text-[#0969da] cursor-pointer" onClick={() => navigate('/schemas')}>Schemas</span>
@@ -585,7 +586,7 @@ export default function SchemaDetail() {
                 </div>
             </div>
 
-            {/* Content Area */}
+            {/* Content Area --- */}
             <div className="px-8 py-6 max-w-[1400px] mx-auto">
                 <div className="bg-white rounded-lg border border-[#d0d7de] shadow-sm min-h-[500px]">
                     <div className="p-6">
@@ -601,8 +602,42 @@ export default function SchemaDetail() {
                                             <>
                                                 <div className="flex items-center justify-between">
                                                     <h3 className="text-sm font-semibold text-[#24292f]">Schema Definition</h3>
-                                                    <Badge variant="outline" className="text-[10px] font-mono">v{detailData.version}</Badge>
+                                                    <div className="flex items-center gap-2">
+                                                        {detailData.policy_score && (
+                                                            <div className="flex items-center gap-1.5 mr-2">
+                                                                <span className="text-[10px] text-gray-500 uppercase font-bold">Policy Score:</span>
+                                                                <span className={`text-xs font-bold ${detailData.policy_score > 0.8 ? 'text-green-600' : 'text-amber-600'}`}>
+                                                                    {Math.round(detailData.policy_score * 100)}%
+                                                                </span>
+                                                            </div>
+                                                        )}
+                                                        <Badge variant="outline" className="text-[10px] font-mono">v{detailData.version}</Badge>
+                                                    </div>
                                                 </div>
+
+                                                {/* Violations Sidebar/Section */}
+                                                {detailData.violations && detailData.violations.length > 0 && (
+                                                    <div className="mt-2 mb-6 p-4 bg-rose-50 border border-rose-100 rounded-xl space-y-3">
+                                                        <div className="flex items-center gap-2 text-rose-700">
+                                                            <AlertCircle className="w-4 h-4" />
+                                                            <h4 className="text-xs font-bold uppercase tracking-wider">Policy Violations ({detailData.violations.length})</h4>
+                                                        </div>
+                                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                                                            {detailData.violations.map((v: any, i: number) => (
+                                                                <div key={i} className="flex items-start gap-2 text-xs bg-white p-2.5 rounded-lg border border-rose-100 shadow-sm">
+                                                                    <div className={`mt-0.5 shrink-0 px-1.5 py-0.5 rounded text-[9px] font-bold uppercase ${v.severity === 'critical' || v.severity === 'error' ? 'bg-rose-100 text-rose-600' : 'bg-amber-100 text-amber-600'}`}>
+                                                                        {v.severity}
+                                                                    </div>
+                                                                    <div>
+                                                                        <div className="font-bold text-gray-900">{v.rule}</div>
+                                                                        <div className="text-gray-500 mt-0.5">{v.message}</div>
+                                                                    </div>
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    </div>
+                                                )}
+
                                                 <OverviewCode schemaStr={detailData.schema_str} />
                                             </>
                                         ) : (
@@ -705,7 +740,13 @@ export default function SchemaDetail() {
                                                             <div className="flex items-center gap-2 text-[10px] text-[#8c959f]">
                                                                 <span className="font-semibold text-[#57606a]">{item.author || 'system'}</span>
                                                                 <span>•</span>
-                                                                {item.created_at && <span>{new Date(item.created_at).toLocaleDateString()}</span>}
+                                                                {item.created_at ? (
+                                                                    <span title={new Date(item.created_at).toLocaleString()}>
+                                                                        {formatDistanceToNow(new Date(item.created_at), { addSuffix: true })}
+                                                                    </span>
+                                                                ) : (
+                                                                    <span>Time unknown</span>
+                                                                )}
                                                             </div>
                                                         </div>
                                                     </div>

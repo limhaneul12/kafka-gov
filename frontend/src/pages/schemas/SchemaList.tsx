@@ -4,6 +4,7 @@ import { Badge } from '../../components/common/Badge';
 import { SearchBar } from '../../components/schema/SearchBar';
 import { useSchemaList } from '../../hooks/schema/useSchemaList';
 import type { SchemaArtifactResponse } from '../../types/schema';
+import { formatDistanceToNow } from 'date-fns';
 
 // --- Components ---
 
@@ -32,6 +33,9 @@ const SchemaItem = ({ schema, onClick }: { schema: SchemaArtifactResponse; onCli
                     </span>
                     {schema.owner && (
                         <span>Owner: <span className="font-semibold text-[#24292f]">{schema.owner}</span></span>
+                    )}
+                    {schema.created_at && (
+                        <span>• Registered {formatDistanceToNow(new Date(schema.created_at), { addSuffix: true })}</span>
                     )}
                 </div>
             </div>

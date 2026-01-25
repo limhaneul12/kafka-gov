@@ -1,143 +1,162 @@
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { toast } from "sonner";
-import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/Card";
+import { Plus, RefreshCw, Layers } from "lucide-react";
+
+import { Card, CardHeader, CardTitle, CardContent } from "../components/ui/Card";
 import Button from "../components/ui/Button";
-import Badge from "../components/ui/Badge";
-import { Plus, RefreshCw, Shield, FileCode } from "lucide-react";
+import schemaApi from "../services/schemaApi";
+
+// New specialized components
+import SchemaPolicyList from "../components/schema/policies/SchemaPolicyList";
+import SchemaPolicyDetailModal from "../components/schema/policies/SchemaPolicyDetailModal";
+import SchemaPolicyComposer from "../components/schema/policies/SchemaPolicyComposer";
 
 export default function SchemaPolicies() {
-  const [loading, setLoading] = useState(false);
+  const [policies, setPolicies] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const handleRefresh = () => {
-    setLoading(true);
-    setTimeout(() => {
+  // Modals state
+  const [selectedPolicy, setSelectedPolicy] = useState<any | null>(null);
+  const [policyHistory, setPolicyHistory] = useState<any[]>([]);
+  const [isDetailOpen, setIsDetailOpen] = useState(false);
+  const [isComposerOpen, setIsComposerOpen] = useState(false);
+
+  // 1. Data Loading (Minimal useEffect)
+  const fetchPolicies = useCallback(async () => {
+    try {
+      setLoading(true);
+      const data = await schemaApi.listPolicies();
+      setPolicies(data);
+    } catch (err) {
+      toast.error("Failed to load schema policies");
+    } finally {
       setLoading(false);
-      toast.success("Schema policies refreshed");
-    }, 500);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchPolicies();
+  }, [fetchPolicies]);
+
+  // 2. Action Handlers
+  const handleViewDetail = async (policy: any) => {
+    setSelectedPolicy(policy);
+    setIsDetailOpen(true);
+    try {
+      const history = await schemaApi.getPolicyHistory(policy.policy_id);
+      setPolicyHistory(history);
+    } catch (err) {
+      toast.error("Failed to load policy history");
+    }
   };
 
-  const handleCreateNew = () => {
-    toast.info("Schema policy creation coming soon");
+  const handleActivate = async (policy: any) => {
+    try {
+      await schemaApi.updatePolicyStatus(policy.policy_id, policy.version, "active");
+      toast.success(`Policy ${policy.name} v${policy.version} is now ACTIVE`);
+      fetchPolicies();
+    } catch (err) {
+      toast.error("Failed to activate policy");
+    }
+  };
+
+  const handleCreateSubmit = async (data: any) => {
+    try {
+      await schemaApi.createPolicy(data);
+      toast.success("Policy created successfully (as DRAFT)");
+      fetchPolicies();
+    } catch (err) {
+      toast.error("Failed to create policy");
+      throw err; // Composer will handle loading state
+    }
+  };
+
+  const handleRollback = async (version: number) => {
+    if (!selectedPolicy) return;
+    try {
+      await schemaApi.updatePolicyStatus(selectedPolicy.policy_id, version, "active");
+      toast.success(`Success! Rolled back to v${version}`);
+      setIsDetailOpen(false);
+      fetchPolicies();
+    } catch (err) {
+      toast.error("Failed to rollback version");
+    }
   };
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
+    <div className="space-y-6 max-w-[1200px] mx-auto pb-20">
+      {/* Page Header */}
+      <div className="flex items-end justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Schema Policies</h1>
+          <div className="flex items-center gap-2 text-blue-600 font-semibold text-sm mb-1">
+            <Layers className="h-4 w-4" />
+            Governance Engine
+          </div>
+          <h1 className="text-3xl font-bold text-gray-900 tracking-tight">Schema Policies</h1>
           <p className="mt-1 text-sm text-gray-500">
-            Manage subject naming strategies and validation rules for schemas
+            Customize linting rules and environment guardrails for schema evolution
           </p>
         </div>
-        <div className="flex gap-2">
-          <Button onClick={handleRefresh} variant="secondary" disabled={loading}>
+        <div className="flex gap-2 mb-1">
+          <Button onClick={fetchPolicies} variant="ghost" size="sm" disabled={loading}>
             <RefreshCw className={`h-4 w-4 mr-2 ${loading ? "animate-spin" : ""}`} />
-            Refresh
+            Sync
           </Button>
-          <Button onClick={handleCreateNew}>
+          <Button onClick={() => setIsComposerOpen(true)}>
             <Plus className="h-4 w-4 mr-2" />
-            Create Policy
+            New Policy
           </Button>
         </div>
       </div>
 
-      {/* Naming Strategy Info */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Shield className="h-5 w-5" />
-            Subject Naming Strategies
-          </CardTitle>
+      {/* Stats Quick View (Optionally could be a separate component if more complex) */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <Card className="bg-gradient-to-br from-blue-600 to-blue-700 text-white border-none shadow-blue-100">
+          <CardContent className="pt-6">
+            <div className="text-sm font-medium opacity-80">Total Policies</div>
+            <div className="text-3xl font-bold mt-1">{policies.length}</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-6">
+            <div className="text-sm font-medium text-gray-500">Active</div>
+            <div className="text-3xl font-bold mt-1 text-green-600">
+              {policies.filter(p => p.status === "active").length}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Policy List Container */}
+      <Card className="overflow-hidden border-gray-200 shadow-sm">
+        <CardHeader className="bg-white border-b border-gray-100">
+          <CardTitle className="text-lg font-bold">Policy Inventory</CardTitle>
         </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            <div>
-              <h4 className="font-medium text-sm text-gray-700 mb-2">SR Built-in Strategies</h4>
-              <div className="grid gap-2 md:grid-cols-3">
-                <div className="p-3 border rounded-lg">
-                  <Badge className="mb-2">TopicNameStrategy</Badge>
-                  <p className="text-xs text-gray-600">Format: topic-key/value</p>
-                </div>
-                <div className="p-3 border rounded-lg">
-                  <Badge className="mb-2">RecordNameStrategy</Badge>
-                  <p className="text-xs text-gray-600">Format: namespace.record</p>
-                </div>
-                <div className="p-3 border rounded-lg">
-                  <Badge className="mb-2">TopicRecordNameStrategy</Badge>
-                  <p className="text-xs text-gray-600">Format: topic-namespace.record</p>
-                </div>
-              </div>
-            </div>
-
-            <div>
-              <h4 className="font-medium text-sm text-gray-700 mb-2">Kafka-Gov Extended Strategies</h4>
-              <div className="grid gap-2 md:grid-cols-3">
-                <div className="p-3 border rounded-lg bg-blue-50">
-                  <Badge variant="success" className="mb-2">EnvPrefixed</Badge>
-                  <p className="text-xs text-gray-600">Format: env.topic-namespace.record</p>
-                </div>
-                <div className="p-3 border rounded-lg bg-blue-50">
-                  <Badge variant="success" className="mb-2">TeamScoped</Badge>
-                  <p className="text-xs text-gray-600">Format: team.namespace.record</p>
-                </div>
-                <div className="p-3 border rounded-lg bg-blue-50">
-                  <Badge variant="success" className="mb-2">CompactRecord</Badge>
-                  <p className="text-xs text-gray-600">Format: record only</p>
-                </div>
-              </div>
-            </div>
-          </div>
+        <CardContent className="p-0">
+          <SchemaPolicyList
+            policies={policies}
+            loading={loading}
+            onViewDetail={handleViewDetail}
+            onViewHistory={handleViewDetail} // Detail modal has history sidebar
+            onActivate={handleActivate}
+          />
         </CardContent>
       </Card>
 
-      {/* Empty State */}
-      <Card>
-        <CardContent className="text-center py-12">
-          <FileCode className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-          <h3 className="text-lg font-medium text-gray-900 mb-2">Schema Policy Management</h3>
-          <p className="text-sm text-gray-500 mb-4 max-w-md mx-auto">
-            Schema policies are currently managed through the upload process. 
-            Select a naming strategy when uploading schemas to ensure consistent subject naming.
-          </p>
-          <div className="flex gap-2 justify-center">
-            <Button variant="secondary" onClick={() => window.location.href = "/schemas"}>
-              Go to Schemas
-            </Button>
-            <Button onClick={handleCreateNew}>
-              <Plus className="h-4 w-4 mr-2" />
-              Create Custom Policy
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
+      {/* Modals (Lazy-ish mounting via isOpen check inside components) */}
+      <SchemaPolicyDetailModal
+        isOpen={isDetailOpen}
+        onClose={() => setIsDetailOpen(false)}
+        policy={selectedPolicy}
+        history={policyHistory}
+        onActivateVersion={handleRollback}
+      />
 
-      {/* Documentation */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Naming Strategy Guidelines</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-3 text-sm text-gray-700">
-            <div>
-              <strong>Security Validation:</strong>
-              <ul className="list-disc list-inside ml-2 text-gray-600">
-                <li>Only alphanumeric characters, dots, hyphens, and underscores allowed</li>
-                <li>Maximum length: 200 characters</li>
-                <li>No forbidden prefixes in production environment</li>
-              </ul>
-            </div>
-            <div>
-              <strong>Best Practices:</strong>
-              <ul className="list-disc list-inside ml-2 text-gray-600">
-                <li>Use environment-prefixed strategies for multi-environment setups</li>
-                <li>Maintain consistent naming across your organization</li>
-                <li>Document your chosen strategy in team guidelines</li>
-              </ul>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+      <SchemaPolicyComposer
+        isOpen={isComposerOpen}
+        onClose={() => setIsComposerOpen(false)}
+        onSubmit={handleCreateSubmit}
+      />
     </div>
   );
 }

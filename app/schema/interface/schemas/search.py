@@ -21,6 +21,7 @@ class SchemaSearchItem(BaseModel):
     owner: str | None = Field(None, description="소유자")
     compatibility_mode: str | None = Field(None, description="호환성 모드")
     schema_type: str | None = Field(None, description="스키마 타입")
+    created_at: str | None = Field(None, description="생성 시간")
 
 
 class SchemaSearchResponse(BaseModel):

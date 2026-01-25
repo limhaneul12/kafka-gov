@@ -6,8 +6,11 @@ import orjson
 
 from app.schema.domain.models.lint import LintReport, LintViolation, ViolationSeverity
 from app.schema.domain.policies.base import ISchemaLintPolicy
+from app.schema.domain.policies.documentation import SchemaDocPolicy
+from app.schema.domain.policies.evolution import NullableDefaultPolicy
 from app.schema.domain.policies.naming import FieldNamingPolicy
 from app.schema.domain.policies.security import PiiCandidatePolicy
+from app.schema.domain.policies.standards import NamespaceStandardPolicy
 from app.schema.domain.policies.structure import (
     BytesOverusePolicy,
     DeepMapPolicy,
@@ -27,6 +30,9 @@ class SchemaLintService:
     def __init__(self) -> None:
         # 정책 등록 (Composition)
         self.policies: list[ISchemaLintPolicy] = [
+            SchemaDocPolicy(),
+            NullableDefaultPolicy(),
+            NamespaceStandardPolicy(),
             FieldNamingPolicy(),
             PiiCandidatePolicy(),
             BytesOverusePolicy(),

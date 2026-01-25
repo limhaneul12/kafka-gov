@@ -113,8 +113,8 @@ const TopSchemasTable = ({ schemas }: { schemas: SubjectStat[] }) => (
                         <th className="px-6 py-3 text-left">Subject</th>
                         <th className="px-6 py-3 text-left">Owner</th>
                         <th className="px-6 py-3 text-center">Versions</th>
-                        <th className="px-6 py-3 text-center">Lint Score</th>
-                        <th className="px-6 py-3 text-center">Docs</th>
+                        <th className="px-6 py-3 text-center">Policy Score</th>
+                        <th className="px-6 py-3 text-center">Violations</th>
                     </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
@@ -150,13 +150,13 @@ const TopSchemasTable = ({ schemas }: { schemas: SubjectStat[] }) => (
                                 </div>
                             </td>
                             <td className="px-6 py-4 text-sm text-center">
-                                {schema.has_doc ? (
-                                    <span className="text-emerald-500">
-                                        <BadgeCheck className="w-5 h-5 mx-auto" />
+                                {schema.violations && schema.violations.length > 0 ? (
+                                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-rose-100 text-rose-800">
+                                        {schema.violations.length} issues
                                     </span>
                                 ) : (
-                                    <span className="text-slate-300">
-                                        <div className="w-5 h-5 mx-auto border-2 border-slate-200 rounded-full" />
+                                    <span className="text-emerald-500">
+                                        <BadgeCheck className="w-5 h-5 mx-auto" />
                                     </span>
                                 )}
                             </td>
@@ -171,6 +171,59 @@ const TopSchemasTable = ({ schemas }: { schemas: SubjectStat[] }) => (
 // --- Main Page ---
 
 // ... components ...
+
+const TeamRanking = ({ schemas }: { schemas: SubjectStat[] }) => {
+    // Group by owner
+    const teamStats: Record<string, { totalScore: number; count: number }> = {};
+
+    schemas.forEach(s => {
+        const team = s.owner || 'Unassigned';
+        if (!teamStats[team]) teamStats[team] = { totalScore: 0, count: 0 };
+        teamStats[team].totalScore += s.lint_score;
+        teamStats[team].count += 1;
+    });
+
+    const rankings = Object.entries(teamStats)
+        .map(([name, stats]) => ({
+            name,
+            avgScore: stats.totalScore / stats.count,
+            count: stats.count
+        }))
+        .sort((a, b) => b.avgScore - a.avgScore);
+
+    return (
+        <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100 flex flex-col h-full">
+            <h3 className="font-semibold text-slate-800 mb-6 flex items-center gap-2">
+                <BadgeCheck className="w-5 h-5 text-emerald-500" />
+                Team Governance Ranking
+            </h3>
+            <div className="space-y-6">
+                {rankings.map((team, idx) => (
+                    <div key={team.name} className="space-y-2">
+                        <div className="flex justify-between items-center text-sm">
+                            <div className="flex items-center gap-3">
+                                <span className={`w-5 h-5 flex items-center justify-center rounded-full text-[10px] font-bold ${idx === 0 ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-500'
+                                    }`}>
+                                    {idx + 1}
+                                </span>
+                                <span className="font-medium text-slate-700">{team.name}</span>
+                            </div>
+                            <span className="font-bold text-slate-900">{Math.round(team.avgScore * 100)}%</span>
+                        </div>
+                        <div className="relative w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                            <div
+                                className={`absolute left-0 top-0 h-full rounded-full transition-all duration-1000 ${team.avgScore > 0.8 ? 'bg-emerald-500' : team.avgScore > 0.5 ? 'bg-amber-500' : 'bg-rose-500'
+                                    }`}
+                                style={{ width: `${team.avgScore * 100}%` }}
+                            />
+                        </div>
+                        <div className="text-[10px] text-slate-400">{team.count} Subjects Managed</div>
+                    </div>
+                ))}
+            </div>
+        </div>
+    );
+};
 
 const RecentActivity = ({ activities }: { activities: any[] }) => (
     <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100 flex flex-col h-full">
@@ -412,7 +465,12 @@ export default function GovernanceDashboard() {
                     <TopSchemasTable schemas={displayData.top_subjects} />
                 </div>
 
-                {/* Middle: Ownership Chart */}
+                {/* Team Ranking */}
+                <div className="lg:col-span-1">
+                    <TeamRanking schemas={displayData.top_subjects} />
+                </div>
+
+                {/* Ownership Chart */}
                 <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100 flex flex-col xl:col-span-1">
                     <h3 className="font-semibold text-slate-800 mb-6">Subject Ownership</h3>
                     <div className="flex-1 min-h-[300px]">
@@ -444,9 +502,11 @@ export default function GovernanceDashboard() {
                         </ResponsiveContainer>
                     </div>
                 </div>
+            </div>
 
-                {/* Right: Recent Activity */}
-                <div className="xl:col-span-1 min-h-[400px]">
+            {/* Bottom Section: Recent Activity */}
+            <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
+                <div className="lg:col-span-4 min-h-[300px]">
                     <RecentActivity activities={recentAudit} />
                 </div>
             </div>

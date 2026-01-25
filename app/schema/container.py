@@ -11,6 +11,7 @@ from .application.use_cases import (
     SchemaBatchDryRunUseCase,
     SchemaDeleteUseCase,
     SchemaPlanUseCase,
+    SchemaPolicyUseCase,
     SchemaSearchUseCase,
     SchemaSyncUseCase,
     SchemaUploadUseCase,
@@ -18,9 +19,11 @@ from .application.use_cases import (
 from .domain.repositories.interfaces import (
     ISchemaAuditRepository,
     ISchemaMetadataRepository,
+    ISchemaPolicyRepository,
 )
 from .infrastructure.repository.audit_repository import MySQLSchemaAuditRepository
 from .infrastructure.repository.mysql_repository import MySQLSchemaMetadataRepository
+from .infrastructure.repository.policy_repository import MySQLSchemaPolicyRepository
 
 
 class SchemaContainer(containers.DeclarativeContainer):
@@ -51,12 +54,18 @@ class SchemaContainer(containers.DeclarativeContainer):
         session_factory=infrastructure.database_manager.provided.get_db_session,
     )
 
+    policy_repository: providers.Provider[ISchemaPolicyRepository] = providers.Factory(
+        MySQLSchemaPolicyRepository,  # type: ignore[arg-type]
+        session_factory=infrastructure.database_manager.provided.get_db_session,
+    )
+
     # Use Cases (ConnectionManager 주입)
     dry_run_use_case: providers.Provider[SchemaBatchDryRunUseCase] = providers.Factory(
         SchemaBatchDryRunUseCase,
         connection_manager=cluster.connection_manager,  # ConnectionManager 주입
         metadata_repository=metadata_repository,
         audit_repository=audit_repository,
+        policy_repository=policy_repository,
     )
 
     apply_use_case: providers.Provider[SchemaBatchApplyUseCase] = providers.Factory(
@@ -102,9 +111,15 @@ class SchemaContainer(containers.DeclarativeContainer):
         audit_repository=audit_repository,
         lint_service=lint_service,
         get_topic_consumers_use_case=consumer.get_topic_consumers_use_case,
+        policy_repository=policy_repository,
     )
 
     search_use_case: providers.Provider[SchemaSearchUseCase] = providers.Factory(
         SchemaSearchUseCase,
         metadata_repository=metadata_repository,
+    )
+
+    policy_use_case: providers.Provider[SchemaPolicyUseCase] = providers.Factory(
+        SchemaPolicyUseCase,
+        policy_repository=policy_repository,
     )

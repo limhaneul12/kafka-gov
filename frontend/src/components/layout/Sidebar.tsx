@@ -19,13 +19,27 @@ const Sidebar = () => {
         <span className="font-bold text-xl text-slate-800 tracking-tight">Kafka Gov</span>
       </div>
 
-      <nav className="flex-1 p-4 space-y-1">
-        <NavItem to="/" icon={LayoutDashboard} label="Dashboard" />
-        <NavItem to="/topics" icon={MessageSquare} label="Topics" />
-        <NavItem to="/schemas" icon={Database} label="Schema Registry" />
-        <NavItem to="/policies" icon={ShieldCheck} label="Policies" />
-        <NavItem to="/connections" icon={LinkIcon} label="Connections" />
-        <NavItem to="/settings" icon={Settings} label="Settings" />
+      <nav className="flex-1 p-4 space-y-6">
+        <div className="space-y-1">
+          <NavItem to="/topics" icon={MessageSquare} label="Topics" />
+          <NavItem to="/schemas" icon={Database} label="Schema Registry" />
+        </div>
+
+        <div className="space-y-4">
+          <div className="px-4 flex items-center gap-2 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+            Governance
+          </div>
+          <div className="space-y-1">
+            <NavItem to="/governance/dashboard" icon={LayoutDashboard} label="Dashboard" />
+            <NavItem to="/schemas/policies" icon={ShieldCheck} label="Schema Policies" />
+            <NavItem to="/policies" icon={ShieldCheck} label="Topic Policies" />
+          </div>
+        </div>
+
+        <div className="space-y-1 pt-4 border-t border-slate-100">
+          <NavItem to="/connections" icon={LinkIcon} label="Connections" />
+          <NavItem to="/settings" icon={Settings} label="Settings" />
+        </div>
       </nav>
 
       <div className="p-4 border-t border-slate-100 space-y-2">

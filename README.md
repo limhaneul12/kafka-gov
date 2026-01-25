@@ -210,6 +210,19 @@ Environment-specific rules prevent production incidents:
 | Min ISR | ≥ 1 | ≥ 2 ⚠️ |
 | 'tmp' prefix | ✅ | 🚫 |
 
+### �️ Schema Governance (New)
+
+Advanced schema quality control and life-cycle management:
+
+- **📊 Governance Dashboard**: Real-time health scoring based on compatibility, documentation, and linting quality.
+- **🛡️ Custom Guardrails**: Define your own linting rules and environment-specific compliance policies (e.g., mandatory 'doc' fields, forbidden naming patterns).
+- **🕒 Schema Time Machine**: Complete history of every schema version with 1-click rollback plans.
+- **📈 Impact Analysis**: Visual graph showing which topics and consumers are affected by a schema change.
+
+<div align="center">
+  <img src="./image/governance_dashboard.png" alt="Governance Dashboard" width="750"/>
+</div>
+
 ### 📊 Real-time Monitoring
 
 - **Consumer lag tracking** with p50/p95/max metrics
@@ -273,9 +286,14 @@ Environment-specific rules prevent production incidents:
 - ✅ Real-time monitoring
 - ✅ Policy enforcement
 
-**v1.1 (In Progress):**
-- 🔄 Enhanced frontend filters
-- 🔄 Preset management UI
+**v1.1 (Completed):**
+- ✅ Enhanced Governance Dashboard
+- ✅ Schema Policy (Linting) Engine
+- ✅ Multi-registry health scoring
+
+**v1.2 (In Progress):**
+- 🔄 AI-assisted Schema Migration
+- 🔄 Slack/Teams alert integration
 
 **v2.0 (Planned):**
 - 📅 RBAC & multi-tenancy

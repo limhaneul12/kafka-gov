@@ -79,18 +79,33 @@ class SchemaSyncUseCase:
             catalog_metrics: dict[str, int] | None = None
 
             for subject, info in subjects_info.items():
+                from datetime import datetime
+
                 artifact = DomainSchemaArtifact(
                     subject=subject,
                     version=info.version,
                     storage_url=f"registry://{subject}/versions/{info.version}",
                     checksum=info.hash,
+                    created_at=datetime.now(),
                 )
 
                 try:
                     await self.metadata_repository.record_artifact(artifact, change_id)
+
+                    # 메타데이터 자동 생성 (목록에 나타나도록)
+                    await self.metadata_repository.save_schema_metadata(
+                        subject,
+                        {
+                            "owner": "team",
+                            "compatibility_mode": info.compatibility_mode
+                            if hasattr(info, "compatibility_mode")
+                            else "BACKWARD",
+                            "created_by": actor,
+                        },
+                    )
                     added_count += 1
-                except Exception:
-                    # 이미 존재하는 경우는 무시 (중복 키 에러)
+                except Exception as e:
+                    logger.warning(f"Failed to record artifact/meta for {subject}: {e}")
                     skipped_count += 1
 
             if self.session_factory is not None:

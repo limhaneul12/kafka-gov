@@ -50,6 +50,37 @@ const schemaApi = {
         });
         return response.data;
     },
+
+    // --- 정책 관리 (Policy Management) ---
+    listPolicies: async (params?: { env?: string; policy_type?: string }): Promise<any[]> => {
+        const response = await axios.get(`/api/schemas/policies`, { params });
+        return response.data;
+    },
+
+    createPolicy: async (data: any): Promise<any> => {
+        const response = await axios.post(`/api/schemas/policies`, data);
+        return response.data;
+    },
+
+    getPolicyDetail: async (policyId: string, version?: number): Promise<any> => {
+        const response = await axios.get(`/api/schemas/policies/${policyId}`, {
+            params: { version }
+        });
+        return response.data;
+    },
+
+    getPolicyHistory: async (policyId: string): Promise<any[]> => {
+        const response = await axios.get(`/api/schemas/policies/${policyId}/history`);
+        return response.data;
+    },
+
+    updatePolicyStatus: async (policyId: string, version: number, status: string): Promise<void> => {
+        await axios.patch(`/api/schemas/policies/status`, {
+            policy_id: policyId,
+            version,
+            status,
+        });
+    },
 };
 
 export default schemaApi;

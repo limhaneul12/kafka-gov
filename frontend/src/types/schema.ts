@@ -13,6 +13,7 @@ export interface SubjectStat {
     compatibility_mode: string | null;
     lint_score: number;
     has_doc: boolean;
+    violations?: Array<{ rule: string; message: string; severity: string }>;
 }
 
 export interface DashboardResponse {
@@ -64,6 +65,7 @@ export interface SchemaArtifactResponse {
     schema_type: string | null;
     compatibility_mode: string | null;
     owner: string | null;
+    created_at: string | null;
 }
 
 export interface SchemaSearchResponse {
