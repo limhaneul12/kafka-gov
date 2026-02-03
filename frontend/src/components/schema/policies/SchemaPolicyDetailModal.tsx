@@ -21,7 +21,7 @@ export default function SchemaPolicyDetailModal({
 
     return (
         <div className="fixed inset-0 z-50 bg-black bg-opacity-50 overflow-y-auto flex items-center justify-center p-4">
-            <div className="w-full max-w-4xl rounded-xl bg-white shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200">
+            <div className="w-full max-w-4xl max-h-[90vh] flex flex-col rounded-xl bg-white shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200">
                 {/* Header */}
                 <div className="flex items-center justify-between border-b px-6 py-4">
                     <div className="flex items-center gap-3">
@@ -38,7 +38,7 @@ export default function SchemaPolicyDetailModal({
                     </button>
                 </div>
 
-                <div className="p-6 grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div className="p-6 grid grid-cols-1 lg:grid-cols-3 gap-6 overflow-y-auto flex-1 custom-scrollbar">
                     {/* Main Content */}
                     <div className="lg:col-span-2 space-y-6">
                         <section>
@@ -95,7 +95,7 @@ export default function SchemaPolicyDetailModal({
 
                                 <div className="bg-gray-950 rounded-lg p-2 font-mono text-[10px] text-blue-300 opacity-50 hover:opacity-100 transition-opacity">
                                     <p className="text-[9px] text-gray-600 mb-1 font-sans italic">// Raw Configuration Source</p>
-                                    <pre>{JSON.stringify(policy.content, null, 2)}</pre>
+                                    <pre className="max-h-40 overflow-auto custom-scrollbar">{JSON.stringify(policy.content, null, 2)}</pre>
                                 </div>
                             </div>
                         </section>

@@ -29,15 +29,14 @@ class CompatibilityGuardrail:
                 )
 
         # 2. 스테이징(STG) 환경은 최소 BACKWARD 이상 권장
-        elif env == DomainEnvironment.STG:
-            if compatibility == DomainCompatibilityMode.NONE:
-                violations.append(
-                    DomainPolicyViolation(
-                        subject=subject,
-                        rule="STG_COMPAT_RECOMMENDATION",
-                        message="스테이징(STG) 환경에서는 최소 BACKWARD 이상의 호환성 모드를 권장합니다.",
-                        severity="warning",
-                    )
+        elif env == DomainEnvironment.STG and compatibility == DomainCompatibilityMode.NONE:
+            violations.append(
+                DomainPolicyViolation(
+                    subject=subject,
+                    rule="STG_COMPAT_RECOMMENDATION",
+                    message="스테이징(STG) 환경에서는 최소 BACKWARD 이상의 호환성 모드를 권장합니다.",
+                    severity="warning",
                 )
+            )
 
         return violations

@@ -156,3 +156,11 @@ class ISchemaPolicyRepository(ABC):
     @abstractmethod
     async def update_status(self, policy_id: str, version: int, status: SchemaPolicyStatus) -> None:
         """정책 상태 업데이트"""
+
+    @abstractmethod
+    async def delete_policy(self, policy_id: str) -> None:
+        """정책의 모든 버전 삭제"""
+
+    @abstractmethod
+    async def delete_version(self, policy_id: str, version: int) -> None:
+        """정책의 특정 버전 삭제"""

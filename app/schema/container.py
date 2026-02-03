@@ -5,17 +5,20 @@ from __future__ import annotations
 from dependency_injector import containers, providers
 
 from .application.services.schema_lint import SchemaLintService
-from .application.use_cases import (
-    GovernanceUseCase,
-    SchemaBatchApplyUseCase,
-    SchemaBatchDryRunUseCase,
-    SchemaDeleteUseCase,
-    SchemaPlanUseCase,
-    SchemaPolicyUseCase,
-    SchemaSearchUseCase,
-    SchemaSyncUseCase,
-    SchemaUploadUseCase,
-)
+from .application.use_cases.batch.apply import SchemaBatchApplyUseCase
+from .application.use_cases.batch.dry_run import SchemaBatchDryRunUseCase
+from .application.use_cases.batch.get_plan import SchemaPlanUseCase
+from .application.use_cases.governance.detail import GetSubjectDetailUseCase
+from .application.use_cases.governance.history import GetSchemaHistoryUseCase
+from .application.use_cases.governance.impact import GetImpactGraphUseCase
+from .application.use_cases.governance.rollback import RollbackSchemaUseCase
+from .application.use_cases.governance.stats import GetGovernanceStatsUseCase
+from .application.use_cases.management.delete import SchemaDeleteUseCase
+from .application.use_cases.management.plan_change import PlanSchemaChangeUseCase
+from .application.use_cases.management.search import SchemaSearchUseCase
+from .application.use_cases.management.sync import SchemaSyncUseCase
+from .application.use_cases.management.upload import SchemaUploadUseCase
+from .application.use_cases.policy.management import SchemaPolicyUseCase
 from .domain.repositories.interfaces import (
     ISchemaAuditRepository,
     ISchemaMetadataRepository,
@@ -104,14 +107,44 @@ class SchemaContainer(containers.DeclarativeContainer):
 
     lint_service: providers.Provider[SchemaLintService] = providers.Factory(SchemaLintService)
 
-    governance_use_case: providers.Provider[GovernanceUseCase] = providers.Factory(
-        GovernanceUseCase,
-        connection_manager=cluster.connection_manager,  # ConnectionManager에서 Registry Client 획득
+    # Governance Use Cases
+    governance_stats_use_case: providers.Provider[GetGovernanceStatsUseCase] = providers.Factory(
+        GetGovernanceStatsUseCase,
+        connection_manager=cluster.connection_manager,
         metadata_repository=metadata_repository,
-        audit_repository=audit_repository,
-        lint_service=lint_service,
-        get_topic_consumers_use_case=consumer.get_topic_consumers_use_case,
         policy_repository=policy_repository,
+    )
+
+    schema_history_use_case: providers.Provider[GetSchemaHistoryUseCase] = providers.Factory(
+        GetSchemaHistoryUseCase,
+        connection_manager=cluster.connection_manager,
+        metadata_repository=metadata_repository,
+    )
+
+    impact_graph_use_case: providers.Provider[GetImpactGraphUseCase] = providers.Factory(
+        GetImpactGraphUseCase,
+        connection_manager=cluster.connection_manager,
+        get_topic_consumers_use_case=consumer.get_topic_consumers_use_case,
+    )
+
+    subject_detail_use_case: providers.Provider[GetSubjectDetailUseCase] = providers.Factory(
+        GetSubjectDetailUseCase,
+        connection_manager=cluster.connection_manager,
+        metadata_repository=metadata_repository,
+        policy_repository=policy_repository,
+    )
+
+    plan_change_use_case: providers.Provider[PlanSchemaChangeUseCase] = providers.Factory(
+        PlanSchemaChangeUseCase,
+        connection_manager=cluster.connection_manager,
+        metadata_repository=metadata_repository,
+    )
+
+    rollback_use_case: providers.Provider[RollbackSchemaUseCase] = providers.Factory(
+        RollbackSchemaUseCase,
+        connection_manager=cluster.connection_manager,
+        metadata_repository=metadata_repository,
+        plan_change_use_case=plan_change_use_case,
     )
 
     search_use_case: providers.Provider[SchemaSearchUseCase] = providers.Factory(

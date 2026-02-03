@@ -44,10 +44,12 @@ def extract_topics_from_subject(subject: str, strategy: SubjectStrategy | str) -
     match strategy:
         case SubjectStrategy.TOPIC_NAME:
             # 예: "orders-value" -> ["orders"]
+            # 예: "orders-value" -> ["orders"]
             if subject.endswith(("-key", "-value")):
                 topic_name = subject.rsplit("-", 1)[0]
                 return [topic_name]
-            return []
+            # 접미사가 없는 경우 subject 자체를 토픽명으로 간주 (혹은 커스텀 전략)
+            return [subject]
 
         case SubjectStrategy.TOPIC_RECORD_NAME:
             # 예: "orders-com.example.Order" -> ["orders"]

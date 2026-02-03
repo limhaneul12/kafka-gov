@@ -30,20 +30,16 @@ class NullableDefaultPolicy(ISchemaLintPolicy):
             field_name = field.get("name", "unknown")
             field_type = field.get("type")
 
-            # 1. Union 타입인지 확인 (리스트 형태)
-            if isinstance(field_type, list):
-                # 2. Union 안에 'null'이 포함되어 있는지 확인
-                if "null" in field_type:
-                    # 3. default 키가 존재하는지 확인
-                    if "default" not in field:
-                        violations.append(
-                            LintViolation(
-                                code=self.code,
-                                severity=ViolationSeverity.WARN,
-                                rule="Nullable 필드(Union with null)는 반드시 default 값을 가져야 함",
-                                actual=f"field '{field_name}' is nullable but has no default",
-                                hint=f"'{field_name}' 필드에 'default': null 속성을 추가하세요 (호환성 사고 방지)",
-                            )
-                        )
+            # 1. Nullable 필드(Union with null)인지 확인 후 default 값 검사
+            if isinstance(field_type, list) and "null" in field_type and "default" not in field:
+                violations.append(
+                    LintViolation(
+                        code=self.code,
+                        severity=ViolationSeverity.WARN,
+                        rule="Nullable 필드(Union with null)는 반드시 default 값을 가져야 함",
+                        actual=f"field '{field_name}' is nullable but has no default",
+                        hint=f"'{field_name}' 필드에 'default': null 속성을 추가하세요 (호환성 사고 방지)",
+                    )
+                )
 
         return violations

@@ -60,7 +60,7 @@ export default function SchemaPolicyComposer({
 
     return (
         <div className="fixed inset-0 z-50 bg-black bg-opacity-50 overflow-y-auto flex items-center justify-center p-4">
-            <div className="w-full max-w-3xl rounded-xl bg-white shadow-2xl overflow-hidden">
+            <div className="w-full max-w-3xl max-h-[90vh] flex flex-col rounded-xl bg-white shadow-2xl overflow-hidden">
                 <div className="flex items-center justify-between border-b px-6 py-4">
                     <div className="flex items-center gap-2">
                         <FileCode className="h-5 w-5 text-blue-600" />
@@ -73,8 +73,8 @@ export default function SchemaPolicyComposer({
                     </button>
                 </div>
 
-                <form onSubmit={handleSubmit}>
-                    <div className="p-6 space-y-5">
+                <form onSubmit={handleSubmit} className="flex-1 flex flex-col overflow-hidden">
+                    <div className="p-6 space-y-5 flex-1 overflow-y-auto custom-scrollbar">
                         {/* Presets Selection */}
                         <div className="bg-blue-50/50 p-4 rounded-xl border border-blue-100 mb-2">
                             <div className="flex items-center gap-2 mb-3 text-blue-700">

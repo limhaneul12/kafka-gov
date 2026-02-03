@@ -6,7 +6,7 @@ from collections.abc import Callable
 from contextlib import AbstractAsyncContextManager
 from datetime import datetime
 
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.schema.domain.models.policy_management import (
@@ -131,6 +131,22 @@ class MySQLSchemaPolicyRepository(ISchemaPolicyRepository):
                 if status == SchemaPolicyStatus.ACTIVE:
                     model.activated_at = datetime.now()
                 await session.flush()
+
+    async def delete_policy(self, policy_id: str) -> None:
+        """정책의 모든 버전 삭제"""
+        async with self.session_factory() as session:
+            stmt = delete(SchemaPolicyModel).where(SchemaPolicyModel.policy_id == policy_id)
+            await session.execute(stmt)
+            await session.flush()
+
+    async def delete_version(self, policy_id: str, version: int) -> None:
+        """정책의 특정 버전 삭제"""
+        async with self.session_factory() as session:
+            stmt = delete(SchemaPolicyModel).where(
+                SchemaPolicyModel.policy_id == policy_id, SchemaPolicyModel.version == version
+            )
+            await session.execute(stmt)
+            await session.flush()
 
     def _to_domain(self, model: SchemaPolicyModel) -> DomainSchemaPolicy:
         """Internal helper to convert ORM to Domain model"""

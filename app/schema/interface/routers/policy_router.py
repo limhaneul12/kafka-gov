@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
 from app.container import AppContainer
-from app.schema.application.use_cases.policy_management import SchemaPolicyUseCase
+from app.schema.application.use_cases import SchemaPolicyUseCase
 from app.schema.domain.models.policy_management import SchemaPolicyStatus, SchemaPolicyType
 
 router = APIRouter(prefix="/schemas/policies", tags=["Schema Policies"])
@@ -94,3 +94,18 @@ async def update_policy_status(
             request.policy_id, request.version, request.status
         )
     return {"message": "Status updated successfully"}
+
+
+@router.delete("/{policy_id}")
+@inject
+async def delete_policy(
+    policy_id: str,
+    version: int | None = None,
+    use_case: SchemaPolicyUseCase = Depends(Provide[AppContainer.schema_container.policy_use_case]),
+):
+    """정책 삭제 (버전 지정 시 특정 버전만 삭제, 미지정 시 전체 삭제)"""
+    if version:
+        await use_case.delete_version(policy_id, version)
+    else:
+        await use_case.delete_policy(policy_id)
+    return {"message": "Policy deleted successfully"}
