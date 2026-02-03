@@ -131,8 +131,8 @@ export const schemasAPI = {
     api.post(`/v1/schemas/upload?registry_id=${registryId}`, formData, {
       headers: { "Content-Type": "multipart/form-data" },
     }),
-  delete: (registryId: string, subject: string) =>
-    api.delete(`/v1/schemas/delete/${subject}?registry_id=${registryId}`),
+  delete: (registryId: string, subject: string, force: boolean = false) =>
+    api.delete(`/v1/schemas/delete/${subject}?registry_id=${registryId}&force=${force}`),
   analyze: (registryId: string, subject: string) =>
     api.post(`/v1/schemas/delete/analyze?registry_id=${registryId}`, null, {
       params: { subject },

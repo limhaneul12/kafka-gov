@@ -15,14 +15,13 @@ services:
     volumes:
       - redis_data:/data
 
-
   app:
     build:
       context: .
       dockerfile: Dockerfile
     user: "0:0"
     ports:
-      - "8000:8000"
+      - "8001:8000"
     command:
       - sh
       - -c

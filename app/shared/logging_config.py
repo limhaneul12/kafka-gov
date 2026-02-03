@@ -136,10 +136,28 @@ def configure_structlog() -> None:
     root_logger.addHandler(handler)
     root_logger.setLevel(logging.INFO if not settings.debug else logging.DEBUG)
 
-    # 외부 라이브러리 로깅 레벨 조정
-    logging.getLogger("uvicorn.access").setLevel(logging.WARNING)
-    logging.getLogger("aiokafka").setLevel(logging.WARNING)
-    logging.getLogger("confluent_kafka").setLevel(logging.WARNING)
+    # 외부 라이브러리 로깅 레벨 조정 (노이즈 제거)
+    noisy_loggers = [
+        "uvicorn",
+        "uvicorn.access",
+        "uvicorn.error",
+        "aiokafka",
+        "kafka",
+        "confluent_kafka",
+        "sqlalchemy",
+        "sqlalchemy.engine",
+        "sqlalchemy.pool",
+        "sqlalchemy.dialects",
+        "sqlalchemy.orm",
+        "aiosqlite",
+        "sqlite3",
+        "httpcore",
+        "httpx",
+        "asyncio",
+        "pyrefly",
+    ]
+    for logger_name in noisy_loggers:
+        logging.getLogger(logger_name).setLevel(logging.WARNING)
 
 
 def get_logger(name: str | None = None) -> structlog.stdlib.BoundLogger:

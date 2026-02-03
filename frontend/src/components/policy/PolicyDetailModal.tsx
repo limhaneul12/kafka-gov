@@ -12,9 +12,7 @@ import {
   RotateCcw,
   Trash2,
   Edit,
-  CheckCircle,
   GitCompare,
-  ChevronRight,
 } from "lucide-react";
 
 interface PolicyVersion {
@@ -53,7 +51,7 @@ export default function PolicyDetailModal({
   const [versions, setVersions] = useState<PolicyVersion[]>([]);
   const [loading, setLoading] = useState(true);
   const [showVersions, setShowVersions] = useState(autoShowVersions);
-  
+
   // Diff 상태
   const [showDiff, setShowDiff] = useState(false);
   const [diffBaseVersion, setDiffBaseVersion] = useState<number | null>(null);
@@ -72,11 +70,11 @@ export default function PolicyDetailModal({
     try {
       setLoading(true);
       let response;
-      
+
       if (preferActive) {
         // ACTIVE 버전 시도
         response = await fetch(`/api/v1/policies/${policyId}/active`);
-        
+
         if (!response.ok) {
           if (response.status === 422) {
             // ACTIVE가 없으면 최신 버전으로 fallback
@@ -89,11 +87,11 @@ export default function PolicyDetailModal({
         // 최신 버전 조회
         response = await fetch(`/api/v1/policies/${policyId}`);
       }
-      
+
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
-      
+
       const data = await response.json();
       setPolicy(data.policy);
     } catch (error: any) {
@@ -149,20 +147,6 @@ export default function PolicyDetailModal({
     }
   };
 
-  const handleDelete = async () => {
-    if (!policy) return;
-    if (!confirm(`Delete policy "${policy.name}"? This cannot be undone.`)) return;
-
-    try {
-      await policiesAPI.delete(policyId);
-      onRefresh();
-      onClose();
-    } catch (error) {
-      console.error("Failed to delete policy:", error);
-      toast.error("Failed to delete policy. Only DRAFT policies can be deleted.");
-    }
-  };
-
   const handleDeleteAllVersions = async () => {
     if (!policy) return;
     if (
@@ -214,42 +198,6 @@ export default function PolicyDetailModal({
     }
   };
 
-  const handleRollback = async (targetVersion: number) => {
-    // Toast 경고
-    toast.warning(`v${targetVersion}으로 롤백`, {
-      description: "롤백 버튼을 다시 한번 클릭하면 해당 버전이 ACTIVE로 변경됩니다.",
-      duration: 5000,
-    });
-
-    try {
-      const response = await fetch(`/api/v1/policies/${policyId}/rollback`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          target_version: targetVersion,
-          created_by: "admin@example.com",
-        }),
-      });
-      
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-      
-      // 롤백 후에는 ACTIVE 버전을 우선적으로 조회
-      await loadPolicy(true);
-      await loadVersions();
-      onRefresh();
-      toast.success("롤백 성공", {
-        description: `v${targetVersion}으로 롤백되었습니다.`
-      });
-    } catch (error) {
-      console.error("Failed to rollback policy:", error);
-      toast.error("롤백 실패", {
-        description: error instanceof Error ? error.message : "다시 시도해주세요."
-      });
-    }
-  };
-
   const getStatusBadgeVariant = (status: string) => {
     switch (status) {
       case "ACTIVE":
@@ -267,7 +215,7 @@ export default function PolicyDetailModal({
   const calculateDiff = (v1: number, v2: number) => {
     const version1 = versions.find(v => v.version === v1);
     const version2 = versions.find(v => v.version === v2);
-    
+
     if (!version1 || !version2) return null;
 
     const content1 = version1.content;
@@ -304,7 +252,7 @@ export default function PolicyDetailModal({
     return diff;
   };
 
-  const diffResult = (diffBaseVersion && diffTargetVersion) 
+  const diffResult = (diffBaseVersion && diffTargetVersion)
     ? calculateDiff(diffBaseVersion, diffTargetVersion)
     : null;
 
@@ -323,63 +271,70 @@ export default function PolicyDetailModal({
   if (!policy) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 overflow-y-auto p-4">
-      <div className="w-full max-w-5xl my-8 rounded-lg bg-white shadow-xl max-h-[90vh] overflow-y-auto">
-        <div className="border-b border-gray-200 p-6">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-70 p-4 backdrop-blur-sm">
+      <div className="w-full max-w-5xl rounded-2xl bg-white shadow-2xl flex flex-col max-h-[92vh] border border-gray-100">
+        {/* Header - Fixed */}
+        <div className="border-b border-gray-100 p-6 flex-shrink-0 bg-white rounded-t-2xl">
           <div className="flex items-start justify-between">
             <div className="flex-1">
               <div className="flex items-center gap-3 mb-2">
-                <h2 className="text-2xl font-bold text-gray-900">{policy.name}</h2>
+                <h2 className="text-2xl font-bold text-gray-900 tracking-tight">{policy.name}</h2>
                 <Badge variant={getStatusBadgeVariant(policy.status)}>
                   {policy.status}
                 </Badge>
-                <Badge variant="info">v{policy.version}</Badge>
+                <Badge variant="info" className="font-mono">v{policy.version}</Badge>
               </div>
-              <p className="text-gray-600">{policy.description}</p>
+              <p className="text-gray-500 text-sm leading-relaxed">{policy.description}</p>
             </div>
             <button
               onClick={onClose}
-              className="rounded-lg p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+              className="rounded-xl p-2.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors"
             >
               <X className="h-5 w-5" />
             </button>
           </div>
         </div>
 
-        <div className="p-6 space-y-6">
+        {/* Body - Scrollable */}
+        <div className="p-6 space-y-8 flex-1 overflow-y-auto custom-scrollbar">
           {/* Policy Info */}
-          <div className="grid gap-4 md:grid-cols-2">
-            <div>
-              <p className="text-sm font-medium text-gray-600">Policy ID</p>
-              <p className="mt-1 text-sm text-gray-900 font-mono">{policy.policy_id}</p>
+          <div className="grid gap-6 md:grid-cols-2 bg-gray-50 rounded-2xl p-6 border border-gray-100">
+            <div className="space-y-1">
+              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Policy ID</p>
+              <p className="text-sm text-gray-900 font-mono bg-white px-2 py-1 rounded inline-block border border-gray-200">{policy.policy_id}</p>
             </div>
-            <div>
-              <p className="text-sm font-medium text-gray-600">Created By</p>
-              <p className="mt-1 text-sm text-gray-900">{policy.created_by}</p>
+            <div className="space-y-1">
+              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Created By</p>
+              <p className="text-sm text-gray-900 flex items-center gap-2">
+                <span className="w-6 h-6 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-[10px] font-bold">
+                  {policy.created_by[0].toUpperCase()}
+                </span>
+                {policy.created_by}
+              </p>
             </div>
-            <div>
-              <p className="text-sm font-medium text-gray-600">Target Environment</p>
+            <div className="space-y-1">
+              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Target Environment</p>
               <div className="mt-1">
-                <Badge variant={policy.target_environment === "total" ? "default" : "warning"}>
-                  {policy.target_environment}
+                <Badge variant={policy.target_environment === "total" ? "default" : "warning"} className="font-semibold px-2">
+                  {policy.target_environment.toUpperCase()}
                 </Badge>
               </div>
             </div>
-            <div>
-              <p className="text-sm font-medium text-gray-600">Policy Type</p>
+            <div className="space-y-1">
+              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Policy Type</p>
               <div className="mt-1">
-                <Badge variant="info">{policy.policy_type}</Badge>
+                <Badge variant="info" className="font-semibold px-2">{policy.policy_type}</Badge>
               </div>
             </div>
-            <div>
-              <p className="text-sm font-medium text-gray-600">Created At</p>
-              <p className="mt-1 text-sm text-gray-900">
+            <div className="space-y-1">
+              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Created At</p>
+              <p className="text-sm text-gray-600">
                 {new Date(policy.created_at).toLocaleString()}
               </p>
             </div>
-            <div>
-              <p className="text-sm font-medium text-gray-600">Updated At</p>
-              <p className="mt-1 text-sm text-gray-900">
+            <div className="space-y-1">
+              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Updated At</p>
+              <p className="text-sm text-gray-600">
                 {policy.updated_at
                   ? new Date(policy.updated_at).toLocaleString()
                   : "Never"}
@@ -388,32 +343,42 @@ export default function PolicyDetailModal({
           </div>
 
           {/* Policy Content */}
-          <div>
-            <div className="flex items-center justify-between mb-2">
-              <p className="text-sm font-medium text-gray-600">Policy Content</p>
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-bold text-gray-900 flex items-center gap-2">
+                <Play className="h-4 w-4 text-blue-500 fill-blue-500" />
+                POLICY CONFIGURATION
+              </h3>
               <Button
                 size="sm"
                 variant="ghost"
+                className="hover:bg-blue-50 text-blue-600"
                 onClick={() => onEdit(policy)}
                 title={policy.status === "ACTIVE" ? "새 버전 생성" : "정책 수정"}
               >
-                <Edit className="h-4 w-4" />
-                {policy.status === "ACTIVE" ? "Edit (New Version)" : "Edit"}
+                <Edit className="h-3.5 w-3.5 mr-1" />
+                {policy.status === "ACTIVE" ? "Create New Version" : "Edit"}
               </Button>
             </div>
-            <pre className="rounded-lg bg-gray-50 p-4 text-sm overflow-x-auto">
-              {JSON.stringify(policy.content, null, 2)}
-            </pre>
+            <div className="relative group">
+              <pre className="rounded-2xl bg-gray-900 text-gray-100 p-6 text-sm overflow-x-auto font-mono leading-relaxed shadow-inner max-h-[400px]">
+                {JSON.stringify(policy.content, null, 2)}
+              </pre>
+            </div>
           </div>
 
-          {/* Version History */}
-          <div>
-            <div className="flex items-center justify-between mb-3">
-              <p className="text-sm font-medium text-gray-600">Version History</p>
+          {/* Version History Section */}
+          <div className="space-y-4">
+            <div className="flex items-center justify-between border-b border-gray-100 pb-3">
+              <h3 className="text-sm font-bold text-gray-900 flex items-center gap-2">
+                <History className="h-4 w-4 text-purple-500" />
+                VERSION HISTORY
+              </h3>
               <div className="flex gap-2">
                 <Button
                   size="sm"
                   variant="secondary"
+                  className="rounded-full h-8 text-xs px-4"
                   onClick={() => {
                     setShowDiff(!showDiff);
                     if (!showDiff) {
@@ -423,244 +388,195 @@ export default function PolicyDetailModal({
                     }
                   }}
                 >
-                  <GitCompare className="h-4 w-4" />
-                  {showDiff ? "Hide" : "Compare"} Versions
+                  <GitCompare className="h-3.5 w-3.5 mr-1.5" />
+                  {showDiff ? "Hide Comparison" : "Diff View"}
                 </Button>
                 <Button
                   size="sm"
                   variant="secondary"
+                  className="rounded-full h-8 text-xs px-4"
                   onClick={() => setShowVersions(!showVersions)}
                 >
-                  <History className="h-4 w-4" />
-                  {showVersions ? "Hide" : "Show"} Versions ({versions.length})
+                  <History className="h-3.5 w-3.5 mr-1.5" />
+                  {showVersions ? "Hide Timeline" : "Show Full Timeline"}
                 </Button>
               </div>
             </div>
 
             {/* Diff UI */}
             {showDiff && (
-              <div className="mb-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
-                <h4 className="text-sm font-semibold text-gray-900 mb-3">
-                  비교할 버전 선택
-                </h4>
-                <div className="grid grid-cols-3 gap-3 items-center">
-                  <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">
-                      이전 버전 (Base)
-                    </label>
-                    <select
-                      value={diffBaseVersion || ""}
-                      onChange={(e) => setDiffBaseVersion(e.target.value ? Number(e.target.value) : null)}
-                      className="w-full text-sm rounded border border-gray-300 px-3 py-2"
-                    >
-                      <option value="">선택하세요</option>
-                      {versions.map(v => (
-                        <option key={v.version} value={v.version}>
-                          v{v.version} ({v.status})
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  
-                  <div className="text-center">
-                    <ChevronRight className="h-5 w-5 text-gray-400 mx-auto" />
+              <div className="animate-in fade-in slide-in-from-top-2 duration-300">
+                <div className="p-5 bg-blue-50 rounded-2xl border border-blue-100">
+                  <div className="grid grid-cols-2 gap-4 items-center">
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-bold text-blue-600 uppercase tracking-wider ml-1">Base Version</label>
+                      <select
+                        value={diffBaseVersion || ""}
+                        onChange={(e) => setDiffBaseVersion(e.target.value ? Number(e.target.value) : null)}
+                        className="w-full text-sm rounded-xl border-blue-200 bg-white px-4 py-2.5 focus:ring-2 focus:ring-blue-500/20 transition-all outline-none"
+                      >
+                        <option value="">Select version...</option>
+                        {versions.map(v => (
+                          <option key={v.version} value={v.version}>
+                            v{v.version} {v.status === 'ACTIVE' ? '🟢' : '⚪️'} {v.status}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-bold text-blue-600 uppercase tracking-wider ml-1">Target Version</label>
+                      <select
+                        value={diffTargetVersion || ""}
+                        onChange={(e) => setDiffTargetVersion(e.target.value ? Number(e.target.value) : null)}
+                        className="w-full text-sm rounded-xl border-blue-200 bg-white px-4 py-2.5 focus:ring-2 focus:ring-blue-500/20 transition-all outline-none"
+                      >
+                        <option value="">Select version...</option>
+                        {versions.map(v => (
+                          <option key={v.version} value={v.version}>
+                            v{v.version} {v.status === 'ACTIVE' ? '🟢' : '⚪️'} {v.status}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
                   </div>
 
-                  <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">
-                      이후 버전 (Target)
-                    </label>
-                    <select
-                      value={diffTargetVersion || ""}
-                      onChange={(e) => setDiffTargetVersion(e.target.value ? Number(e.target.value) : null)}
-                      className="w-full text-sm rounded border border-gray-300 px-3 py-2"
-                    >
-                      <option value="">선택하세요</option>
-                      {versions.map(v => (
-                        <option key={v.version} value={v.version}>
-                          v{v.version} ({v.status})
-                        </option>
-                      ))}
-                    </select>
-                  </div>
+                  {/* Diff Results */}
+                  {diffResult && (
+                    <div className="mt-5 space-y-4 animate-in zoom-in-95 duration-200">
+                      <div className="flex items-center justify-between px-1">
+                        <span className="text-xs font-bold text-blue-900 bg-blue-100/50 px-3 py-1 rounded-full">
+                          v{diffBaseVersion} → v{diffTargetVersion}
+                        </span>
+                        <div className="flex gap-4">
+                          <span className="text-[11px] font-bold text-green-600">+{diffResult.added.length}</span>
+                          <span className="text-[11px] font-bold text-red-500">-{diffResult.removed.length}</span>
+                          <span className="text-[11px] font-bold text-blue-500">~{diffResult.changed.length}</span>
+                        </div>
+                      </div>
+
+                      <div className="bg-white rounded-xl border border-blue-100 overflow-hidden shadow-sm">
+                        {/* Added Items */}
+                        {diffResult.added.length > 0 && (
+                          <div className="border-b border-blue-50">
+                            <div className="px-4 py-2 bg-green-50/50 border-b border-green-100">
+                              <span className="text-[10px] font-bold text-green-700 uppercase tracking-tight">Added</span>
+                            </div>
+                            {diffResult.added.map(({ key, value }) => (
+                              <div key={key} className="px-4 py-2.5 font-mono text-xs border-b border-gray-50 last:border-0">
+                                <span className="text-green-600 font-bold mr-2">+</span>
+                                <span className="text-gray-900 font-semibold">{key}</span>:{" "}
+                                <span className="text-gray-600 italic">{JSON.stringify(value)}</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+
+                        {/* Removed Items */}
+                        {diffResult.removed.length > 0 && (
+                          <div className="border-b border-blue-50">
+                            <div className="px-4 py-2 bg-red-50/50 border-b border-red-100">
+                              <span className="text-[10px] font-bold text-red-700 uppercase tracking-tight">Removed</span>
+                            </div>
+                            {diffResult.removed.map(({ key, value }) => (
+                              <div key={key} className="px-4 py-2.5 font-mono text-xs border-b border-gray-50 last:border-0">
+                                <span className="text-red-500 font-bold mr-2">-</span>
+                                <span className="text-gray-400 line-through">{key}</span>:{" "}
+                                <span className="text-gray-400 opacity-60">{JSON.stringify(value)}</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+
+                        {/* Changed Items */}
+                        {diffResult.changed.length > 0 && (
+                          <div>
+                            <div className="px-4 py-2 bg-blue-50/50 border-b border-blue-100">
+                              <span className="text-[10px] font-bold text-blue-700 uppercase tracking-tight">Changed</span>
+                            </div>
+                            {diffResult.changed.map(({ key, old, new: newVal }) => (
+                              <div key={key} className="px-4 py-3 border-b border-gray-50 last:border-0">
+                                <div className="font-mono text-xs mb-1.5 flex items-center gap-2">
+                                  <span className="text-blue-500 font-bold">~</span>
+                                  <span className="text-gray-900 font-bold">{key}</span>
+                                </div>
+                                <div className="ml-4 space-y-1">
+                                  <div className="font-mono text-[11px] text-red-400/80 line-through">- {JSON.stringify(old)}</div>
+                                  <div className="font-mono text-[11px] text-green-600 bg-green-50 px-1.5 py-0.5 rounded">+ {JSON.stringify(newVal)}</div>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
                 </div>
-
-                {/* Diff 결과 */}
-                {diffResult && (
-                  <div className="mt-4 space-y-3">
-                    <div className="flex items-center justify-between">
-                      <h5 className="text-sm font-semibold text-gray-900">
-                        비교 결과: v{diffBaseVersion} → v{diffTargetVersion}
-                      </h5>
-                      <div className="flex gap-3 text-xs">
-                        <span className="text-green-700">+ {diffResult.added.length} 추가</span>
-                        <span className="text-red-700">- {diffResult.removed.length} 삭제</span>
-                        <span className="text-blue-700">~ {diffResult.changed.length} 변경</span>
-                      </div>
-                    </div>
-
-                    <div className="border border-gray-200 rounded-lg overflow-hidden">
-                      {/* 추가된 항목 */}
-                      {diffResult.added.length > 0 && (
-                        <div className="bg-green-50 border-b border-green-200">
-                          <div className="px-3 py-2 bg-green-100 border-b border-green-200">
-                            <span className="text-xs font-semibold text-green-900">
-                              ✚ 추가됨 ({diffResult.added.length})
-                            </span>
-                          </div>
-                          {diffResult.added.map(({ key, value }) => (
-                            <div key={key} className="px-3 py-2 font-mono text-xs">
-                              <span className="text-green-700 font-semibold">+ {key}:</span>{" "}
-                              <span className="text-green-800">{JSON.stringify(value)}</span>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-
-                      {/* 삭제된 항목 */}
-                      {diffResult.removed.length > 0 && (
-                        <div className="bg-red-50 border-b border-red-200">
-                          <div className="px-3 py-2 bg-red-100 border-b border-red-200">
-                            <span className="text-xs font-semibold text-red-900">
-                              ✖ 삭제됨 ({diffResult.removed.length})
-                            </span>
-                          </div>
-                          {diffResult.removed.map(({ key, value }) => (
-                            <div key={key} className="px-3 py-2 font-mono text-xs">
-                              <span className="text-red-700 font-semibold">- {key}:</span>{" "}
-                              <span className="text-red-800">{JSON.stringify(value)}</span>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-
-                      {/* 변경된 항목 */}
-                      {diffResult.changed.length > 0 && (
-                        <div className="bg-blue-50">
-                          <div className="px-3 py-2 bg-blue-100 border-b border-blue-200">
-                            <span className="text-xs font-semibold text-blue-900">
-                              ⟳ 변경됨 ({diffResult.changed.length})
-                            </span>
-                          </div>
-                          {diffResult.changed.map(({ key, old, new: newVal }) => (
-                            <div key={key} className="px-3 py-2 space-y-1">
-                              <div className="font-mono text-xs">
-                                <span className="text-blue-700 font-semibold">~ {key}:</span>
-                              </div>
-                              <div className="ml-4 space-y-1">
-                                <div className="font-mono text-xs">
-                                  <span className="text-red-700">- </span>
-                                  <span className="text-red-800 line-through">{JSON.stringify(old)}</span>
-                                </div>
-                                <div className="font-mono text-xs">
-                                  <span className="text-green-700">+ </span>
-                                  <span className="text-green-800">{JSON.stringify(newVal)}</span>
-                                </div>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-
-                    {diffResult.added.length === 0 && 
-                     diffResult.removed.length === 0 && 
-                     diffResult.changed.length === 0 && (
-                      <div className="text-center py-4 text-sm text-gray-500">
-                        두 버전이 동일합니다
-                      </div>
-                    )}
-                  </div>
-                )}
               </div>
             )}
 
             {showVersions && (
-              <div className="rounded-lg border border-gray-200 overflow-hidden">
-                <table className="w-full">
-                  <thead className="bg-gray-50">
+              <div className="rounded-2xl border border-gray-100 overflow-hidden shadow-sm">
+                <table className="w-full border-collapse">
+                  <thead className="bg-gray-50/50 border-b border-gray-100">
                     <tr>
-                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-600 w-20">
-                        Version
-                      </th>
-                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-600 w-24">
-                        Status
-                      </th>
-                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-600 w-40">
-                        Created By
-                      </th>
-                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-600 w-36">
-                        Created At
-                      </th>
-                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-600 w-36">
-                        Using At
-                      </th>
-                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-600 w-36">
-                        Actions
-                      </th>
+                      <th className="px-5 py-3 text-left text-[10px] font-bold text-gray-500 uppercase tracking-widest w-24">Version</th>
+                      <th className="px-5 py-3 text-left text-[10px] font-bold text-gray-500 uppercase tracking-widest w-28">Status</th>
+                      <th className="px-5 py-3 text-left text-[10px] font-bold text-gray-500 uppercase tracking-widest">Creator</th>
+                      <th className="px-5 py-3 text-left text-[10px] font-bold text-gray-500 uppercase tracking-widest w-40">Date</th>
+                      <th className="px-5 py-3 text-right text-[10px] font-bold text-gray-500 uppercase tracking-widest w-40">Actions</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-gray-200">
+                  <tbody className="divide-y divide-gray-50">
                     {versions.map((ver) => (
-                      <tr 
-                        key={ver.version} 
-                        className={`hover:bg-gray-50 ${ver.status === "ACTIVE" ? "bg-green-50" : ""}`}
+                      <tr
+                        key={ver.version}
+                        className={`hover:bg-blue-50/30 transition-colors ${ver.status === "ACTIVE" ? "bg-blue-50/20" : ""}`}
                       >
-                        <td className="px-4 py-2">
-                          <div className="flex items-center gap-2">
-                            <span className={`text-sm font-medium ${ver.status === "ACTIVE" ? "text-green-700" : "text-gray-900"}`}>
-                              v{ver.version}
-                            </span>
-                            {ver.status === "ACTIVE" && (
-                              <Badge variant="success" className="text-xs">적용중</Badge>
-                            )}
-                          </div>
+                        <td className="px-5 py-4">
+                          <span className={`text-sm font-bold font-mono ${ver.status === "ACTIVE" ? "text-blue-600 underline decoration-2 underline-offset-4" : "text-gray-900"}`}>
+                            v{ver.version}
+                          </span>
                         </td>
-                        <td className="px-4 py-2">
-                          <Badge variant={getStatusBadgeVariant(ver.status)}>
+                        <td className="px-5 py-4">
+                          <Badge variant={getStatusBadgeVariant(ver.status)} className="px-2.5 py-0.5 rounded-full text-[10px]">
                             {ver.status}
                           </Badge>
                         </td>
-                        <td className="px-4 py-2 text-sm text-gray-600">
-                          {ver.created_by}
+                        <td className="px-5 py-4">
+                          <div className="flex items-center gap-2">
+                            <div className="w-6 h-6 rounded-full bg-gray-100 flex items-center justify-center text-[9px] font-bold text-gray-500">
+                              {ver.created_by[0].toUpperCase()}
+                            </div>
+                            <span className="text-xs text-gray-600 truncate max-w-[120px]">{ver.created_by}</span>
+                          </div>
                         </td>
-                        <td className="px-4 py-2 text-sm text-gray-600">
-                          {new Date(ver.created_at).toLocaleString()}
+                        <td className="px-5 py-4 text-xs text-gray-400 font-mono">
+                          {new Date(ver.created_at).toLocaleDateString()}
                         </td>
-                        <td className="px-4 py-2 text-sm text-gray-600">
-                          {ver.activated_at ? new Date(ver.activated_at).toLocaleString() : '-'}
-                        </td>
-                        <td className="px-4 py-2">
-                          <div className="flex gap-1">
-                            {ver.status !== "ACTIVE" && ver.status === "DRAFT" && (
+                        <td className="px-5 py-4 text-right">
+                          <div className="flex justify-end gap-1">
+                            {ver.status !== "ACTIVE" && (
                               <Button
                                 size="sm"
                                 variant="ghost"
+                                className="h-8 w-8 p-0 rounded-full hover:bg-green-100 hover:text-green-600"
                                 onClick={() => handleActivate(ver.version)}
-                                title="이 버전을 활성화"
+                                title="Activate this version"
                               >
-                                <CheckCircle className="h-4 w-4 text-green-600" />
+                                {ver.status === 'DRAFT' ? <Play className="h-3.5 w-3.5 fill-current" /> : <RotateCcw className="h-3.5 w-3.5" />}
                               </Button>
                             )}
                             {ver.status !== "ACTIVE" && (
-                              <>
-                                <Button
-                                  size="sm"
-                                  variant="ghost"
-                                  onClick={() => handleRollback(ver.version)}
-                                  title={`v${ver.version}을 ACTIVE로 변경`}
-                                >
-                                  <RotateCcw className="h-4 w-4 text-blue-600" />
-                                </Button>
-                                <Button
-                                  size="sm"
-                                  variant="ghost"
-                                  onClick={() => handleDeleteVersion(ver.version)}
-                                  title={`v${ver.version} 삭제`}
-                                >
-                                  <Trash2 className="h-4 w-4 text-red-600" />
-                                </Button>
-                              </>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="h-8 w-8 p-0 rounded-full hover:bg-red-100 hover:text-red-600"
+                                onClick={() => handleDeleteVersion(ver.version)}
+                                title="Delete version"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </Button>
                             )}
                           </div>
                         </td>
@@ -673,54 +589,38 @@ export default function PolicyDetailModal({
           </div>
         </div>
 
-        {/* Actions */}
-        <div className="border-t border-gray-200 p-6 bg-gray-50">
-          <div className="flex justify-between">
+        {/* Footer - Fixed */}
+        <div className="border-t border-gray-100 p-6 bg-gray-50/80 rounded-b-2xl flex-shrink-0 backdrop-blur-md">
+          <div className="flex items-center justify-between gap-4">
             <div className="flex gap-2">
-              {policy.status === "DRAFT" && (
-                <>
-                  <Button variant="secondary" onClick={() => onEdit(policy)}>
-                    <Edit className="h-4 w-4" />
-                    Edit
-                  </Button>
-                  <Button variant="danger" onClick={handleDelete}>
-                    <Trash2 className="h-4 w-4" />
-                    Delete
-                  </Button>
-                </>
-              )}
-              {policy.status === "ACTIVE" && (
-                <>
-                  <Button variant="secondary" onClick={() => onEdit(policy)}>
-                    <Edit className="h-4 w-4" />
-                    Edit (Create New Version)
-                  </Button>
-                  <Button variant="secondary" onClick={handleArchive}>
-                    <Archive className="h-4 w-4" />
-                    Archive
-                  </Button>
-                </>
-              )}
-              {/* 정책 전체 삭제 버튼 */}
-              <Button 
-                variant="danger" 
-                onClick={handleDeleteAllVersions}
-                className="ml-auto"
-              >
+              <Button variant="danger" onClick={handleDeleteAllVersions} className="flex items-center gap-2 shadow-sm border-red-200">
                 <Trash2 className="h-4 w-4" />
-                Delete All Versions
+                <span className="hidden sm:inline">Delete Entire Policy</span>
+                <span className="sm:hidden">Delete All</span>
               </Button>
-            </div>
-            <div className="flex gap-2">
-              {policy.status === "DRAFT" && (
-                <Button onClick={() => handleActivate()}>
-                  <Play className="h-4 w-4" />
-                  Activate
+              {policy.status === "ACTIVE" && (
+                <Button variant="secondary" onClick={handleArchive} className="bg-white">
+                  <Archive className="h-4 w-4 mr-2" />
+                  Archive
                 </Button>
               )}
-              <Button variant="secondary" onClick={onClose}>
+            </div>
+
+            <div className="flex gap-3">
+              <Button variant="secondary" onClick={onClose} className="bg-white px-6">
                 Close
               </Button>
+              {policy.status === "DRAFT" ? (
+                <Button onClick={() => handleActivate()} className="px-8 shadow-lg shadow-blue-500/20">
+                  <Play className="h-4 w-4 mr-2 fill-current" />
+                  Activate Now
+                </Button>
+              ) : (
+                <Button onClick={() => onEdit(policy)} className="px-8 shadow-lg shadow-blue-500/20">
+                  <Edit className="h-4 w-4 mr-2" />
+                  Edit Policy
+                </Button>
+              )}
             </div>
           </div>
         </div>

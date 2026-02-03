@@ -1,6 +1,6 @@
 import Badge from "../../ui/Badge";
 import Button from "../../ui/Button";
-import { Eye, History, Play } from "lucide-react";
+import { Eye, History, Play, Trash2 } from "lucide-react";
 
 interface Policy {
     policy_id: string;
@@ -18,6 +18,7 @@ interface SchemaPolicyListProps {
     onViewDetail: (policy: Policy) => void;
     onViewHistory: (policy: Policy) => void;
     onActivate: (policy: Policy) => void;
+    onDelete: (policy: Policy) => void;
 }
 
 export default function SchemaPolicyList({
@@ -26,6 +27,7 @@ export default function SchemaPolicyList({
     onViewDetail,
     onViewHistory,
     onActivate,
+    onDelete,
 }: SchemaPolicyListProps) {
     if (loading) {
         return <div className="py-12 text-center text-gray-500">Loading policies...</div>;
@@ -85,7 +87,7 @@ export default function SchemaPolicyList({
                                 </Badge>
                             </td>
                             <td className="px-6 py-4 text-right">
-                                <div className="flex justify-end gap-2">
+                                <div className="flex justify-end gap-1">
                                     <Button variant="ghost" size="sm" onClick={() => onViewDetail(policy)}>
                                         <Eye className="h-4 w-4" />
                                     </Button>
@@ -97,6 +99,9 @@ export default function SchemaPolicyList({
                                             <Play className="h-4 w-4" />
                                         </Button>
                                     )}
+                                    <Button variant="ghost" size="sm" onClick={() => onDelete(policy)} className="text-gray-400 hover:text-red-600">
+                                        <Trash2 className="h-4 w-4" />
+                                    </Button>
                                 </div>
                             </td>
                         </tr>

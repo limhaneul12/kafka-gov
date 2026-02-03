@@ -571,11 +571,8 @@ class MySQLSchemaMetadataRepository(ISchemaMetadataRepository):
                             version=artifact.version if artifact else None,
                             storage_url=artifact.storage_url if artifact else None,
                             checksum=artifact.checksum if artifact else None,
-                            schema_type=next(
-                                (t for t in DomainSchemaType if t.value == artifact.schema_type),
-                                None,
-                            )
-                            if artifact and artifact.schema_type
+                            schema_type=self._to_domain_schema_type(artifact.schema_type)
+                            if artifact
                             else None,
                             created_at=artifact.created_at if artifact else None,
                         )
@@ -629,10 +626,8 @@ class MySQLSchemaMetadataRepository(ISchemaMetadataRepository):
                     version=artifact_model.version if artifact_model else None,
                     storage_url=artifact_model.storage_url if artifact_model else None,
                     checksum=artifact_model.checksum if artifact_model else None,
-                    schema_type=next(
-                        (t for t in DomainSchemaType if t.value == artifact_model.schema_type), None
-                    )
-                    if artifact_model and artifact_model.schema_type
+                    schema_type=self._to_domain_schema_type(artifact_model.schema_type)
+                    if artifact_model
                     else None,
                     compatibility_mode=compat_mode,
                     owner=metadata_model.owner if metadata_model else None,
@@ -642,3 +637,12 @@ class MySQLSchemaMetadataRepository(ISchemaMetadataRepository):
             except Exception as e:
                 logger.error(f"Failed to get latest artifact for {subject}: {e}")
                 return None
+
+    def _to_domain_schema_type(self, type_str: str | None) -> DomainSchemaType | None:
+        """문자열을 DomainSchemaType Enum으로 안전하게 변환"""
+        if not type_str:
+            return None
+        try:
+            return DomainSchemaType(type_str)
+        except ValueError:
+            return None

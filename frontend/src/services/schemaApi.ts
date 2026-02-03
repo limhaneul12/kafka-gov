@@ -81,6 +81,12 @@ const schemaApi = {
             status,
         });
     },
+
+    deletePolicy: async (policyId: string, version?: number): Promise<void> => {
+        await axios.delete(`/api/schemas/policies/${policyId}`, {
+            params: { version }
+        });
+    },
 };
 
 export default schemaApi;

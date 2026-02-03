@@ -139,6 +139,17 @@ export default function SchemaPolicies() {
             onViewDetail={handleViewDetail}
             onViewHistory={handleViewDetail} // Detail modal has history sidebar
             onActivate={handleActivate}
+            onDelete={async (policy) => {
+              if (window.confirm(`Are you sure you want to delete policy "${policy.name}"?`)) {
+                try {
+                  await schemaApi.deletePolicy(policy.policy_id);
+                  toast.success(`Policy ${policy.name} deleted`);
+                  fetchPolicies();
+                } catch (err) {
+                  toast.error("Failed to delete policy");
+                }
+              }
+            }}
           />
         </CardContent>
       </Card>

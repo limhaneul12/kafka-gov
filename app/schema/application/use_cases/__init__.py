@@ -1,17 +1,29 @@
 """Schema Application Use Cases - Export Module"""
 
-from .batch_apply import SchemaBatchApplyUseCase
-from .batch_dry_run import SchemaBatchDryRunUseCase
-from .delete import SchemaDeleteUseCase
-from .governance import GovernanceUseCase
-from .plan import SchemaPlanUseCase
-from .policy_management import SchemaPolicyUseCase
-from .search import SchemaSearchUseCase
-from .sync import SchemaSyncUseCase
-from .upload import SchemaUploadUseCase
+from .batch.apply import SchemaBatchApplyUseCase
+from .batch.dry_run import SchemaBatchDryRunUseCase
+from .batch.get_plan import SchemaPlanUseCase
+from .governance.detail import GetSubjectDetailUseCase
+from .governance.history import GetSchemaHistoryUseCase
+from .governance.impact import GetImpactGraphUseCase
+from .governance.rollback import RollbackSchemaUseCase
+
+# Governance use cases (previously combined in GovernanceUseCase)
+from .governance.stats import GetGovernanceStatsUseCase
+from .management.delete import SchemaDeleteUseCase
+from .management.plan_change import PlanSchemaChangeUseCase
+from .management.search import SchemaSearchUseCase
+from .management.sync import SchemaSyncUseCase
+from .management.upload import SchemaUploadUseCase
+from .policy.management import SchemaPolicyUseCase
 
 __all__ = [
-    "GovernanceUseCase",
+    "GetGovernanceStatsUseCase",
+    "GetImpactGraphUseCase",
+    "GetSchemaHistoryUseCase",
+    "GetSubjectDetailUseCase",
+    "PlanSchemaChangeUseCase",
+    "RollbackSchemaUseCase",
     "SchemaBatchApplyUseCase",
     "SchemaBatchDryRunUseCase",
     "SchemaDeleteUseCase",

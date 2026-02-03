@@ -368,6 +368,8 @@ export default function SchemaDetail() {
     const navigate = useNavigate();
     const [activeTab, setActiveTab] = useState('overview');
     const [isDeleting, setIsDeleting] = useState(false);
+    const [showForceDeleteModal, setShowForceDeleteModal] = useState(false);
+    const [deleteWarning, setDeleteWarning] = useState<string>('');
 
     // Edit & Plan States
     const [isEditing, setIsEditing] = useState(false);
@@ -504,8 +506,43 @@ export default function SchemaDetail() {
             toast.success('Subject deleted successfully');
             navigate('/schemas');
         } catch (e: any) {
-            console.error('Delete failed', e);
-            toast.error(e.response?.data?.detail || 'Delete failed');
+            const errorMsg = e.response?.data?.detail || 'Delete failed';
+
+            // Check if it's a safety violation that can be forced
+            if (e.response?.status === 400 && errorMsg.includes('안전하지 않습니다')) {
+                setDeleteWarning(errorMsg);
+                setShowForceDeleteModal(true);
+            } else {
+                console.error('Delete failed', e);
+                toast.error(errorMsg);
+            }
+        } finally {
+            setIsDeleting(false);
+        }
+    };
+
+    const handleConfirmForceDelete = async () => {
+        if (!subject) return;
+
+        try {
+            setIsDeleting(true);
+            const registriesRes = await clustersAPI.listRegistries();
+            const registries = registriesRes.data;
+            const activeRegistry = registries?.find((r: any) => r.is_active) || registries?.[0];
+
+            if (!activeRegistry) {
+                toast.error('No Active Schema Registry found');
+                return;
+            }
+
+            // Call with force=true
+            await schemasAPI.delete(activeRegistry.registry_id, subject, true);
+            toast.success('Subject force deleted successfully');
+            setShowForceDeleteModal(false);
+            navigate('/schemas');
+        } catch (e: any) {
+            console.error('Force delete failed', e);
+            toast.error(e.response?.data?.detail || 'Force delete failed');
         } finally {
             setIsDeleting(false);
         }
@@ -798,6 +835,50 @@ export default function SchemaDetail() {
                     </div>
                 </div>
             </div>
+
+            {/* Force Delete Confirmation Modal */}
+            {showForceDeleteModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+                    <div className="bg-white rounded-xl shadow-xl max-w-lg w-full overflow-hidden border border-rose-200 animate-in fade-in zoom-in-95 duration-200">
+                        <div className="p-6">
+                            <div className="flex items-start gap-4">
+                                <div className="p-3 bg-rose-100 rounded-full shrink-0">
+                                    <AlertTriangle className="w-6 h-6 text-rose-600" />
+                                </div>
+                                <div className="flex-1">
+                                    <h3 className="text-lg font-bold text-gray-900 mb-2">Unsafe Delete Warning</h3>
+                                    <p className="text-sm text-gray-600 mb-4 whitespace-pre-wrap">
+                                        {deleteWarning}
+                                    </p>
+                                    <div className="bg-rose-50 border border-rose-100 rounded-lg p-3 text-xs text-rose-800 font-medium">
+                                        This is a production schema or has dependents. Deleting it may cause system outages.
+                                    </div>
+                                    <p className="text-sm text-gray-900 font-semibold mt-4">
+                                        Do you really want to force delete this schema?
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                        <div className="bg-gray-50 px-6 py-4 flex justify-end gap-3 border-t border-gray-100">
+                            <Button
+                                variant="ghost"
+                                onClick={() => setShowForceDeleteModal(false)}
+                                disabled={isDeleting}
+                            >
+                                Cancel
+                            </Button>
+                            <Button
+                                variant="danger"
+                                onClick={handleConfirmForceDelete}
+                                className="bg-rose-600 hover:bg-rose-700 text-white"
+                                disabled={isDeleting}
+                            >
+                                {isDeleting ? 'Deleting...' : 'Yes, Force Delete'}
+                            </Button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
