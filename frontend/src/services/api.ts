@@ -156,7 +156,7 @@ export const schemasAPI = {
     }),
   dryRun: (registryId: string, data: Record<string, unknown>) =>
     api.post(`/v1/schemas/batch/dry-run?registry_id=${registryId}`, data),
-  apply: (registryId: string, data: Record<string, unknown>) =>
+  apply: (registryId: string, data: object) =>
     api.post(`/v1/schemas/batch/apply?registry_id=${registryId}`, data),
   planChange: (registryId: string, data: { subject: string; new_schema: string; compatibility: string }) =>
     api.post(`/v1/schemas/plan-change?registry_id=${registryId}`, data),

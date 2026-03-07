@@ -8,7 +8,7 @@
   [![Python](https://img.shields.io/badge/Python-3.12+-blue.svg)](https://python.org)
   [![FastAPI](https://img.shields.io/badge/FastAPI-0.117.1+-green.svg)](https://fastapi.tiangolo.com)
   [![React](https://img.shields.io/badge/React-19.1-61dafb.svg)](https://react.dev)
-  [![Coverage](https://img.shields.io/badge/Coverage-64%25-yellow.svg)](https://github.com/limhaneul12/kafka-gov)
+  [![Coverage](https://img.shields.io/badge/Coverage-97.62%25-brightgreen.svg)](https://github.com/limhaneul12/kafka-gov)
   [![License](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
   
   **"Without knowing who owns a topic and what it's used for, Kafka is just a message queue."**
@@ -321,6 +321,12 @@ uv run pytest --cov=app
 uv run ruff check app/
 uv run ruff format app/
 ```
+
+### Test Status (Current Branch)
+
+- Backend tests: `37 passed`
+- Coverage (`uv run pytest --cov=app`): `97.62%`
+- Core domain mock matrix: `cluster`, `topic`, `schema`, `consumer`, `shared`
 
 ---
 

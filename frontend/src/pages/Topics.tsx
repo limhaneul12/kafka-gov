@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
@@ -62,26 +62,7 @@ export default function Topics() {
   const allOwners = Array.from(new Set(topics.flatMap(t => t.owners)));
   const allTags = Array.from(new Set(topics.flatMap(t => t.tags)));
 
-  useEffect(() => {
-    loadClusters();
-  }, []);
-
-  useEffect(() => {
-    if (selectedCluster) {
-      setCurrentPage(1); // 클러스터 변경 시 1페이지로 리셋
-      loadTopics(1);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedCluster]);
-
-  useEffect(() => {
-    if (selectedCluster) {
-      loadTopics(currentPage);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentPage]);
-
-  const loadClusters = async () => {
+  const loadClusters = useCallback(async () => {
     try {
       const response = await clustersAPI.listKafka();
       setClusters(response.data);
@@ -91,9 +72,9 @@ export default function Topics() {
     } catch (error) {
       console.error("Failed to load clusters:", error);
     }
-  };
+  }, []);
 
-  const loadTopics = async (page: number = 1) => {
+  const loadTopics = useCallback(async (page: number = 1) => {
     if (!selectedCluster) return;
 
     try {
@@ -110,7 +91,23 @@ export default function Topics() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [pageSize, selectedCluster]);
+
+  useEffect(() => {
+    void loadClusters();
+  }, [loadClusters]);
+
+  useEffect(() => {
+    if (selectedCluster) {
+      setCurrentPage(1);
+    }
+  }, [selectedCluster]);
+
+  useEffect(() => {
+    if (selectedCluster) {
+      void loadTopics(currentPage);
+    }
+  }, [currentPage, loadTopics, selectedCluster]);
 
   const handleRefresh = async () => {
     if (!selectedCluster) {
@@ -125,7 +122,7 @@ export default function Topics() {
         description: 'Kafka 클러스터에서 토픽 목록을 가져오는 중...'
       });
       
-      await loadTopics();
+      await loadTopics(currentPage);
       
       toast.success('새로고침 완료', {
         description: `${topics.length}개의 토픽이 조회되었습니다.`
@@ -150,7 +147,7 @@ export default function Topics() {
 
     try {
       await topicsAPI.updateMetadata(selectedCluster, editingTopic.name, data);
-      await loadTopics();
+      await loadTopics(currentPage);
     } catch (error) {
       console.error("Failed to update topic metadata:", error);
       throw error;
@@ -198,7 +195,11 @@ export default function Topics() {
       // 각 YAML 문서를 개별적으로 Backend에 전송
         for (const doc of documents) {
           try {
-          const response = await topicsAPI.createFromYAML(clusterId, doc, approvalOverride);
+          const response = await topicsAPI.createFromYAML(
+            clusterId,
+            doc,
+            approvalOverride ?? undefined,
+          );
           
           // Backend가 200을 반환해도 failed가 있으면 실패로 간주
           const hasFailures = response.data.failed && response.data.failed.length > 0;
@@ -299,7 +300,7 @@ export default function Topics() {
         }
       }
       
-      await loadTopics();
+      await loadTopics(currentPage);
       
       // 상세 리포트 생성
       const totalSuccess = results.filter(r => r.success).length;
@@ -484,10 +485,11 @@ export default function Topics() {
         <CardContent className="pt-6">
           <div className="grid gap-4 md:grid-cols-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label htmlFor="topics-cluster" className="block text-sm font-medium text-gray-700 mb-2">
                 Cluster
               </label>
               <select
+                id="topics-cluster"
                 value={selectedCluster}
                 onChange={(e) => setSelectedCluster(e.target.value)}
                 className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
@@ -501,12 +503,13 @@ export default function Topics() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label htmlFor="topics-search" className="block text-sm font-medium text-gray-700 mb-2">
                 Search
               </label>
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
                 <input
+                  id="topics-search"
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
@@ -606,6 +609,7 @@ export default function Topics() {
                   일괄 삭제
                 </Button>
                 <button
+                  type="button"
                   onClick={() => setSelectedTopics([])}
                   className="text-sm text-gray-500 hover:text-gray-700 underline"
                 >
