@@ -1,5 +1,7 @@
 import axios from "axios";
 
+import type { ApprovalOverridePayload } from "../utils/approvalOverride";
+
 const api = axios.create({
   baseURL: "/api/",
   headers: {
@@ -48,7 +50,7 @@ api.interceptors.response.use(
 // API 연결 테스트 함수
 export const testAPIConnection = async () => {
   try {
-    const response = await api.get("");
+    const response = await api.get("/v1");
     return { success: true, data: response.data };
   } catch (error: unknown) {
     const err = error as { message?: string; response?: { data?: unknown }; config?: { url?: string; baseURL?: string }; request?: unknown };
@@ -83,10 +85,20 @@ export const topicsAPI = {
   },
   dryRun: (clusterId: string, batchRequest: Record<string, unknown>) =>
     api.post(`/v1/topics/batch/dry-run?cluster_id=${clusterId}`, batchRequest),
-  create: (clusterId: string, batchRequest: Record<string, unknown>) =>
-    api.post(`/v1/topics/batch/apply?cluster_id=${clusterId}`, batchRequest),
-  createFromYAML: (clusterId: string, yamlContent: string) =>
-    api.post(`/v1/topics/batch/apply-yaml?cluster_id=${clusterId}`, { yaml_content: yamlContent }),
+  create: (
+    clusterId: string,
+    batchRequest: Record<string, unknown>,
+    approvalOverride?: ApprovalOverridePayload,
+  ) =>
+    api.post(`/v1/topics/batch/apply?cluster_id=${clusterId}`, {
+      ...batchRequest,
+      approvalOverride,
+    }),
+  createFromYAML: (clusterId: string, yamlContent: string, approvalOverride?: ApprovalOverridePayload) =>
+    api.post(`/v1/topics/batch/apply-yaml?cluster_id=${clusterId}`, {
+      yaml_content: yamlContent,
+      approvalOverride,
+    }),
   updateMetadata: (
     clusterId: string,
     topicName: string,
@@ -100,27 +112,32 @@ export const topicsAPI = {
     }
   ) =>
     api.patch(`/v1/topics/${topicName}/metadata?cluster_id=${clusterId}`, metadata),
-  delete: (clusterId: string, name: string) =>
-    api.delete(`/v1/topics/${name}?cluster_id=${clusterId}`),
-  bulkDelete: (clusterId: string, names: string[]) =>
-    api.post(`/v1/topics/bulk-delete?cluster_id=${clusterId}`, names),
+  delete: (clusterId: string, name: string, approvalOverride?: ApprovalOverridePayload) =>
+    api.delete(`/v1/topics/${name}?cluster_id=${clusterId}`, {
+      data: approvalOverride ? { approvalOverride } : undefined,
+    }),
+  bulkDelete: (clusterId: string, names: string[], approvalOverride?: ApprovalOverridePayload) =>
+    api.post(`/v1/topics/bulk-delete?cluster_id=${clusterId}`, {
+      names,
+      approvalOverride,
+    }),
   getDetail: (clusterId: string, topicName: string) =>
     api.get(`/v1/topics/${topicName}/detail?cluster_id=${clusterId}`),
 };
 
 export const metricsAPI = {
   getTopicMetrics: (clusterId: string, topicName: string) =>
-    api.get(`/metrics/topics/${topicName}?cluster_id=${clusterId}`),
+    api.get(`/v1/metrics/topics/${topicName}?cluster_id=${clusterId}`),
   getTopicMetricsLive: (clusterId: string, topicName: string) =>
-    api.get(`/metrics/topics/${topicName}/live?cluster_id=${clusterId}`),
+    api.get(`/v1/metrics/topics/${topicName}/live?cluster_id=${clusterId}`),
   getAllTopicsMetrics: (clusterId: string) =>
-    api.get(`/metrics/topics?cluster_id=${clusterId}`),
+    api.get(`/v1/metrics/topics?cluster_id=${clusterId}`),
   getClusterMetrics: (clusterId: string) =>
-    api.get(`/metrics/cluster?cluster_id=${clusterId}`),
+    api.get(`/v1/metrics/cluster?cluster_id=${clusterId}`),
   refreshMetrics: (clusterId: string) =>
-    api.post(`/metrics/refresh?cluster_id=${clusterId}`),
+    api.post(`/v1/metrics/refresh?cluster_id=${clusterId}`),
   syncMetrics: (clusterId: string) =>
-    api.post(`/metrics/sync?cluster_id=${clusterId}`),
+    api.post(`/v1/metrics/sync?cluster_id=${clusterId}`),
 };
 
 export const schemasAPI = {
@@ -137,9 +154,9 @@ export const schemasAPI = {
     api.post(`/v1/schemas/delete/analyze?registry_id=${registryId}`, null, {
       params: { subject },
     }),
-  dryRun: (registryId: string, data: any) =>
+  dryRun: (registryId: string, data: Record<string, unknown>) =>
     api.post(`/v1/schemas/batch/dry-run?registry_id=${registryId}`, data),
-  apply: (registryId: string, data: any) =>
+  apply: (registryId: string, data: Record<string, unknown>) =>
     api.post(`/v1/schemas/batch/apply?registry_id=${registryId}`, data),
   planChange: (registryId: string, data: { subject: string; new_schema: string; compatibility: string }) =>
     api.post(`/v1/schemas/plan-change?registry_id=${registryId}`, data),
@@ -202,15 +219,6 @@ export const policiesAPI = {
 export const auditAPI = {
   recent: (limit = 20) => api.get(`/v1/audit/recent?limit=${limit}`),
   history: (params: Record<string, unknown>) => api.get("/v1/audit/history", { params }),
-};
-
-export const analysisAPI = {
-  statistics: () => api.get("/v1/analysis/statistics"),
-  correlations: () => api.get("/v1/analysis/correlations"),
-  topicSchemas: (topicName: string) =>
-    api.get(`/v1/analysis/correlations/topic/${topicName}`),
-  schemaImpact: (subject: string) =>
-    api.get(`/v1/analysis/impact/schema/${subject}`),
 };
 
 export const consumerAPI = {

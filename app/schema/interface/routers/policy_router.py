@@ -10,7 +10,7 @@ from app.container import AppContainer
 from app.schema.application.use_cases import SchemaPolicyUseCase
 from app.schema.domain.models.policy_management import SchemaPolicyStatus, SchemaPolicyType
 
-router = APIRouter(prefix="/schemas/policies", tags=["Schema Policies"])
+router = APIRouter(prefix="/v1/schemas/policies", tags=["Schema Policies"])
 
 
 class PolicyCreateRequest(BaseModel):

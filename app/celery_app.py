@@ -3,11 +3,13 @@
 from celery import Celery
 from celery.schedules import crontab
 
+from app.shared.settings import settings
+
 # Celery 인스턴스 생성
 celery_app = Celery(
     "kafka_gov",
-    broker="redis://localhost:6379/0",  # Redis broker
-    backend="redis://localhost:6379/0",  # Result backend
+    broker=settings.celery_broker_url,
+    backend=settings.celery_result_backend,
     include=["app.tasks.metrics_tasks"],  # 태스크 모듈
 )
 

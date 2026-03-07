@@ -23,7 +23,9 @@ from .policy import (
 from .request import (
     TopicBatchRequest,
     TopicBatchYAMLRequest,
+    TopicBulkDeleteRequest,
     TopicConfig,
+    TopicDeleteRequest,
     TopicItem,
     TopicMetadata,
 )
@@ -59,8 +61,10 @@ __all__ = [
     # Topic Request
     "TopicBatchRequest",
     "TopicBatchYAMLRequest",
+    "TopicBulkDeleteRequest",
     "TopicBulkDeleteResponse",
     "TopicConfig",
+    "TopicDeleteRequest",
     "TopicItem",
     "TopicListItem",
     "TopicListResponse",

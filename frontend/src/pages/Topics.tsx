@@ -15,6 +15,7 @@ import CreateTopicModal from "../components/topic/CreateTopicModal";
 import MultiSelect from "../components/ui/MultiSelect";
 import FailureReportModal from "../components/topic/FailureReportModal";
 import SuccessReportModal from "../components/topic/SuccessReportModal";
+import { promptApprovalOverride } from "../utils/approvalOverride";
 import { getOwnerColor, getTagColor } from "../utils/colors";
 import { formatRetention } from "../utils/format";
 
@@ -160,6 +161,19 @@ export default function Topics() {
     try {
       // 여러 YAML 문서(---로 구분됨)를 개별 처리
       const documents = yamlContent.split(/\n---\n/).filter((doc) => doc.trim());
+      const requiresApproval = documents.some(
+        (doc) => /(^|\n)env:\s*prod\b/i.test(doc) || /(^|\n)\s*action:\s*delete\b/i.test(doc)
+      );
+      const approvalOverride = requiresApproval
+        ? promptApprovalOverride("topic apply")
+        : undefined;
+
+      if (requiresApproval && !approvalOverride) {
+        toast.error('승인 근거 필요', {
+          description: '고위험 토픽 변경에는 사유, 승인자, 만료 시간이 필요합니다.'
+        });
+        return;
+      }
       
       const results: Array<{
         success: boolean;
@@ -182,9 +196,9 @@ export default function Topics() {
       }> = [];
       
       // 각 YAML 문서를 개별적으로 Backend에 전송
-      for (const doc of documents) {
-        try {
-          const response = await topicsAPI.createFromYAML(clusterId, doc);
+        for (const doc of documents) {
+          try {
+          const response = await topicsAPI.createFromYAML(clusterId, doc, approvalOverride);
           
           // Backend가 200을 반환해도 failed가 있으면 실패로 간주
           const hasFailures = response.data.failed && response.data.failed.length > 0;
@@ -380,7 +394,15 @@ export default function Topics() {
     });
 
     try {
-      await topicsAPI.delete(selectedCluster, topicName);
+      const approvalOverride = promptApprovalOverride(`topic delete for ${topicName}`);
+      if (!approvalOverride) {
+        toast.error('승인 근거 필요', {
+          description: '토픽 삭제에는 사유, 승인자, 만료 시간이 필요합니다.'
+        });
+        return;
+      }
+
+      await topicsAPI.delete(selectedCluster, topicName, approvalOverride);
       await loadTopics();
     } catch (error) {
       console.error("Failed to delete topic:", error);
@@ -557,7 +579,15 @@ export default function Topics() {
                     });
                     
                     try {
-                      await topicsAPI.bulkDelete(selectedCluster, selectedTopics);
+                      const approvalOverride = promptApprovalOverride('bulk topic delete');
+                      if (!approvalOverride) {
+                        toast.error('승인 근거 필요', {
+                          description: '일괄 삭제에는 사유, 승인자, 만료 시간이 필요합니다.'
+                        });
+                        return;
+                      }
+
+                      await topicsAPI.bulkDelete(selectedCluster, selectedTopics, approvalOverride);
                       await loadTopics();
                       const count = selectedTopics.length;
                       setSelectedTopics([]);

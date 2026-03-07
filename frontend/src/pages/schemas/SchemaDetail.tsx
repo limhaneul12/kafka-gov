@@ -19,6 +19,7 @@ import { Badge } from '../../components/common/Badge';
 import { useSchemaDetail } from '../../hooks/schema/useSchemaDetail';
 import { toast } from 'sonner';
 import { schemasAPI, clustersAPI } from '../../services/api';
+import { promptApprovalOverride } from '../../utils/approvalOverride';
 import { formatDistanceToNow } from 'date-fns';
 
 // --- Tab Navigation ---
@@ -436,6 +437,7 @@ export default function SchemaDetail() {
             const batchRequest = {
                 env: subject.split('.')[0] || 'dev',
                 change_id: planResult.change_id,
+                approvalOverride: promptApprovalOverride(`schema apply for ${subject}`),
                 items: planResult.plan.map((item: any) => ({
                     subject: item.subject,
                     type: item.diff.schema_type,
@@ -443,6 +445,11 @@ export default function SchemaDetail() {
                     schema: editedSchema,
                 }))
             };
+
+            if (!batchRequest.approvalOverride) {
+                toast.error('Approval evidence is required for this schema change');
+                return;
+            }
 
             await schemasAPI.apply(activeRegistry.registry_id, batchRequest);
             toast.success('Schema successfully updated to next version');

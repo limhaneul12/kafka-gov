@@ -7,6 +7,7 @@ from datetime import datetime
 
 from app.cluster.domain.services import IConnectionManager
 from app.schema.infrastructure.schema_registry_adapter import ConfluentSchemaRegistryAdapter
+from app.shared.approval import ApprovalOverride, assess_schema_batch_risk, ensure_approval
 from app.shared.constants import AuditAction, AuditStatus, AuditTarget
 from app.shared.domain.events import SchemaRegisteredEvent
 from app.shared.infrastructure.event_bus import get_event_bus
@@ -43,9 +44,20 @@ class SchemaBatchApplyUseCase:
         self.event_bus = get_event_bus()
 
     async def execute(
-        self, registry_id: str, storage_id: str | None, batch: DomainSchemaBatch, actor: str
+        self,
+        registry_id: str,
+        storage_id: str | None,
+        batch: DomainSchemaBatch,
+        actor: str,
+        approval_override: ApprovalOverride | None = None,
     ) -> DomainSchemaApplyResult:
         audit_id = str(uuid.uuid4())
+        approval_context = {
+            "risk": {"requires_approval": False, "reasons": []},
+            "approval_override": (
+                approval_override.to_audit_dict() if approval_override is not None else None
+            ),
+        }
         await self.audit_repository.log_operation(
             change_id=batch.change_id,
             action=AuditAction.APPLY,
@@ -65,6 +77,11 @@ class SchemaBatchApplyUseCase:
                 registry_repository=registry_repository, policy_repository=self.policy_repository
             )  # type: ignore[arg-type]
             plan = await planner_service.create_plan(batch)
+
+            approval_context = ensure_approval(
+                assess_schema_batch_risk(batch, plan),
+                approval_override,
+            )
 
             if not plan.can_apply:
                 raise ValueError("Policy violations or incompatibilities detected; apply aborted")
@@ -117,7 +134,7 @@ class SchemaBatchApplyUseCase:
                 actor=actor,
                 status=AuditStatus.COMPLETED,
                 message="Schema apply completed",
-                snapshot={"summary": result.summary()},
+                snapshot={"summary": result.summary(), **approval_context},
             )
 
             return result
@@ -129,6 +146,7 @@ class SchemaBatchApplyUseCase:
                 actor=actor,
                 status=AuditStatus.FAILED,
                 message=f"Schema apply failed: {exc!s}",
+                snapshot=approval_context,
             )
             raise
 

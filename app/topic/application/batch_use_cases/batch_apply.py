@@ -8,6 +8,7 @@ from collections import defaultdict
 from dataclasses import asdict
 
 from app.cluster.domain.services import IConnectionManager
+from app.shared.approval import ApprovalOverride, assess_topic_batch_risk, ensure_approval
 from app.shared.constants import AuditAction, AuditStatus, AuditTarget, MethodType
 from app.shared.domain.policy_types import (
     DomainPolicySeverity,
@@ -94,10 +95,20 @@ class TopicBatchApplyUseCase:
         self.policy_repository = policy_repository
 
     async def execute(
-        self, cluster_id: str, batch: DomainTopicBatch, actor: str
+        self,
+        cluster_id: str,
+        batch: DomainTopicBatch,
+        actor: str,
+        approval_override: ApprovalOverride | None = None,
     ) -> DomainTopicApplyResult:
         """배치 적용 실행 (트랜잭션 보장 개선)"""
         audit_id = str(uuid.uuid4())
+        approval_context = {
+            "risk": {"requires_approval": False, "reasons": []},
+            "approval_override": (
+                approval_override.to_audit_dict() if approval_override is not None else None
+            ),
+        }
 
         # 감사 로그 기록
         await self.audit_repository.log_topic_operation(
@@ -129,6 +140,11 @@ class TopicBatchApplyUseCase:
             # 4. Planner Service 생성 및 계획 재생성
             planner_service = TopicPlannerService(topic_repository)  # type: ignore[arg-type]
             plan = await planner_service.create_plan(batch, actor)
+
+            approval_context = ensure_approval(
+                assess_topic_batch_risk(batch, plan),
+                approval_override,
+            )
 
             # 에러 위반이 있으면 적용 중단
             if not plan.can_apply:
@@ -221,6 +237,7 @@ class TopicBatchApplyUseCase:
                     "actions": dict(actions_map),
                     "failed_details": failed,  # 실패 상세 정보
                     "apply_summary": result.summary(),
+                    **approval_context,
                 },
             )
 
@@ -236,6 +253,7 @@ class TopicBatchApplyUseCase:
                 actor=actor,
                 status=AuditStatus.FAILED,
                 message=f"Apply failed: {e!s}",
+                snapshot=approval_context,
             )
             raise
 
@@ -560,7 +578,9 @@ class TopicBatchApplyUseCase:
             logger = logging.getLogger(__name__)
             logger.error(f"Failed to delete topic metadata for {topic_name}: {e}", exc_info=True)
 
-    async def _validate_policies(self, specs: tuple[DomainTopicSpec, ...]) -> list:
+    async def _validate_policies(
+        self, specs: tuple[DomainTopicSpec, ...]
+    ) -> list[DomainPolicyViolation]:
         """정책 검증 (Naming + Guardrail)
 
         로직:
