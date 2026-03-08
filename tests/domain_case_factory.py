@@ -43,8 +43,8 @@ from app.topic.domain.models.types_enum import (
 )
 
 
-def _fixture_secret(label: str) -> str:
-    return f"fixture-{label}-value"
+def _fixture_test_value(label: str) -> str:
+    return f"test-{label}-placeholder"
 
 
 class DomainMockFactory:
@@ -59,7 +59,7 @@ class DomainMockFactory:
             else SecurityProtocol.PLAINTEXT,
             sasl_mechanism=SaslMechanism.SCRAM_SHA_256 if with_sasl else None,
             sasl_username="svc-user" if with_sasl else None,
-            sasl_password=_fixture_secret("sasl") if with_sasl else None,
+            sasl_password=_fixture_test_value("sasl") if with_sasl else None,
             ssl_ca_location="/tmp/ca.crt" if with_ssl else None,
             ssl_cert_location="/tmp/client.crt" if with_ssl else None,
             ssl_key_location="/tmp/client.key" if with_ssl else None,
@@ -74,7 +74,7 @@ class DomainMockFactory:
             name="registry-a",
             url="http://localhost:8081",
             auth_username="sr-user" if with_auth else None,
-            auth_password=_fixture_secret("schema-registry") if with_auth else None,
+            auth_password=_fixture_test_value("schema-registry") if with_auth else None,
             created_at=datetime(2026, 1, 1, tzinfo=UTC),
             updated_at=datetime(2026, 1, 1, tzinfo=UTC),
         )
@@ -278,7 +278,7 @@ def build_domain_case_matrix() -> dict[str, list[dict[str, Any]]]:
             payload={
                 "run": lambda: factory.schema_registry(with_auth=True).to_client_config(),
                 "assert": lambda cfg: cfg["basic.auth.user.info"]
-                == f"sr-user:{_fixture_secret('schema-registry')}",
+                == f"sr-user:{_fixture_test_value('schema-registry')}",
             },
         ).build(),
     ]
