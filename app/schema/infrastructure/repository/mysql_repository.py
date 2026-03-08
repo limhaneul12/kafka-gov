@@ -66,6 +66,7 @@ class MySQLSchemaMetadataRepository(ISchemaMetadataRepository):
                             "action": item.action.value,
                             "current_version": item.current_version,
                             "target_version": item.target_version,
+                            "reason": item.reason,
                             "diff": {
                                 "type": item.diff.type,
                                 "changes": list(item.diff.changes),
@@ -102,6 +103,7 @@ class MySQLSchemaMetadataRepository(ISchemaMetadataRepository):
                         }
                         for impact in plan.impacts
                     ],
+                    "actor_context": plan.actor_context,
                 }
 
                 # Dialect에 따른 UPSERT 처리
@@ -178,6 +180,7 @@ class MySQLSchemaMetadataRepository(ISchemaMetadataRepository):
                             target_compatibility=item["diff"]["target_compatibility"],
                             schema_type=item["diff"].get("schema_type"),
                         ),
+                        reason=item.get("reason"),
                     )
                     for item in plan_data["items"]
                 ]
@@ -218,6 +221,7 @@ class MySQLSchemaMetadataRepository(ISchemaMetadataRepository):
                     items=tuple(items),
                     compatibility_reports=tuple(compatibility_reports),
                     impacts=tuple(impacts),
+                    actor_context=plan_data.get("actor_context"),
                 )
 
             except Exception as e:
@@ -241,7 +245,9 @@ class MySQLSchemaMetadataRepository(ISchemaMetadataRepository):
                         }
                         for failed_item in result.failed
                     ],
+                    "details": [dict(item) for item in result.details],
                     "audit_id": result.audit_id,
+                    "actor_context": result.actor_context,
                     "artifacts": [
                         {
                             "subject": artifact.subject,
@@ -467,7 +473,7 @@ class MySQLSchemaMetadataRepository(ISchemaMetadataRepository):
                 if existing:
                     # 업데이트
                     existing.owner = metadata.get("owner", existing.owner)
-                    existing.updated_by = metadata.get("updated_by", "system")
+                    existing.updated_by = metadata.get("updated_by", existing.updated_by)
                     existing.description = description
                 else:
                     # 새로 생성
@@ -475,7 +481,7 @@ class MySQLSchemaMetadataRepository(ISchemaMetadataRepository):
                         subject=subject,
                         owner=metadata.get("owner"),
                         created_by=metadata.get("created_by", "system"),
-                        updated_by=metadata.get("updated_by", "system"),
+                        updated_by=metadata.get("updated_by", metadata.get("created_by", "system")),
                         description=description,
                     )
                     session.add(metadata_model)

@@ -239,6 +239,7 @@ class SchemaPlanItem(BaseModel):
     diff: dict[str, Any] = Field(default_factory=dict)
     schema_definition: SchemaDefinition | None = None
     current_schema: SchemaDefinition | None = None
+    reason: StrictStr | None = Field(default=None, description="변경 사유")
 
 
 class SchemaArtifact(BaseModel):

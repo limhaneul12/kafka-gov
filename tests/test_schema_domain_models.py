@@ -277,9 +277,11 @@ def test_schema_plan_and_results_paths() -> None:
     )
     assert apply_result.summary() == {
         "total_items": 3,
+        "planned_count": 2,
         "registered_count": 1,
         "skipped_count": 1,
         "failed_count": 1,
+        "warning_count": 0,
     }
 
     upload = DomainSchemaUploadResult(

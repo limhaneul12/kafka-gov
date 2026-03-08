@@ -25,11 +25,24 @@ preflight schema dry-run --registry-id <registry_id> [--file <path>]
 preflight schema apply --registry-id <registry_id> --storage-id <storage_id> [--file <path>]
 ```
 
+Optional actor provenance flags for all four commands:
+
+- `--user-id <user_id>`
+- `--username <username>`
+- `--source <source>`
+
 Identifier flag mapping:
 
 - `cluster_id` is passed as `--cluster-id` for topic commands.
 - `registry_id` is passed as `--registry-id` for schema commands.
 - `storage_id` is passed as `--storage-id` for `preflight schema apply`.
+
+Actor provenance mapping:
+
+- Explicit CLI flags take precedence over environment fallbacks.
+- Environment fallbacks are `KAFKA_GOV_USER_ID`, `KAFKA_GOV_USERNAME`, and `KAFKA_GOV_ACTOR_SOURCE`.
+- Resolved actor identity prefers `username`, then `user_id`, and falls back to `system` only when neither is supplied.
+- Provenance is additive audit metadata only; it does not introduce new authorization semantics.
 
 ## Payload Input Rules
 
@@ -64,6 +77,34 @@ Parity invariants:
 Incompatibility handling rule:
 
 - If payload content, identifiers, execution environment, or policy inputs differ between a prior `dry-run` and a later `apply`, the prior `dry-run` is non-authoritative for gating. `apply` MUST re-run full pre-apply evaluation and MUST NOT inherit pass status or approval outcomes from the prior run.
+
+## Policy-Pack V1 Decision Contract
+
+The four in-scope commands share one deterministic policy evaluation model.
+
+- Policy decision precedence is fixed: `reject` -> `approval_required` -> `warn` -> `allow`.
+- Risk is normalized as `none`, `low`, `medium`, `high`, or `critical`.
+- A blocking policy result sets `risk.blocking = true` and prevents mutation.
+- An approval-required result is non-blocking for `dry-run` visibility but blocks `apply` until a valid approval override is provided.
+- Rule ordering and summary generation MUST be deterministic for identical inputs.
+
+Default rule families currently enforced by `policy-pack v1`:
+
+- Topic preflight: naming and guardrail policy reuse, batch `env`/topic name parity, replication minimum, replication-factor change rejection, partition decrease rejection, partition increase approval gate, retention decrease approval gate, cleanup-policy change approval gate, delete approval gate, and environment-sensitive `metadata.doc` coverage.
+- Schema preflight: compatibility planner enforcement, repo-backed dynamic schema policy reuse, `compatibility: NONE` gating, metadata and `metadata.doc` coverage, required-field-without-default rejection, type-change rejection, enum narrowing approval gate, and subject/topic linkage validation.
+
+## Request Rationale Contract
+
+- Topic and schema requests use canonical `reason` for change rationale.
+- `business_purpose` and `businessPurpose` are accepted as backward-compatible input aliases and normalize to `reason`.
+- Normalized rationale is expected to flow through plan/apply details and audit snapshot metadata so dry-run, apply, and history views stay aligned.
+
+Out-of-scope policy surfaces remain unchanged for this MVP:
+
+- connect workflows
+- monitoring or dashboard behavior
+- runtime proxy or data-plane enforcement
+- cluster operations outside the four preflight commands
 
 ## Command Examples
 
@@ -106,10 +147,10 @@ Each invocation MUST return exactly one process exit code from this matrix:
 | Category | Exit code | Deterministic trigger | JSON envelope alignment |
 | --- | --- | --- | --- |
 | success | `0` | Command completed without any blocking error condition. | `result.status` is `success` and `error` is `null`. |
-| validation failure | `10` | Input source, identifier, payload, or semantic validation failed before execution can proceed. | `result.status` is `failed`; `error.code` MUST be a validation-class code such as `INPUT_SOURCE_CONFLICT` or `PAYLOAD_VALIDATION_FAILED`. |
-| policy or approval rejection | `20` | Policy gate blocked execution, required approval missing, or approval explicitly rejected. | `result.status` is `failed`; `error.code` MUST be a policy or approval-class code such as `POLICY_BLOCKED` or `APPROVAL_REJECTED`. |
-| runtime dependency failure | `30` | External dependency failure at runtime, including cluster or registry unavailability, auth backend failure, or dependency timeout. | `result.status` is `failed`; `error.code` MUST be a dependency-class code such as `KAFKA_UNREACHABLE`, `REGISTRY_TIMEOUT`, or `AUTH_PROVIDER_UNAVAILABLE`. |
-| unknown internal error | `99` | Unclassified internal failure after known categories are evaluated. | `result.status` is `failed`; `error.code` MUST be `INTERNAL_UNKNOWN` or another stable internal-class code. |
+| validation failure | `10` | Input source, identifier, payload, or semantic validation failed before execution can proceed. | `result.status` is `failed`; `error.code` is a validation-class code such as `input_error` or `validation_error`. |
+| policy or approval rejection | `20` | Policy gate blocked execution, required approval missing, approval expired, or approval explicitly rejected. | `result.status` is `failed`; `error.code` is a policy or approval-class code such as `policy_blocked`, `approval_required`, or `approval_expired`. |
+| runtime dependency failure | `30` | External dependency failure at runtime, including cluster or registry unavailability, auth backend failure, or dependency timeout. | `result.status` is `failed`; `error.code` is `runtime_dependency_failure`. |
+| unknown internal error | `99` | Unclassified internal failure after known categories are evaluated. | `result.status` is `failed`; `error.code` is `internal_unknown`. |
 
 Deterministic mapping notes:
 
@@ -117,6 +158,13 @@ Deterministic mapping notes:
 2. The first matched failure category in that order determines the single non-zero exit code.
 3. `error.code` values MUST remain machine-stable and map to exactly one category in this matrix.
 4. `error` MUST be non-null for any non-zero exit code.
+
+Stable failure codes currently emitted by the CLI:
+
+- Validation class: `input_error`, `validation_error`
+- Policy and approval class: `policy_blocked`, `approval_required`, `approval_expired`
+- Runtime dependency class: `runtime_dependency_failure`
+- Internal class: `internal_unknown`
 
 ### Envelope Shape
 
@@ -172,7 +220,7 @@ Deterministic mapping notes:
   "approval": {
     "required": false,
     "state": "not_required",
-    "summary": "approval gate not required for dry-run"
+    "summary": "approval gate not required for this evaluation"
   },
   "result": {
     "status": "success",
@@ -213,7 +261,7 @@ Deterministic mapping notes:
   "approval": {
     "required": false,
     "state": "not_required",
-    "summary": "approval not evaluated due to input error"
+    "summary": "approval not evaluated due to failure"
   },
   "result": {
     "status": "failed",
@@ -228,16 +276,26 @@ Deterministic mapping notes:
     }
   },
   "error": {
-    "code": "INPUT_SOURCE_CONFLICT",
+    "code": "input_error",
     "message": "Provide either --file or stdin, not both.",
-    "target": "input_source",
-    "retryable": true,
-    "details": {
-      "provided_sources": [
-        "--file",
-        "stdin"
-      ]
-    }
+    "target": "payload",
+    "retryable": false,
+    "details": {}
   }
 }
 ```
+
+## Approval Semantics
+
+- `approval.required = false` with `approval.state = not_required` means the requested operation is policy-clean enough to proceed without an override.
+- `approval.required = true` with `approval.state = pending` means `dry-run` completed, but `apply` must not mutate until approval evidence is supplied.
+- `approval.required = true` with `approval.state = approved` means a valid override was supplied and the apply request can continue.
+- `approval.state = rejected` is reserved for blocking policy outcomes where mutation is denied by policy rather than held for approval.
+
+Representative approval summaries:
+
+- `approval gate not required for this evaluation`
+- `approval required before apply for 1 rule(s)`
+- `approval required for 1 rule(s)`
+- `approval override supplied for 1 rule(s)`
+- `policy pack rejected the requested change`

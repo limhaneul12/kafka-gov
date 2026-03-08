@@ -37,6 +37,7 @@ DocumentUrl: TypeAlias = string_type(desc="문서 URL", max_length=500, pattern=
 ChangeId: TypeAlias = string_type(desc="변경 ID(추적용)", max_length=100, pattern=COMMON_CHANGE_ID_PATTERN)
 PlanStatus: TypeAlias = string_type(desc="계획 상태", max_length=10, pattern=TOPIC_PLAN_STATUS_PATTERN)
 PlanAction: TypeAlias = string_type(desc="실행될 액션", max_length=10, pattern=TOPIC_PLAN_ACTION_PATTERN)
+ReasonText: TypeAlias = string_type(desc="변경 사유", max_length=500)
 
 # ===== 감사/로깅 타입 =====
 AuditId: TypeAlias = string_type(desc="감사 로그 ID", max_length=100)

@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 
 from app.schema.domain.models import DomainSchemaApplyResult, DomainSchemaPlan
+from app.shared.domain.preflight_policy import DomainPolicyPackEvaluation
 from app.topic.domain.models import DomainTopicApplyResult, DomainTopicPlan
 
 CONTRACT_VERSION = "preflight.v1"
@@ -30,11 +31,18 @@ def translate_topic_dry_run_result(
     summary = result.summary()
     total = _to_non_negative_int(summary.get("total_items", 0))
     planned = _to_non_negative_int(
-        summary.get("create_count", 0)
-        + summary.get("alter_count", 0)
-        + summary.get("delete_count", 0)
+        summary.get(
+            "planned_count",
+            summary.get("create_count", 0)
+            + summary.get("alter_count", 0)
+            + summary.get("delete_count", 0),
+        )
     )
-    warnings = _to_non_negative_int(len(result.warning_violations))
+    warnings = _resolve_warning_count(result, summary.get("warning_count"))
+    resolved_risk = risk if risk is not None else _policy_pack_risk(result)
+    resolved_approval = (
+        approval if approval is not None else _policy_pack_approval(result, MODE_DRY_RUN)
+    )
 
     return _build_success_envelope(
         command=COMMAND_TOPIC_DRY_RUN,
@@ -43,14 +51,14 @@ def translate_topic_dry_run_result(
         cluster_id=cluster_id,
         registry_id=None,
         storage_id=None,
-        risk=risk,
-        approval=approval,
+        risk=resolved_risk,
+        approval=resolved_approval,
         summary=f"evaluated {total} topic changes",
         counts={
             "total": total,
             "planned": planned,
             "applied": 0,
-            "unchanged": _to_non_negative_int(total - planned),
+            "unchanged": _to_non_negative_int(summary.get("unchanged_count", total - planned)),
             "failed": 0,
             "warnings": warnings,
         },
@@ -67,10 +75,17 @@ def translate_topic_apply_result(
 ) -> dict[str, object]:
     summary = result.summary()
     total = _to_non_negative_int(summary.get("total_items", 0))
+    planned = _to_non_negative_int(summary.get("planned_count", 0))
     applied = _to_non_negative_int(summary.get("applied_count", 0))
     unchanged = _to_non_negative_int(summary.get("skipped_count", 0))
     failed = _to_non_negative_int(summary.get("failed_count", 0))
-    planned = _to_non_negative_int(total - unchanged)
+    if planned == 0 and total > unchanged:
+        planned = _to_non_negative_int(total - unchanged)
+    warnings = _resolve_warning_count(result, summary.get("warning_count"))
+    resolved_risk = risk if risk is not None else _policy_pack_risk(result)
+    resolved_approval = (
+        approval if approval is not None else _policy_pack_approval(result, MODE_APPLY)
+    )
 
     return _build_success_envelope(
         command=COMMAND_TOPIC_APPLY,
@@ -79,8 +94,8 @@ def translate_topic_apply_result(
         cluster_id=cluster_id,
         registry_id=None,
         storage_id=None,
-        risk=risk,
-        approval=approval,
+        risk=resolved_risk,
+        approval=resolved_approval,
         summary=f"applied {applied} of {planned} topic changes",
         counts={
             "total": total,
@@ -88,7 +103,7 @@ def translate_topic_apply_result(
             "applied": applied,
             "unchanged": unchanged,
             "failed": failed,
-            "warnings": 0,
+            "warnings": warnings,
         },
     )
 
@@ -104,12 +119,19 @@ def translate_schema_dry_run_result(
     summary = result.summary()
     total = _to_non_negative_int(summary.get("total_items", 0))
     planned = _to_non_negative_int(
-        summary.get("register_count", 0)
-        + summary.get("update_count", 0)
-        + summary.get("delete_count", 0)
+        summary.get(
+            "planned_count",
+            summary.get("register_count", 0)
+            + summary.get("update_count", 0)
+            + summary.get("delete_count", 0),
+        )
     )
     unchanged = _to_non_negative_int(summary.get("none_count", 0))
-    warnings = _to_non_negative_int(summary.get("violation_count", 0))
+    warnings = _resolve_warning_count(result, summary.get("warning_count"))
+    resolved_risk = risk if risk is not None else _policy_pack_risk(result)
+    resolved_approval = (
+        approval if approval is not None else _policy_pack_approval(result, MODE_DRY_RUN)
+    )
 
     return _build_success_envelope(
         command=COMMAND_SCHEMA_DRY_RUN,
@@ -118,8 +140,8 @@ def translate_schema_dry_run_result(
         cluster_id=None,
         registry_id=registry_id,
         storage_id=None,
-        risk=risk,
-        approval=approval,
+        risk=resolved_risk,
+        approval=resolved_approval,
         summary=f"evaluated {total} schema changes",
         counts={
             "total": total,
@@ -143,10 +165,17 @@ def translate_schema_apply_result(
 ) -> dict[str, object]:
     summary = result.summary()
     total = _to_non_negative_int(summary.get("total_items", 0))
+    planned = _to_non_negative_int(summary.get("planned_count", 0))
     applied = _to_non_negative_int(summary.get("registered_count", 0))
     unchanged = _to_non_negative_int(summary.get("skipped_count", 0))
     failed = _to_non_negative_int(summary.get("failed_count", 0))
-    planned = _to_non_negative_int(total - unchanged)
+    if planned == 0 and total > unchanged:
+        planned = _to_non_negative_int(total - unchanged)
+    warnings = _resolve_warning_count(result, summary.get("warning_count"))
+    resolved_risk = risk if risk is not None else _policy_pack_risk(result)
+    resolved_approval = (
+        approval if approval is not None else _policy_pack_approval(result, MODE_APPLY)
+    )
 
     return _build_success_envelope(
         command=COMMAND_SCHEMA_APPLY,
@@ -155,8 +184,8 @@ def translate_schema_apply_result(
         cluster_id=None,
         registry_id=registry_id,
         storage_id=storage_id,
-        risk=risk,
-        approval=approval,
+        risk=resolved_risk,
+        approval=resolved_approval,
         summary=f"applied {applied} of {planned} schema changes",
         counts={
             "total": total,
@@ -164,7 +193,7 @@ def translate_schema_apply_result(
             "applied": applied,
             "unchanged": unchanged,
             "failed": failed,
-            "warnings": 0,
+            "warnings": warnings,
         },
     )
 
@@ -331,6 +360,46 @@ def _merge_approval(
         "state": _string_value(source_to_use, "state", str(default["state"])),
         "summary": _string_value(source_to_use, "summary", str(default["summary"])),
     }
+
+
+def _policy_pack_evaluation(result: object) -> DomainPolicyPackEvaluation | None:
+    raw = getattr(result, "policy_evaluation", None)
+    return raw if isinstance(raw, DomainPolicyPackEvaluation) else None
+
+
+def _policy_pack_risk(result: object) -> Mapping[str, RiskValue] | None:
+    evaluation = _policy_pack_evaluation(result)
+    return evaluation.risk_metadata() if evaluation is not None else None
+
+
+def _policy_pack_approval(result: object, mode: str) -> Mapping[str, ApprovalValue] | None:
+    evaluation = _policy_pack_evaluation(result)
+    return (
+        evaluation.approval_metadata(mode=mode, approval_override_present=False)
+        if evaluation is not None
+        else None
+    )
+
+
+def _policy_pack_warning_count(result: object) -> int:
+    evaluation = _policy_pack_evaluation(result)
+    return evaluation.warning_count if evaluation is not None else 0
+
+
+def _resolve_warning_count(result: object, fallback: object) -> int:
+    policy_pack_warning_count = _policy_pack_warning_count(result)
+    if policy_pack_warning_count > 0:
+        return policy_pack_warning_count
+
+    fallback_count = _to_non_negative_int(fallback)
+    if fallback_count > 0:
+        return fallback_count
+
+    warning_violations = getattr(result, "warning_violations", None)
+    if isinstance(warning_violations, tuple):
+        return len(warning_violations)
+
+    return 0
 
 
 def _to_non_negative_int(value: object) -> int:

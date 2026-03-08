@@ -7,6 +7,7 @@ import uuid
 
 from app.cluster.domain.services import IConnectionManager
 from app.schema.infrastructure.schema_registry_adapter import ConfluentSchemaRegistryAdapter
+from app.shared.actor import merge_actor_metadata
 
 from ....domain.models import DomainSchemaDeleteImpact, DomainSubjectStrategy, SubjectName
 from ....domain.repositories.interfaces import (
@@ -35,6 +36,7 @@ class SchemaDeleteUseCase:
         subject: SubjectName,
         strategy: DomainSubjectStrategy,
         actor: str,
+        actor_context: dict[str, str] | None = None,
     ) -> DomainSchemaDeleteImpact:
         """스키마 삭제 영향도 분석
 
@@ -63,13 +65,16 @@ class SchemaDeleteUseCase:
             actor=actor,
             status="completed",
             message=f"Delete impact analysis: {len(impact.warnings)} warnings, safe={impact.safe_to_delete}",
-            snapshot={
-                "subject": subject,
-                "current_version": impact.current_version,
-                "affected_topics": list(impact.affected_topics),
-                "warnings": list(impact.warnings),
-                "safe_to_delete": impact.safe_to_delete,
-            },
+            snapshot=merge_actor_metadata(
+                {
+                    "subject": subject,
+                    "current_version": impact.current_version,
+                    "affected_topics": list(impact.affected_topics),
+                    "warnings": list(impact.warnings),
+                    "safe_to_delete": impact.safe_to_delete,
+                },
+                actor_context,
+            ),
         )
 
         return impact
@@ -81,6 +86,7 @@ class SchemaDeleteUseCase:
         strategy: DomainSubjectStrategy,
         actor: str,
         force: bool = False,
+        actor_context: dict[str, str] | None = None,
     ) -> DomainSchemaDeleteImpact:
         """스키마 삭제 실행 (영향도 분석 포함)
 
@@ -133,12 +139,15 @@ class SchemaDeleteUseCase:
                 actor=actor,
                 status="success",
                 message=f"Schema deleted (force={force})",
-                snapshot={
-                    "subject": subject,
-                    "deleted_version": impact.current_version,
-                    "affected_topics": list(impact.affected_topics),
-                    "force": force,
-                },
+                snapshot=merge_actor_metadata(
+                    {
+                        "subject": subject,
+                        "deleted_version": impact.current_version,
+                        "affected_topics": list(impact.affected_topics),
+                        "force": force,
+                    },
+                    actor_context,
+                ),
             )
 
         except Exception as e:
@@ -150,10 +159,13 @@ class SchemaDeleteUseCase:
                 actor=actor,
                 status="failed",
                 message=f"Schema deletion failed: {e}",
-                snapshot={
-                    "subject": subject,
-                    "error": str(e),
-                },
+                snapshot=merge_actor_metadata(
+                    {
+                        "subject": subject,
+                        "error": str(e),
+                    },
+                    actor_context,
+                ),
             )
             raise
 

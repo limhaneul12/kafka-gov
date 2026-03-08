@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from typing import Any
 
+from app.shared.domain.policy_types import DomainPolicyViolation
+
 from .models import (
     DomainPlanAction,
     DomainTopicBatch,
@@ -33,7 +35,7 @@ class TopicPlannerService:
     def __init__(self, topic_repository: ITopicRepository) -> None:
         self.topic_repository = topic_repository
 
-    async def create_plan(self, batch: DomainTopicBatch, actor: str = "system") -> DomainTopicPlan:
+    async def create_plan(self, batch: DomainTopicBatch, actor: str) -> DomainTopicPlan:
         """배치에 대한 실행 계획 생성
 
         Args:
@@ -47,7 +49,7 @@ class TopicPlannerService:
             정책 검증은 이 메서드 호출 전에 수행되어야 합니다.
         """
         # 정책 검증은 Application Layer에서 수행
-        violations: list = []
+        violations: list[DomainPolicyViolation] = []
 
         # 현재 토픽 상태 조회
         topic_names: list[str] = [spec.name for spec in batch.specs]
@@ -65,6 +67,7 @@ class TopicPlannerService:
             env=batch.env,
             items=tuple(plan_items),
             violations=tuple(violations),
+            requested_total=len(batch.specs),
         )
 
     def _create_plan_item(
@@ -86,6 +89,7 @@ class TopicPlannerService:
                     **current_topic.get("config", {}),
                 },
                 target_config=None,
+                reason=spec.reason,
             )
 
         if current_topic is None:
@@ -96,6 +100,7 @@ class TopicPlannerService:
                 diff={"status": "new→created"},
                 current_config=None,
                 target_config=self._spec_to_config_dict(spec),
+                reason=spec.reason,
             )
 
         # 기존 토픽 수정
@@ -106,7 +111,7 @@ class TopicPlannerService:
             **current_topic.get("config", {}),
         }
         target_config: dict[str, str] = self._spec_to_config_dict(spec)
-        diff: dict = self._calculate_config_diff(current_config, target_config)
+        diff: dict[str, str] = self._calculate_config_diff(current_config, target_config)
 
         if not diff:
             # 변경 사항 없음 - 스킵
@@ -118,6 +123,7 @@ class TopicPlannerService:
             diff=diff,
             current_config=current_config,
             target_config=target_config,
+            reason=spec.reason,
         )
 
     def _spec_to_config_dict(self, spec: DomainTopicSpec) -> dict[str, str]:
@@ -134,7 +140,9 @@ class TopicPlannerService:
 
         return config_dict
 
-    def _calculate_config_diff(self, current: dict[str, Any], target: dict[str, Any]) -> dict:
+    def _calculate_config_diff(
+        self, current: dict[str, Any], target: dict[str, Any]
+    ) -> dict[str, str]:
         """설정 변경 사항 계산 (공통 유틸리티 사용)"""
         raw_diff = calculate_dict_diff(current, target)
 

@@ -16,6 +16,7 @@ import orjson
 
 from app.cluster.domain.services import IConnectionManager
 from app.schema.infrastructure.schema_registry_adapter import ConfluentSchemaRegistryAdapter
+from app.shared.actor import merge_actor_metadata
 from app.shared.constants import AuditAction, AuditStatus, AuditTarget
 from app.shared.domain.events import SchemaRegisteredEvent
 from app.shared.infrastructure.event_bus import get_event_bus
@@ -78,6 +79,7 @@ class SchemaUploadUseCase:
         actor: str,
         compatibility_mode: DomainCompatibilityMode | None = None,
         strategy_id: str = "gov:EnvPrefixed",  # Naming strategy
+        actor_context: dict[str, str] | None = None,
     ) -> DomainSchemaUploadResult:
         """스키마 파일 업로드 처리"""
         upload_id = f"upload_{change_id}_{uuid.uuid4().hex[:8]}"
@@ -89,6 +91,7 @@ class SchemaUploadUseCase:
             actor=actor,
             status=AuditStatus.STARTED,
             message=f"Schema upload started: {len(files)} files",
+            snapshot=merge_actor_metadata(None, actor_context),
         )
 
         try:
@@ -138,17 +141,20 @@ class SchemaUploadUseCase:
                 actor=actor,
                 status=AuditStatus.COMPLETED,
                 message=f"스키마 등록 완료: {schema_details}",
-                snapshot={
-                    "summary": result.summary(),
-                    "artifacts": [
-                        {
-                            "subject": a.subject,
-                            "version": a.version,
-                            "type": a.schema_type.value if a.schema_type else "UNKNOWN",
-                        }
-                        for a in artifacts
-                    ],
-                },
+                snapshot=merge_actor_metadata(
+                    {
+                        "summary": result.summary(),
+                        "artifacts": [
+                            {
+                                "subject": a.subject,
+                                "version": a.version,
+                                "type": a.schema_type.value if a.schema_type else "UNKNOWN",
+                            }
+                            for a in artifacts
+                        ],
+                    },
+                    actor_context,
+                ),
             )
 
             return result
@@ -161,6 +167,7 @@ class SchemaUploadUseCase:
                 actor=actor,
                 status=AuditStatus.FAILED,
                 message=f"Schema upload failed: {exc!s}",
+                snapshot=merge_actor_metadata(None, actor_context),
             )
             raise
 

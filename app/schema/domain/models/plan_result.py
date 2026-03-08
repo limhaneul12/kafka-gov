@@ -5,6 +5,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime
 
+from app.shared.domain.preflight_policy import DomainPolicyPackEvaluation
+
 from .policy import DomainPolicyViolation, DomainSchemaCompatibilityReport, DomainSchemaImpactRecord
 from .types_enum import (
     ChangeId,
@@ -39,6 +41,7 @@ class DomainSchemaPlanItem:
     diff: DomainSchemaDiff
     schema: str | None = None  # New schema
     current_schema: str | None = None  # Current schema for diff
+    reason: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -51,6 +54,33 @@ class DomainSchemaPlan:
     compatibility_reports: tuple[DomainSchemaCompatibilityReport, ...] = ()
     impacts: tuple[DomainSchemaImpactRecord, ...] = ()
     violations: tuple[DomainPolicyViolation, ...] = ()
+    risk: dict[str, str | bool] | None = None
+    approval: dict[str, str | bool] | None = None
+    policy_evaluation: DomainPolicyPackEvaluation | None = None
+    requested_total: int | None = None
+    actor_context: dict[str, str] | None = None
+
+    @property
+    def planned_total(self) -> int:
+        return sum(1 for item in self.items if item.action is not DomainPlanAction.NONE)
+
+    @property
+    def total_items(self) -> int:
+        if self.requested_total is not None:
+            return self.requested_total
+        return len(self.items)
+
+    @property
+    def unchanged_count(self) -> int:
+        if self.requested_total is not None:
+            return max(self.total_items - self.planned_total, 0)
+        return sum(1 for item in self.items if item.action is DomainPlanAction.NONE)
+
+    @property
+    def warning_count(self) -> int:
+        if self.policy_evaluation is not None:
+            return self.policy_evaluation.warning_count
+        return sum(1 for violation in self.violations if not violation.is_error)
 
     def summary(self) -> dict[str, int]:
         """계획 요약 정보"""
@@ -64,15 +94,17 @@ class DomainSchemaPlan:
             action_counts[item.action] = action_counts.get(item.action, 0) + 1
 
         return {
-            "total_items": len(self.items),
+            "total_items": self.total_items,
+            "planned_count": self.planned_total,
             "register_count": action_counts[DomainPlanAction.REGISTER],
             "update_count": action_counts[DomainPlanAction.UPDATE],
             "delete_count": action_counts[DomainPlanAction.DELETE],
-            "none_count": action_counts[DomainPlanAction.NONE],
+            "none_count": self.unchanged_count,
             "incompatible_count": sum(
                 1 for report in self.compatibility_reports if not report.is_compatible
             ),
             "violation_count": len(self.violations),
+            "warning_count": self.warning_count,
         }
 
     @property
@@ -113,13 +145,41 @@ class DomainSchemaApplyResult:
     failed: tuple[dict[str, str], ...]
     audit_id: str
     artifacts: tuple[DomainSchemaArtifact, ...] = ()
+    risk: dict[str, str | bool] | None = None
+    approval: dict[str, str | bool] | None = None
+    policy_evaluation: DomainPolicyPackEvaluation | None = None
+    requested_total: int | None = None
+    planned_total: int | None = None
+    warning_total: int | None = None
+    details: tuple[dict[str, str | None], ...] = ()
+    actor_context: dict[str, str] | None = None
 
     def summary(self) -> dict[str, int]:
+        total_items = (
+            self.requested_total
+            if self.requested_total is not None
+            else len(self.registered) + len(self.skipped) + len(self.failed)
+        )
+        planned_total = (
+            self.planned_total
+            if self.planned_total is not None
+            else max(total_items - len(self.skipped), 0)
+        )
+        unchanged_count = max(total_items - planned_total, 0)
+        warning_count = (
+            self.warning_total
+            if self.warning_total is not None
+            else self.policy_evaluation.warning_count
+            if self.policy_evaluation is not None
+            else 0
+        )
         return {
-            "total_items": len(self.registered) + len(self.skipped) + len(self.failed),
+            "total_items": total_items,
+            "planned_count": planned_total,
             "registered_count": len(self.registered),
-            "skipped_count": len(self.skipped),
+            "skipped_count": unchanged_count,
             "failed_count": len(self.failed),
+            "warning_count": warning_count,
         }
 
 

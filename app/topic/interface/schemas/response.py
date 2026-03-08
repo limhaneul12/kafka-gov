@@ -27,6 +27,16 @@ class FailureDetail(BaseModel):
     raw_error: str | None = None  # 원본 에러 (디버깅용)
 
 
+class TopicApplyItem(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    name: TopicName
+    action: str
+    status: str
+    reason: str | None = None
+    error_message: str | None = None
+
+
 class TopicBatchDryRunResponse(BaseModel):
     """토픽 배치 Dry-Run 응답"""
 
@@ -98,6 +108,7 @@ class TopicBatchApplyResponse(BaseModel):
     applied: list[TopicName] = Field(default_factory=list)
     skipped: list[TopicName] = Field(default_factory=list)
     failed: list[FailureDetail] = Field(default_factory=list)  # 상세 에러 리포트
+    details: list[TopicApplyItem] = Field(default_factory=list)
     audit_id: AuditId
     summary: dict[str, int] = Field(default_factory=dict)
 

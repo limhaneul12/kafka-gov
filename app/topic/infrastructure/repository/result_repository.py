@@ -39,7 +39,9 @@ class ResultRepository:
                         }
                         for failed_item in result.failed
                     ],
+                    "details": [dict(item) for item in result.details],
                     "audit_id": result.audit_id,
+                    "actor_context": result.actor_context,
                     "summary": result.summary(),
                 }
 

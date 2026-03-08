@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 
 from app.cluster.domain.services import IConnectionManager
+from app.shared.actor import merge_actor_metadata
 from app.shared.constants import AuditAction, AuditStatus, AuditTarget
 from app.shared.domain.policy_types import (
     DomainPolicySeverity,
@@ -18,6 +19,7 @@ from app.topic.domain.policies.management import (
     PolicyStatus,
     PolicyType,
 )
+from app.topic.domain.policies.policy_pack import DefaultTopicPolicyPackV1
 from app.topic.domain.policies.validation import PolicyResolver
 from app.topic.domain.repositories import IAuditRepository, ITopicMetadataRepository
 from app.topic.domain.services import TopicPlannerService
@@ -84,7 +86,11 @@ class TopicBatchDryRunUseCase:
         self.policy_repository = policy_repository
 
     async def execute(
-        self, cluster_id: str, batch: DomainTopicBatch, actor: str
+        self,
+        cluster_id: str,
+        batch: DomainTopicBatch,
+        actor: str,
+        actor_context: dict[str, str] | None = None,
     ) -> DomainTopicPlan:
         """Dry-Run 실행"""
         # 감사 로그 기록
@@ -95,6 +101,7 @@ class TopicBatchDryRunUseCase:
             actor=actor,
             status=AuditStatus.STARTED,
             message=f"Dry-run started for {len(batch.specs)} topics",
+            snapshot=merge_actor_metadata(None, actor_context),
         )
 
         try:
@@ -105,20 +112,34 @@ class TopicBatchDryRunUseCase:
             topic_repository = KafkaTopicAdapter(admin_client)
 
             # 3. 정책 검증 (Naming + Guardrail)
-            violations = await self._validate_policies(batch.specs, batch.env)
+            violations = await self._validate_policies(batch.specs, batch.env.value)
 
             # 4. Planner Service 생성 및 계획 수립
             planner_service = TopicPlannerService(topic_repository)  # type: ignore[arg-type]
             plan = await planner_service.create_plan(batch, actor)
 
-            # 5. violations를 plan에 추가
-            plan_with_violations = DomainTopicPlan(
+            base_plan = DomainTopicPlan(
                 change_id=plan.change_id,
                 env=plan.env,
                 items=plan.items,
                 violations=tuple(violations) if violations else plan.violations,
+                requested_total=len(batch.specs),
             )
-            plan = plan_with_violations
+            policy_pack_result = DefaultTopicPolicyPackV1().evaluate(batch, base_plan)
+            plan = DomainTopicPlan(
+                change_id=base_plan.change_id,
+                env=base_plan.env,
+                items=base_plan.items,
+                violations=policy_pack_result.violations,
+                risk=policy_pack_result.evaluation.risk_metadata(),
+                approval=policy_pack_result.evaluation.approval_metadata(
+                    mode="dry-run",
+                    approval_override_present=False,
+                ),
+                policy_evaluation=policy_pack_result.evaluation,
+                requested_total=base_plan.requested_total,
+                actor_context=actor_context,
+            )
 
             # 계획 저장
             await self.metadata_repository.save_plan(plan, actor)
@@ -131,7 +152,23 @@ class TopicBatchDryRunUseCase:
                 actor=actor,
                 status=AuditStatus.COMPLETED,
                 message=f"Dry-run completed: {len(plan.items)} items, {len(plan.violations)} violations",
-                snapshot={"plan_summary": plan.summary()},
+                snapshot=merge_actor_metadata(
+                    {
+                        "plan_summary": plan.summary(),
+                        "requested_items": [
+                            {
+                                "name": spec.name,
+                                "action": spec.action.value.upper(),
+                                "reason": spec.reason,
+                            }
+                            for spec in batch.specs
+                        ],
+                        "policy_pack": plan.policy_evaluation.to_audit_dict()
+                        if plan.policy_evaluation is not None
+                        else None,
+                    },
+                    actor_context,
+                ),
             )
 
             return plan
@@ -145,10 +182,13 @@ class TopicBatchDryRunUseCase:
                 actor=actor,
                 status=AuditStatus.FAILED,
                 message=f"Dry-run failed: {e!s}",
+                snapshot=merge_actor_metadata(None, actor_context),
             )
             raise
 
-    async def _validate_policies(self, specs: tuple[DomainTopicSpec, ...], env: str) -> list:
+    async def _validate_policies(
+        self, specs: tuple[DomainTopicSpec, ...], env: str
+    ) -> list[DomainPolicyViolation]:
         """환경별 ACTIVE 정책 검증
 
         Args:
@@ -191,7 +231,7 @@ class TopicBatchDryRunUseCase:
                 return []
 
             # 4. 각 spec에 대해 검증
-            all_violations = []
+            all_violations: list[DomainPolicyViolation] = []
             for spec in specs:
                 violations = validator.validate(spec)
                 if violations:

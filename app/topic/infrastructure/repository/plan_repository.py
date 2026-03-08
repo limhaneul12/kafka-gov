@@ -64,6 +64,7 @@ class PlanRepository:
                             "diff": item.diff,
                             "current_config": item.current_config,
                             "target_config": item.target_config,
+                            "reason": item.reason,
                         }
                         for item in plan.items
                     ],
@@ -77,6 +78,7 @@ class PlanRepository:
                         }
                         for v in plan.violations
                     ],
+                    "actor_context": plan.actor_context,
                 }
 
                 # Dialect에 따른 UPSERT 처리
@@ -146,6 +148,7 @@ class PlanRepository:
                         diff=item["diff"],
                         current_config=item["current_config"],
                         target_config=item["target_config"],
+                        reason=item.get("reason"),
                     )
                     for item in plan_data["items"]
                 ]
@@ -171,6 +174,7 @@ class PlanRepository:
                     env=env,
                     items=tuple(items),
                     violations=tuple(violations),
+                    actor_context=plan_data.get("actor_context"),
                 )
 
             except Exception as e:

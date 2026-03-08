@@ -35,6 +35,8 @@ class RollbackSchemaUseCase:
         subject: str,
         version: int,
         actor: str,
+        reason: str | None = None,
+        actor_context: dict[str, str] | None = None,
     ) -> DomainSchemaPlan:
         """특정 버전으로 롤백 계획 수립"""
         registry_client = await self.connection_manager.get_schema_registry_client(registry_id)
@@ -62,6 +64,8 @@ class RollbackSchemaUseCase:
             new_schema=old_version_info.schema or "",
             compatibility=compatibility,
             actor=actor,
+            reason=reason,
+            actor_context=actor_context,
         )
 
         return plan

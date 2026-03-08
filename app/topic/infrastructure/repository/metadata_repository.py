@@ -11,6 +11,7 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.shared.roles import DEFAULT_USER
 from app.topic.domain.models import TopicName
 from app.topic.infrastructure.models import TopicMetadataModel
 
@@ -93,7 +94,7 @@ class MetadataRepository:
                     existing.slo = metadata.get("slo")
                     existing.sla = metadata.get("sla")
                     existing.config = metadata.get("config", {})
-                    existing.updated_by = metadata.get("updated_by", "system")
+                    existing.updated_by = metadata.get("updated_by", existing.updated_by)
                     session.add(existing)
                     logger.info(f"Updating existing metadata for {name}")
                 else:
@@ -107,8 +108,10 @@ class MetadataRepository:
                         slo=metadata.get("slo"),
                         sla=metadata.get("sla"),
                         config=metadata.get("config", {}),
-                        created_by=metadata.get("created_by", "system"),
-                        updated_by=metadata.get("updated_by", "system"),
+                        created_by=metadata.get("created_by", DEFAULT_USER),
+                        updated_by=metadata.get(
+                            "updated_by", metadata.get("created_by", DEFAULT_USER)
+                        ),
                     )
                     session.add(metadata_model)
                     logger.info(f"Creating new metadata for {name}")

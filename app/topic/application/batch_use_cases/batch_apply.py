@@ -8,6 +8,7 @@ from collections import defaultdict
 from dataclasses import asdict
 
 from app.cluster.domain.services import IConnectionManager
+from app.shared.actor import merge_actor_metadata
 from app.shared.approval import ApprovalOverride, assess_topic_batch_risk, ensure_approval
 from app.shared.constants import AuditAction, AuditStatus, AuditTarget, MethodType
 from app.shared.domain.policy_types import (
@@ -20,6 +21,7 @@ from app.topic.domain.models import (
     DomainTopicApplyResult,
     DomainTopicBatch,
     DomainTopicPlan,
+    DomainTopicPlanItem,
     DomainTopicSpec,
     TopicName,
 )
@@ -29,6 +31,7 @@ from app.topic.domain.policies.management import (
     PolicyStatus,
     PolicyType,
 )
+from app.topic.domain.policies.policy_pack import DefaultTopicPolicyPackV1
 from app.topic.domain.policies.validation import PolicyResolver
 from app.topic.domain.repositories.interfaces import IAuditRepository, ITopicMetadataRepository
 from app.topic.domain.services import TopicPlannerService
@@ -100,6 +103,7 @@ class TopicBatchApplyUseCase:
         batch: DomainTopicBatch,
         actor: str,
         approval_override: ApprovalOverride | None = None,
+        actor_context: dict[str, str] | None = None,
     ) -> DomainTopicApplyResult:
         """배치 적용 실행 (트랜잭션 보장 개선)"""
         audit_id = str(uuid.uuid4())
@@ -118,6 +122,7 @@ class TopicBatchApplyUseCase:
             actor=actor,
             status=AuditStatus.STARTED,
             message=f"Apply started for {len(batch.specs)} topics",
+            snapshot=merge_actor_metadata(None, actor_context),
         )
 
         try:
@@ -129,7 +134,7 @@ class TopicBatchApplyUseCase:
 
             # 3. 정책 검증 (Naming + Guardrail)
             # Note: violations가 있어도 사용자가 강제 실행을 선택하면 계속 진행
-            violations = await self._validate_policies(batch.specs)
+            violations = await self._validate_policies(batch.specs, batch.env.value)
             if violations:
                 logger = logging.getLogger(__name__)
                 logger.warning(
@@ -140,23 +145,51 @@ class TopicBatchApplyUseCase:
             # 4. Planner Service 생성 및 계획 재생성
             planner_service = TopicPlannerService(topic_repository)  # type: ignore[arg-type]
             plan = await planner_service.create_plan(batch, actor)
+            base_plan = DomainTopicPlan(
+                change_id=plan.change_id,
+                env=plan.env,
+                items=plan.items,
+                violations=tuple(violations) if violations else plan.violations,
+                requested_total=len(batch.specs),
+            )
+            policy_pack_result = DefaultTopicPolicyPackV1().evaluate(batch, base_plan)
+            plan = DomainTopicPlan(
+                change_id=base_plan.change_id,
+                env=base_plan.env,
+                items=base_plan.items,
+                violations=policy_pack_result.violations,
+                risk=policy_pack_result.evaluation.risk_metadata(),
+                approval=policy_pack_result.evaluation.approval_metadata(
+                    mode="apply",
+                    approval_override_present=approval_override is not None,
+                ),
+                policy_evaluation=policy_pack_result.evaluation,
+                requested_total=base_plan.requested_total,
+                actor_context=actor_context,
+            )
 
             approval_context = ensure_approval(
-                assess_topic_batch_risk(batch, plan),
+                plan.policy_evaluation
+                if plan.policy_evaluation is not None
+                else assess_topic_batch_risk(batch, plan),
                 approval_override,
             )
 
             # 에러 위반이 있으면 적용 중단
             if not plan.can_apply:
+                if plan.policy_evaluation is not None:
+                    reasons = "; ".join(plan.policy_evaluation.reasons[:3])
+                    raise RuntimeError(f"policy blocked: {reasons}")
                 error_violations = [v.message for v in plan.error_violations]
                 raise ValueError(f"Cannot apply due to policy violations: {error_violations}")
 
             # Plan과 현재 상태 일치 검증 (경쟁 조건 방지)
-            await self._validate_plan_consistency(topic_repository, plan, batch.specs)
+            await self._validate_plan_consistency(topic_repository, plan)
 
             # 토픽 적용 실행
             applied, skipped, failed = await self._apply_topics(
                 topic_repository=topic_repository,
+                plan=plan,
                 specs=batch.specs,
                 actor=actor,
                 change_id=batch.change_id,
@@ -170,6 +203,20 @@ class TopicBatchApplyUseCase:
                 skipped=tuple(skipped),
                 failed=tuple(failed),
                 audit_id=audit_id,
+                risk=plan.policy_evaluation.risk_metadata()
+                if plan.policy_evaluation is not None
+                else None,
+                approval=approval_context.get("approval")
+                if isinstance(approval_context.get("approval"), dict)
+                else None,
+                policy_evaluation=plan.policy_evaluation,
+                requested_total=len(batch.specs),
+                planned_total=len(plan.items),
+                warning_total=plan.policy_evaluation.warning_count
+                if plan.policy_evaluation is not None
+                else None,
+                details=tuple(self._build_result_details(batch, plan, applied, skipped, failed)),
+                actor_context=actor_context,
             )
 
             # 결과 저장
@@ -180,15 +227,18 @@ class TopicBatchApplyUseCase:
             method = MethodType.SINGLE if is_single else MethodType.BATCH
 
             # 액션별로 그룹화 (스냅샷용)
+            plan_actions_by_name = {item.name: item.action.value for item in plan.items}
             actions_map: defaultdict[str, list[str]] = defaultdict(list)
             for spec in batch.specs:
                 if spec.name in applied:
-                    actions_map[spec.action.value.upper()].append(spec.name)
+                    actions_map[
+                        plan_actions_by_name.get(spec.name, spec.action.value.upper())
+                    ].append(spec.name)
 
             # 상태 결정: 실패가 있으면 PARTIALLY_COMPLETED
-            if len(failed) > 0 and len(applied) > 0:
+            if len(failed) > 0 and (len(applied) > 0 or len(skipped) > 0):
                 final_status = AuditStatus.PARTIALLY_COMPLETED
-            elif len(applied) == 0:
+            elif len(failed) > 0:
                 final_status = AuditStatus.FAILED
             else:
                 final_status = AuditStatus.COMPLETED
@@ -207,6 +257,8 @@ class TopicBatchApplyUseCase:
                 elif spec.name in failed_dict:
                     error_msg = failed_dict[spec.name]
                     message = f"토픽 {action_str} 실패: {spec.name} - {error_msg}"
+                elif spec.name in skipped:
+                    message = f"토픽 변경 없음: {spec.name}"
                 else:
                     message = f"토픽 {action_str}: {spec.name}"
 
@@ -218,6 +270,8 @@ class TopicBatchApplyUseCase:
                 )
                 if len(failed) > 0:
                     message = f"배치 작업 부분 성공: {len(applied)}개 성공, {len(failed)}개 실패 ({action_summary})"
+                elif len(skipped) > 0 and len(applied) == 0:
+                    message = f"배치 작업 완료: {len(skipped)}개 변경 없음"
                 else:
                     message = f"배치 작업 완료: {action_summary}"
                 target = AuditTarget.BATCH
@@ -230,15 +284,29 @@ class TopicBatchApplyUseCase:
                 actor=actor,
                 status=final_status,  # 동적 상태
                 message=message,
-                snapshot={
-                    "method": method,
-                    "total_count": len(applied),
-                    "failed_count": len(failed),
-                    "actions": dict(actions_map),
-                    "failed_details": failed,  # 실패 상세 정보
-                    "apply_summary": result.summary(),
-                    **approval_context,
-                },
+                snapshot=merge_actor_metadata(
+                    {
+                        "method": method,
+                        "total_count": len(applied),
+                        "failed_count": len(failed),
+                        "actions": dict(actions_map),
+                        "failed_details": failed,
+                        "requested_items": [
+                            {
+                                "name": spec.name,
+                                "action": spec.action.value.upper(),
+                                "reason": spec.reason,
+                            }
+                            for spec in batch.specs
+                        ],
+                        "apply_summary": result.summary(),
+                        "policy_pack": plan.policy_evaluation.to_audit_dict()
+                        if plan.policy_evaluation is not None
+                        else None,
+                        **approval_context,
+                    },
+                    actor_context,
+                ),
             )
 
             # 부분 실패 허용 - 결과 반환 (failed 포함)
@@ -253,21 +321,60 @@ class TopicBatchApplyUseCase:
                 actor=actor,
                 status=AuditStatus.FAILED,
                 message=f"Apply failed: {e!s}",
-                snapshot=approval_context,
+                snapshot=merge_actor_metadata(approval_context, actor_context),
             )
             raise
+
+    def _build_result_details(
+        self,
+        batch: DomainTopicBatch,
+        plan: DomainTopicPlan,
+        applied: list[TopicName],
+        skipped: list[TopicName],
+        failed: list[dict[str, str]],
+    ) -> list[dict[str, str | None]]:
+        plan_items_by_name = {item.name: item for item in plan.items}
+        failed_by_name = {
+            item.get("name"): item.get("error")
+            for item in failed
+            if isinstance(item.get("name"), str)
+        }
+        details: list[dict[str, str | None]] = []
+
+        for spec in batch.specs:
+            plan_item = plan_items_by_name.get(spec.name)
+            details.append(
+                {
+                    "name": spec.name,
+                    "action": (
+                        plan_item.action.value
+                        if plan_item is not None
+                        else spec.action.value.upper()
+                    ),
+                    "status": (
+                        "applied"
+                        if spec.name in applied
+                        else "failed"
+                        if spec.name in failed_by_name
+                        else "skipped"
+                    ),
+                    "reason": spec.reason,
+                    "error_message": failed_by_name.get(spec.name),
+                }
+            )
+
+        return details
 
     async def _validate_plan_consistency(
         self,
         topic_repository: KafkaTopicAdapter,
         plan: DomainTopicPlan,
-        specs: tuple[DomainTopicSpec, ...],
     ) -> None:
         """계획 일관성 검증 (경쟁 조건 방지)
 
         Plan 생성 시점과 Apply 시점 사이에 토픽 상태 변경 검증
         """
-        topic_names = [spec.name for spec in specs]
+        topic_names = [item.name for item in plan.items]
         current_state = await topic_repository.describe_topics(topic_names)
 
         for item in plan.items:
@@ -297,23 +404,28 @@ class TopicBatchApplyUseCase:
     async def _apply_topics(
         self,
         topic_repository: KafkaTopicAdapter,
+        plan: DomainTopicPlan,
         specs: tuple[DomainTopicSpec, ...],
         actor: str,
         change_id: ChangeId,
     ) -> tuple[list[TopicName], list[TopicName], list[dict[str, str]]]:
         """토픽 적용 실행 (트랜잭션 개선)"""
+        spec_by_name = {spec.name: spec for spec in specs}
+        planned_names = {item.name for item in plan.items}
         created_topics: list[TopicName] = []  # 롤백용
         applied: list[TopicName] = []
-        skipped: list[TopicName] = []
+        skipped: list[TopicName] = [spec.name for spec in specs if spec.name not in planned_names]
         failed: list[dict[str, str]] = []
 
         # 액션별로 그룹화
         create_specs: list[DomainTopicSpec] = [
-            s for s in specs if s.action.value in ("create", "upsert")
+            spec_by_name[item.name] for item in plan.items if item.action.value == "CREATE"
         ]
-        delete_specs: list[DomainTopicSpec] = [s for s in specs if s.action.value == "delete"]
-        update_specs: list[DomainTopicSpec] = [
-            s for s in specs if s.action.value in ("update", "upsert")
+        delete_specs: list[DomainTopicSpec] = [
+            spec_by_name[item.name] for item in plan.items if item.action.value == "DELETE"
+        ]
+        update_plan_specs: list[tuple[DomainTopicPlanItem, DomainTopicSpec]] = [
+            (item, spec_by_name[item.name]) for item in plan.items if item.action.value == "ALTER"
         ]
 
         # 토픽 생성 (트랜잭션 보장)
@@ -409,29 +521,39 @@ class TopicBatchApplyUseCase:
                     )
 
         # 토픽 설정 변경
-        if update_specs:
+        if update_plan_specs:
             # 파티션 수 변경
             partition_changes = {}
             config_changes = {}
 
-            for spec in update_specs:
-                if spec.config:
-                    # 현재 토픽 정보 조회
-                    current_topics = await topic_repository.describe_topics([spec.name])
-                    current_topic = current_topics.get(spec.name)
+            for item, spec in update_plan_specs:
+                if spec.config is None:
+                    continue
 
-                    if current_topic:
-                        current_partitions = current_topic.get("partition_count", 0)
-                        if spec.config.partitions > current_partitions:
-                            partition_changes[spec.name] = spec.config.partitions
+                current_partitions = int(
+                    item.current_config.get("partitions", 0) if item.current_config else 0
+                )
+                target_partitions = int(
+                    item.target_config.get("partitions", current_partitions)
+                    if item.target_config
+                    else current_partitions
+                )
+                if target_partitions > current_partitions:
+                    partition_changes[spec.name] = target_partitions
 
-                        # 설정 변경
-                        config_changes[spec.name] = spec.config.to_kafka_config()
+                target_config = item.target_config or {}
+                mutable_config = {
+                    key: value
+                    for key, value in target_config.items()
+                    if key not in {"partitions", "replication_factor", "replication.factor"}
+                }
+                if mutable_config:
+                    config_changes[spec.name] = mutable_config
 
             # 파티션 수 변경 실행
             if partition_changes:
                 partition_results = await topic_repository.create_partitions(partition_changes)
-                for spec in update_specs:
+                for _item, spec in update_plan_specs:
                     if spec.name in partition_results:
                         error = partition_results[spec.name]
                         team = (
@@ -461,7 +583,7 @@ class TopicBatchApplyUseCase:
             if config_changes:
                 config_results = await topic_repository.alter_topic_configs(config_changes)
 
-                for spec in update_specs:
+                for _item, spec in update_plan_specs:
                     if spec.name in config_results:
                         error = config_results[spec.name]
                         team = (
@@ -579,7 +701,7 @@ class TopicBatchApplyUseCase:
             logger.error(f"Failed to delete topic metadata for {topic_name}: {e}", exc_info=True)
 
     async def _validate_policies(
-        self, specs: tuple[DomainTopicSpec, ...]
+        self, specs: tuple[DomainTopicSpec, ...], env: str
     ) -> list[DomainPolicyViolation]:
         """정책 검증 (Naming + Guardrail)
 
@@ -594,21 +716,11 @@ class TopicBatchApplyUseCase:
         logger = logging.getLogger(__name__)
 
         try:
-            # 1. ACTIVE 정책 조회 (type별로)
-            naming_policies = await self.policy_repository.list_policies(
-                policy_type=PolicyType.NAMING,
-                status=None,  # ACTIVE만 필터링하려면 get_active_policy 사용
-            )
-            guardrail_policies = await self.policy_repository.list_policies(
-                policy_type=PolicyType.GUARDRAIL, status=None
-            )
-
-            # ACTIVE 상태만 필터링
-            active_naming = [p for p in naming_policies if p.status == PolicyStatus.ACTIVE]  # type: ignore[misc]
-            active_guardrail = [p for p in guardrail_policies if p.status == PolicyStatus.ACTIVE]  # type: ignore[misc]
+            naming_policy = await self._get_active_policy(PolicyType.NAMING, env)
+            guardrail_policy = await self._get_active_policy(PolicyType.GUARDRAIL, env)
 
             # 2. 정책이 하나도 없으면 스킵
-            if not active_naming and not active_guardrail:
+            if not naming_policy and not guardrail_policy:
                 logger.info("No active policies found. Skipping policy validation.")
                 return []
 
@@ -620,12 +732,10 @@ class TopicBatchApplyUseCase:
 
             # PolicyReference 생성
             naming_ref = (
-                PolicyReference(policy_id=active_naming[0].policy_id) if active_naming else None
+                PolicyReference(policy_id=naming_policy.policy_id) if naming_policy else None
             )
             guardrail_ref = (
-                PolicyReference(policy_id=active_guardrail[0].policy_id)
-                if active_guardrail
-                else None
+                PolicyReference(policy_id=guardrail_policy.policy_id) if guardrail_policy else None
             )
 
             validator = await resolver.resolve(naming_ref, guardrail_ref)
@@ -671,3 +781,19 @@ class TopicBatchApplyUseCase:
                     field=None,
                 )
             ]
+
+    async def _get_active_policy(self, policy_type: PolicyType, env: str):
+        policies = await self.policy_repository.list_policies(
+            policy_type=policy_type,
+            status=PolicyStatus.ACTIVE,
+        )
+
+        for policy in policies:
+            if policy.target_environment == env:
+                return policy
+
+        for policy in policies:
+            if policy.target_environment == "total":
+                return policy
+
+        return None

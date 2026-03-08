@@ -17,6 +17,7 @@ class DomainTopicSpec:
     action: DomainTopicAction
     config: DomainTopicConfig | None = None
     metadata: DomainTopicMetadata | None = None
+    reason: str | None = None
 
     def __post_init__(self) -> None:
         if not self.name:

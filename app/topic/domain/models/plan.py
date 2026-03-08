@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from app.shared.domain.policy_types import DomainPolicySeverity, DomainPolicyViolation
+from app.shared.domain.preflight_policy import DomainPolicyPackEvaluation
 
 from .types_enum import ChangeId, DomainEnvironment, DomainPlanAction, TopicName
 
@@ -18,6 +19,7 @@ class DomainTopicPlanItem:
     diff: dict[str, str]
     current_config: dict[str, str] | None = None
     target_config: dict[str, str] | None = None
+    reason: str | None = None
 
     def __post_init__(self) -> None:
         if not self.name:
@@ -32,6 +34,11 @@ class DomainTopicPlan:
     env: DomainEnvironment
     items: tuple[DomainTopicPlanItem, ...]
     violations: tuple[DomainPolicyViolation, ...]
+    risk: dict[str, str | bool] | None = None
+    approval: dict[str, str | bool] | None = None
+    policy_evaluation: DomainPolicyPackEvaluation | None = None
+    requested_total: int | None = None
+    actor_context: dict[str, str] | None = None
 
     def __post_init__(self) -> None:
         if not self.change_id:
@@ -61,6 +68,26 @@ class DomainTopicPlan:
         """적용 가능 여부 (에러 위반이 없는 경우)"""
         return len(self.error_violations) == 0
 
+    @property
+    def planned_total(self) -> int:
+        return len(self.items)
+
+    @property
+    def total_items(self) -> int:
+        if self.requested_total is not None:
+            return self.requested_total
+        return self.planned_total
+
+    @property
+    def unchanged_count(self) -> int:
+        return max(self.total_items - self.planned_total, 0)
+
+    @property
+    def warning_count(self) -> int:
+        if self.policy_evaluation is not None:
+            return self.policy_evaluation.warning_count
+        return len(self.warning_violations)
+
     def summary(self) -> dict[str, int]:
         """계획 요약"""
         action_counts = {}
@@ -70,11 +97,14 @@ class DomainTopicPlan:
             )
 
         return {
-            "total_items": len(self.items),
+            "total_items": self.total_items,
+            "planned_count": self.planned_total,
             "create_count": action_counts.get("create_count", 0),
             "alter_count": action_counts.get("alter_count", 0),
             "delete_count": action_counts.get("delete_count", 0),
+            "unchanged_count": self.unchanged_count,
             "violation_count": len(self.violations),
+            "warning_count": self.warning_count,
         }
 
 
@@ -88,6 +118,14 @@ class DomainTopicApplyResult:
     skipped: tuple[TopicName, ...]
     failed: tuple[dict[str, str], ...]
     audit_id: str
+    risk: dict[str, str | bool] | None = None
+    approval: dict[str, str | bool] | None = None
+    policy_evaluation: DomainPolicyPackEvaluation | None = None
+    requested_total: int | None = None
+    planned_total: int | None = None
+    warning_total: int | None = None
+    details: tuple[dict[str, str | None], ...] = ()
+    actor_context: dict[str, str] | None = None
 
     def __post_init__(self) -> None:
         if not self.change_id:
@@ -97,9 +135,29 @@ class DomainTopicApplyResult:
 
     def summary(self) -> dict[str, int]:
         """적용 결과 요약"""
+        total_items = (
+            self.requested_total
+            if self.requested_total is not None
+            else len(self.applied) + len(self.skipped) + len(self.failed)
+        )
+        planned_total = (
+            self.planned_total
+            if self.planned_total is not None
+            else max(total_items - len(self.skipped), 0)
+        )
+        unchanged_count = max(total_items - planned_total, 0)
+        warning_count = (
+            self.warning_total
+            if self.warning_total is not None
+            else self.policy_evaluation.warning_count
+            if self.policy_evaluation is not None
+            else 0
+        )
         return {
-            "total_items": len(self.applied) + len(self.skipped) + len(self.failed),
+            "total_items": total_items,
+            "planned_count": planned_total,
             "applied_count": len(self.applied),
-            "skipped_count": len(self.skipped),
+            "skipped_count": unchanged_count,
             "failed_count": len(self.failed),
+            "warning_count": warning_count,
         }

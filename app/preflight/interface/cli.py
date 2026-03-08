@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import json
 import sys
+import uuid
 from collections.abc import Callable, Coroutine, Mapping
 from pathlib import Path
 from typing import Annotated, NoReturn
@@ -30,7 +31,7 @@ from app.preflight.interface.schema_transport_adapter import SchemaTransportAdap
 from app.preflight.interface.topic_transport_adapter import TopicTransportAdapter
 from app.schema.domain.models import DomainSchemaApplyResult, DomainSchemaPlan
 from app.schema.interface.schemas.request import SchemaBatchRequest
-from app.shared.roles import DEFAULT_USER
+from app.shared.actor import actor_context_dict, actor_context_from_cli
 from app.topic.domain.models import DomainTopicApplyResult, DomainTopicPlan
 from app.topic.interface.schemas.request import TopicBatchRequest
 
@@ -60,6 +61,21 @@ JsonOption = Annotated[
         "--json/--no-json",
         help="Emit machine-readable JSON envelope output.",
     ),
+]
+
+ActorUserIdOption = Annotated[
+    str | None,
+    typer.Option("--user-id", help="Actor user identifier."),
+]
+
+ActorUsernameOption = Annotated[
+    str | None,
+    typer.Option("--username", help="Actor username."),
+]
+
+ActorSourceOption = Annotated[
+    str | None,
+    typer.Option("--source", help="Actor source label."),
 ]
 
 EXIT_VALIDATION_FAILURE = 10
@@ -182,6 +198,21 @@ def _extract_metadata(result: object, key: str) -> Mapping[str, str | bool] | No
         for item_key, item_value in raw.items()
         if isinstance(item_key, str) and isinstance(item_value, str | bool)
     }
+
+
+def _resolve_cli_actor(
+    *,
+    user_id: str | None,
+    username: str | None,
+    source: str | None,
+) -> tuple[str, dict[str, str] | None]:
+    actor_context = actor_context_from_cli(user_id=user_id, username=username, source=source)
+    return actor_context.actor, actor_context_dict(actor_context)
+
+
+def _fallback_request_id(command: str) -> str:
+    normalized = command.replace(" ", "-")
+    return f"{normalized}-{uuid.uuid4().hex[:12]}"
 
 
 def _classify_error(error: Exception) -> tuple[str, str, bool, str | None, int]:
@@ -307,6 +338,8 @@ def _emit_error_envelope(
         message=message,
         target=target,
         retryable=retryable,
+        risk=_extract_metadata(error, "risk"),
+        approval=_extract_metadata(error, "approval"),
     )
     _emit_output(payload=error_payload, as_json=as_json)
     raise typer.Exit(code=exit_code) from error
@@ -317,6 +350,9 @@ def topic_dry_run(
     cluster_id: Annotated[str, typer.Option("--cluster-id", help="Kafka cluster identifier")],
     file_path: FileOption = None,
     as_json: JsonOption = False,
+    user_id: ActorUserIdOption = None,
+    username: ActorUsernameOption = None,
+    source: ActorSourceOption = None,
 ) -> None:
     try:
         payload = _load_payload(file_path=file_path)
@@ -329,15 +365,21 @@ def topic_dry_run(
             cluster_id=cluster_id,
             registry_id=None,
             storage_id=None,
-            request_id="unknown",
+            request_id=_fallback_request_id(COMMAND_TOPIC_DRY_RUN),
             as_json=as_json,
             error=exc,
         )
     request_id = str(request.change_id)
     transport = _build_transport()
+    actor, actor_context = _resolve_cli_actor(user_id=user_id, username=username, source=source)
 
     async def _runner() -> dict[str, object]:
-        raw_result = await transport.topic_dry_run(cluster_id, request, DEFAULT_USER)
+        raw_result = await transport.topic_dry_run(
+            cluster_id,
+            request,
+            actor,
+            actor_context=actor_context,
+        )
         if not isinstance(raw_result, DomainTopicPlan):
             raise TypeError("unexpected topic dry-run result type")
         return translate_topic_dry_run_result(
@@ -365,6 +407,9 @@ def topic_apply(
     cluster_id: Annotated[str, typer.Option("--cluster-id", help="Kafka cluster identifier")],
     file_path: FileOption = None,
     as_json: JsonOption = False,
+    user_id: ActorUserIdOption = None,
+    username: ActorUsernameOption = None,
+    source: ActorSourceOption = None,
 ) -> None:
     try:
         payload = _load_payload(file_path=file_path)
@@ -377,16 +422,22 @@ def topic_apply(
             cluster_id=cluster_id,
             registry_id=None,
             storage_id=None,
-            request_id="unknown",
+            request_id=_fallback_request_id(COMMAND_TOPIC_APPLY),
             as_json=as_json,
             error=exc,
         )
 
     request_id = str(request.change_id)
     transport = _build_transport()
+    actor, actor_context = _resolve_cli_actor(user_id=user_id, username=username, source=source)
 
     async def _runner() -> dict[str, object]:
-        raw_result = await transport.topic_apply(cluster_id, request, DEFAULT_USER)
+        raw_result = await transport.topic_apply(
+            cluster_id,
+            request,
+            actor,
+            actor_context=actor_context,
+        )
         if not isinstance(raw_result, DomainTopicApplyResult):
             raise TypeError("unexpected topic apply result type")
         return translate_topic_apply_result(
@@ -414,6 +465,9 @@ def schema_dry_run(
     registry_id: Annotated[str, typer.Option("--registry-id", help="Schema registry identifier")],
     file_path: FileOption = None,
     as_json: JsonOption = False,
+    user_id: ActorUserIdOption = None,
+    username: ActorUsernameOption = None,
+    source: ActorSourceOption = None,
 ) -> None:
     try:
         payload = _load_payload(file_path=file_path)
@@ -426,16 +480,22 @@ def schema_dry_run(
             cluster_id=None,
             registry_id=registry_id,
             storage_id=None,
-            request_id="unknown",
+            request_id=_fallback_request_id(COMMAND_SCHEMA_DRY_RUN),
             as_json=as_json,
             error=exc,
         )
 
     request_id = str(request.change_id)
     transport = _build_transport()
+    actor, actor_context = _resolve_cli_actor(user_id=user_id, username=username, source=source)
 
     async def _runner() -> dict[str, object]:
-        raw_result = await transport.schema_dry_run(registry_id, request, DEFAULT_USER)
+        raw_result = await transport.schema_dry_run(
+            registry_id,
+            request,
+            actor,
+            actor_context=actor_context,
+        )
         if not isinstance(raw_result, DomainSchemaPlan):
             raise TypeError("unexpected schema dry-run result type")
         return translate_schema_dry_run_result(
@@ -464,6 +524,9 @@ def schema_apply(
     storage_id: Annotated[str, typer.Option("--storage-id", help="Storage identifier")],
     file_path: FileOption = None,
     as_json: JsonOption = False,
+    user_id: ActorUserIdOption = None,
+    username: ActorUsernameOption = None,
+    source: ActorSourceOption = None,
 ) -> None:
     try:
         payload = _load_payload(file_path=file_path)
@@ -476,16 +539,23 @@ def schema_apply(
             cluster_id=None,
             registry_id=registry_id,
             storage_id=storage_id,
-            request_id="unknown",
+            request_id=_fallback_request_id(COMMAND_SCHEMA_APPLY),
             as_json=as_json,
             error=exc,
         )
 
     request_id = str(request.change_id)
     transport = _build_transport()
+    actor, actor_context = _resolve_cli_actor(user_id=user_id, username=username, source=source)
 
     async def _runner() -> dict[str, object]:
-        raw_result = await transport.schema_apply(registry_id, request, DEFAULT_USER, storage_id)
+        raw_result = await transport.schema_apply(
+            registry_id,
+            request,
+            actor,
+            storage_id,
+            actor_context=actor_context,
+        )
         if not isinstance(raw_result, DomainSchemaApplyResult):
             raise TypeError("unexpected schema apply result type")
         return translate_schema_apply_result(

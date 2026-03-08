@@ -6,6 +6,7 @@ from ..domain.models import (
     DomainCleanupPolicy,
     DomainEnvironment,
     DomainTopicAction,
+    DomainTopicApplyResult,
     DomainTopicBatch,
     DomainTopicConfig,
     DomainTopicMetadata,
@@ -15,12 +16,15 @@ from ..domain.models import (
 from .schemas import (
     KafkaCoreMetadata as InterfaceKafkaCoreMetadata,
     PolicyViolation as ResponseViolation,
+    TopicBatchApplyResponse,
     TopicBatchDryRunResponse,
     TopicBatchRequest,
     TopicConfig as InterfaceTopicConfig,
     TopicItem,
+    TopicMetadata as InterfaceTopicMetadata,
     TopicPlanItem as ResponsePlanItem,
 )
+from .schemas.response import FailureDetail, TopicApplyItem
 
 
 class TopicTypeAdapters:
@@ -66,12 +70,15 @@ class TopicTypeAdapters:
             # 메타데이터 변환 (직접 생성)
             domain_metadata = None
             if item.metadata:
+                metadata: InterfaceTopicMetadata = item.metadata
+                owners = tuple(metadata.owners)
+                tags = tuple(metadata.tags)
                 domain_metadata = DomainTopicMetadata(
-                    owners=tuple(item.metadata.owners) if item.metadata.owners else (),
-                    doc=item.metadata.doc,
-                    tags=tuple(item.metadata.tags),
-                    slo=item.metadata.slo,
-                    sla=item.metadata.sla,
+                    owners=owners,
+                    doc=metadata.doc,
+                    tags=tags,
+                    slo=metadata.slo,
+                    sla=metadata.sla,
                 )
 
             # TopicSpec 생성 (직접 생성)
@@ -80,6 +87,7 @@ class TopicTypeAdapters:
                 action=DomainTopicAction(item.action.value),
                 config=domain_config,
                 metadata=domain_metadata,
+                reason=item.reason,
             )
 
         except ValueError as e:
@@ -138,6 +146,7 @@ class TopicTypeAdapters:
                 diff=item.diff,
                 current_config=item.current_config,
                 target_config=item.target_config,
+                reason=item.reason,
             )
             for item in plan.items
         ]
@@ -162,6 +171,52 @@ class TopicTypeAdapters:
             summary=plan.summary(),
         )
 
+    @classmethod
+    def convert_apply_result_to_response(
+        cls, result: DomainTopicApplyResult, request: TopicBatchRequest
+    ) -> TopicBatchApplyResponse:
+        failed_details = {
+            item.get("name"): item.get("error")
+            for item in result.failed
+            if isinstance(item.get("name"), str)
+        }
+        failures = [
+            FailureDetail(
+                topic_name=item.get("name"),
+                failure_type="kafka_error",
+                error_message=item.get("error", "unknown error"),
+                raw_error=item.get("error"),
+            )
+            for item in result.failed
+        ]
+        details = [
+            TopicApplyItem(
+                name=item.name,
+                action=item.action.value.upper(),
+                status=(
+                    "applied"
+                    if item.name in result.applied
+                    else "failed"
+                    if item.name in failed_details
+                    else "skipped"
+                ),
+                reason=item.reason,
+                error_message=failed_details.get(item.name),
+            )
+            for item in request.items
+        ]
+
+        return TopicBatchApplyResponse(
+            env=request.env,
+            change_id=request.change_id,
+            applied=list(result.applied),
+            skipped=list(result.skipped),
+            failed=failures,
+            details=details,
+            audit_id=result.audit_id,
+            summary=result.summary(),
+        )
+
 
 def safe_convert_item_to_spec(item: TopicItem) -> DomainTopicSpec:
     """안전한 TopicItem → TopicSpec 변환 (전역 함수)"""
@@ -180,15 +235,29 @@ def safe_convert_plan_to_response(
     return TopicTypeAdapters.convert_plan_to_response(plan, request)
 
 
+def safe_convert_apply_result_to_response(
+    result: DomainTopicApplyResult, request: TopicBatchRequest
+) -> TopicBatchApplyResponse:
+    return TopicTypeAdapters.convert_apply_result_to_response(result, request)
+
+
 # ===== Kafka 메타데이터 변환 유틸 =====
 def _to_int(val: object) -> int | None:
     """안전한 정수 변환"""
-    if val is None or isinstance(val, int):
-        return val  # type: ignore[return-value]
-    try:
-        return int(val)  # type: ignore[arg-type]
-    except (ValueError, TypeError):
+    if val is None:
         return None
+    if isinstance(val, bool):
+        return int(val)
+    if isinstance(val, int):
+        return val
+    if isinstance(val, str):
+        try:
+            return int(val)
+        except ValueError:
+            return None
+    if isinstance(val, float):
+        return int(val)
+    return None
 
 
 def kafka_metadata_to_interface_config(
@@ -261,8 +330,8 @@ def kafka_metadata_to_core_metadata(
     replicas_raw = kafka_metadata.get("leader_replicas") or kafka_metadata.get("replicas")
     replicas: list[int] = []
     if isinstance(replicas_raw, list | tuple):
-        for r in replicas_raw:
-            iv = _to_int(r)
+        for replica in replicas_raw:
+            iv = _to_int(replica)
             if iv is not None:
                 replicas.append(iv)
 

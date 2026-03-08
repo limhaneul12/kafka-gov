@@ -14,10 +14,18 @@ from app.topic.domain.models.types_enum import DomainEnvironment, DomainPlanActi
 
 
 class _UnusedSchemaTransport:
-    async def dry_run(self, registry_id: str, request: SchemaBatchRequest, actor: str) -> object:
+    async def dry_run(
+        self,
+        registry_id: str,
+        request: SchemaBatchRequest,
+        actor: str,
+        *,
+        actor_context: dict[str, str] | None = None,
+    ) -> object:
         _ = registry_id
         _ = request
         _ = actor
+        _ = actor_context
         raise AssertionError("schema transport should not be called in topic tests")
 
     async def apply(
@@ -26,11 +34,14 @@ class _UnusedSchemaTransport:
         request: SchemaBatchRequest,
         actor: str,
         storage_id: str | None,
+        *,
+        actor_context: dict[str, str] | None = None,
     ) -> object:
         _ = registry_id
         _ = request
         _ = actor
         _ = storage_id
+        _ = actor_context
         raise AssertionError("schema transport should not be called in topic tests")
 
 
@@ -47,8 +58,16 @@ class _TopicTransportStub:
         self._apply_error: Exception | None = apply_error
         self.calls: list[tuple[str, str, str]] = []
 
-    async def dry_run(self, cluster_id: str, request: object, actor: str) -> object:
+    async def dry_run(
+        self,
+        cluster_id: str,
+        request: object,
+        actor: str,
+        *,
+        actor_context: dict[str, str] | None = None,
+    ) -> object:
         _ = request
+        _ = actor_context
         self.calls.append(("dry_run", cluster_id, actor))
         return self._dry_run_result
 
@@ -58,9 +77,12 @@ class _TopicTransportStub:
         request: object,
         actor: str,
         approval_override: object | None = None,
+        *,
+        actor_context: dict[str, str] | None = None,
     ) -> object:
         _ = request
         _ = approval_override
+        _ = actor_context
         self.calls.append(("apply", cluster_id, actor))
         if self._apply_error is not None:
             raise self._apply_error
