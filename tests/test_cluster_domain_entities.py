@@ -10,6 +10,10 @@ def _now() -> datetime:
     return datetime(2026, 1, 1, tzinfo=UTC)
 
 
+def _fixture_secret(label: str) -> str:
+    return f"fixture-{label}-value"
+
+
 def test_kafka_cluster_admin_config_plaintext() -> None:
     cluster = KafkaCluster(
         cluster_id="c1",
@@ -35,7 +39,7 @@ def test_kafka_cluster_admin_config_with_sasl_and_ssl() -> None:
         security_protocol=SecurityProtocol.SASL_SSL,
         sasl_mechanism=SaslMechanism.SCRAM_SHA_512,
         sasl_username="svc",
-        sasl_password="secret",
+        sasl_password=_fixture_secret("sasl"),
         ssl_ca_location="/tmp/ca",
         ssl_cert_location="/tmp/cert",
         ssl_key_location="/tmp/key",
@@ -48,7 +52,7 @@ def test_kafka_cluster_admin_config_with_sasl_and_ssl() -> None:
     assert cfg["security.protocol"] == "SASL_SSL"
     assert cfg["sasl.mechanism"] == "SCRAM-SHA-512"
     assert cfg["sasl.username"] == "svc"
-    assert cfg["sasl.password"] == "secret"
+    assert cfg["sasl.password"] == _fixture_secret("sasl")
     assert cfg["ssl.ca.location"] == "/tmp/ca"
     assert cfg["ssl.certificate.location"] == "/tmp/cert"
     assert cfg["ssl.key.location"] == "/tmp/key"
@@ -76,7 +80,7 @@ def test_schema_registry_client_config_with_auth_and_ssl() -> None:
         name="registry-2",
         url="https://registry.local",
         auth_username="alice",
-        auth_password="pw",
+        auth_password=_fixture_secret("schema-registry"),
         ssl_ca_location="/tmp/ca",
         ssl_cert_location="/tmp/cert",
         ssl_key_location="/tmp/key",
@@ -86,7 +90,7 @@ def test_schema_registry_client_config_with_auth_and_ssl() -> None:
 
     cfg = registry.to_client_config()
 
-    assert cfg["basic.auth.user.info"] == "alice:pw"
+    assert cfg["basic.auth.user.info"] == f"alice:{_fixture_secret('schema-registry')}"
     assert cfg["ssl.ca.location"] == "/tmp/ca"
     assert cfg["ssl.certificate.location"] == "/tmp/cert"
     assert cfg["ssl.key.location"] == "/tmp/key"
