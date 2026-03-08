@@ -5,11 +5,13 @@ from __future__ import annotations
 import yaml as pyyaml
 from pydantic import ValidationError
 
+from app.shared.approval import ApprovalOverride
 from app.topic.application.batch_use_cases.batch_apply import TopicBatchApplyUseCase
 from app.topic.domain.models import DomainTopicApplyResult
 from app.topic.interface.adapters import safe_convert_request_to_batch
 from app.topic.interface.helpers import translate_usecase_failure, translate_validation_error
 from app.topic.interface.schemas import FailureDetail, TopicBatchApplyResponse, TopicBatchRequest
+from app.topic.interface.types import Environment
 
 
 class TopicBatchApplyFromYAMLUseCase:
@@ -19,7 +21,11 @@ class TopicBatchApplyFromYAMLUseCase:
         self.batch_apply_use_case = batch_apply_use_case
 
     async def execute(
-        self, cluster_id: str, yaml_content: str, actor: str
+        self,
+        cluster_id: str,
+        yaml_content: str,
+        actor: str,
+        approval_override: ApprovalOverride | None = None,
     ) -> TopicBatchApplyResponse:
         """YAML 기반 토픽 배치 Apply 실행
 
@@ -48,7 +54,7 @@ class TopicBatchApplyFromYAMLUseCase:
                 raw_error=str(e),
             )
             return TopicBatchApplyResponse(
-                env="unknown",
+                env=Environment.DEV,
                 change_id="failed",
                 applied=[],
                 skipped=[],
@@ -111,8 +117,13 @@ class TopicBatchApplyFromYAMLUseCase:
 
         # 4. 배치 Apply UseCase 호출
         try:
+            resolved_approval_override = approval_override or batch_request.approval_override
+
             result: DomainTopicApplyResult = await self.batch_apply_use_case.execute(
-                cluster_id=cluster_id, batch=batch, actor=actor
+                cluster_id=cluster_id,
+                batch=batch,
+                actor=actor,
+                approval_override=resolved_approval_override,
             )
 
             # UseCase 결과를 Response로 변환

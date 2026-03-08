@@ -174,6 +174,8 @@ def create_app() -> FastAPI:
 
     @app.get("/api")
     @app.get("/api/")
+    @app.get("/api/v1")
+    @app.get("/api/v1/")
     async def api_info() -> dict[str, str]:
         return {"message": "Kafka Governance API", "version": "1.0.0"}
 

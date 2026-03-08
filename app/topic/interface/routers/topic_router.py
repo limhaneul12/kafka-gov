@@ -25,25 +25,28 @@ from app.topic.interface.schemas import (
     TopicBatchDryRunResponse,
     TopicBatchRequest,
     TopicBatchYAMLRequest,
+    TopicBulkDeleteRequest,
     TopicBulkDeleteResponse,
+    TopicDeleteRequest,
     TopicListItem,
 )
 
 router = APIRouter(prefix="/v1/topics", tags=["topics"])
 
 
-def _convert_owner_to_owners(topic_dict: dict) -> list[str]:
+def _convert_owner_to_owners(topic_dict: dict[str, object]) -> list[str]:
     """owner 또는 owners 필드를 owners 리스트로 변환"""
     if "owners" in topic_dict:
-        return (
-            topic_dict["owners"]
-            if isinstance(topic_dict["owners"], list)
-            else [topic_dict["owners"]]
-        )
-    if topic_dict.get("owner"):
-        return (
-            [topic_dict["owner"]] if isinstance(topic_dict["owner"], str) else topic_dict["owner"]
-        )
+        owners_value = topic_dict["owners"]
+        if isinstance(owners_value, list):
+            return [str(owner) for owner in owners_value]
+        if isinstance(owners_value, str):
+            return [owners_value]
+    owner_value = topic_dict.get("owner")
+    if isinstance(owner_value, list):
+        return [str(owner) for owner in owner_value]
+    if isinstance(owner_value, str):
+        return [owner_value]
     return []
 
 
@@ -234,7 +237,12 @@ async def topic_batch_apply_yaml(
     """YAML 기반 토픽 배치 Apply - UseCase에 위임"""
     # UseCase 생성 및 실행
     yaml_use_case = TopicBatchApplyFromYAMLUseCase(apply_use_case)
-    return await yaml_use_case.execute(cluster_id, yaml_request.yaml_content, DEFAULT_USER)
+    return await yaml_use_case.execute(
+        cluster_id,
+        yaml_request.yaml_content,
+        DEFAULT_USER,
+        yaml_request.approval_override,
+    )
 
 
 @router.post(
@@ -254,7 +262,12 @@ async def topic_batch_apply(
 ) -> TopicBatchApplyResponse:
     """토픽 배치 Apply"""
     batch = safe_convert_request_to_batch(batch_request)
-    result = await apply_use_case.execute(cluster_id, batch, DEFAULT_USER)
+    result = await apply_use_case.execute(
+        cluster_id,
+        batch,
+        DEFAULT_USER,
+        batch_request.approval_override,
+    )
     return TopicBatchApplyResponse(
         env=batch_request.env,
         change_id=batch_request.change_id,
@@ -276,12 +289,17 @@ async def topic_batch_apply(
 @inject
 @handle_server_errors(error_message="Failed to delete topics")
 async def bulk_delete_topics(
-    topic_names: list[str],
+    request: TopicBulkDeleteRequest,
     cluster_id: str = Query(..., description="Kafka Cluster ID"),
     bulk_delete_use_case=Depends(Provide[AppContainer.topic_container.bulk_delete_use_case]),
 ) -> TopicBulkDeleteResponse:
     """토픽 일괄 삭제 - Use Case 패턴"""
-    result = await bulk_delete_use_case.execute(cluster_id, topic_names, DEFAULT_USER)
+    result = await bulk_delete_use_case.execute(
+        cluster_id,
+        request.names,
+        DEFAULT_USER,
+        request.approval_override,
+    )
 
     return TopicBulkDeleteResponse(
         succeeded=result["succeeded"],
@@ -320,11 +338,17 @@ async def update_topic_metadata(
 @handle_server_errors(error_message="Failed to delete topic")
 async def delete_topic(
     name: str,
+    request: TopicDeleteRequest | None = None,
     cluster_id: str = Query(..., description="Kafka Cluster ID"),
     bulk_delete_use_case=Depends(Provide[AppContainer.topic_container.bulk_delete_use_case]),
 ) -> dict[str, str]:
     """토픽 단일 삭제 - BulkDeleteUseCase 재사용"""
-    result = await bulk_delete_use_case.execute(cluster_id, [name], DEFAULT_USER)
+    result = await bulk_delete_use_case.execute(
+        cluster_id,
+        [name],
+        DEFAULT_USER,
+        request.approval_override if request is not None else None,
+    )
 
     if result["failed"]:
         raise HTTPException(

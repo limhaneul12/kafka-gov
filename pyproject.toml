@@ -70,6 +70,7 @@ python_functions = "test_*"
 markers = [
     "unit: Unit tests",
     "integration: Integration tests", 
+    "e2e: Full-system end-to-end tests",
     "slow: Slow running tests",
     "kafka: Tests that require Kafka",
     "database: Tests that require database",
@@ -104,6 +105,7 @@ dev = [
   "pytest-asyncio>=1.2.0",
   "pytest-cov>=5.0",
   "pytest-xdist>=3.6.0",  # 병렬 테스트 실행
+  "playwright>=1.54.0",
   "coverage>=7.6",
   "pip-audit>=2.7",
   "bandit>=1.7",

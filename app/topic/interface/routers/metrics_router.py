@@ -8,11 +8,13 @@ from app.container import AppContainer
 from app.shared.error_handlers import handle_server_errors
 from app.topic.interface.schemas.metrics_schemas import (
     ClusterMetricsResponse,
+    PartitionDetail,
+    StorageMetrics,
     TopicDistributionResponse,
     TopicMetricsResponse,
 )
 
-router = APIRouter(prefix="/metrics", tags=["metrics"])
+router = APIRouter(prefix="/v1/metrics", tags=["metrics"])
 
 
 @router.get(
@@ -80,21 +82,21 @@ async def get_topic_metrics_live(
     return TopicMetricsResponse(
         topic_name=topic_name,
         partition_count=len(partitions),
-        storage={
-            "total_size": total_size,
-            "max_partition_size": max_size,
-            "min_partition_size": min_size,
-            "avg_partition_size": avg_size,
-        },
+        storage=StorageMetrics(
+            total_size=total_size,
+            max_partition_size=max_size,
+            min_partition_size=min_size,
+            avg_partition_size=avg_size,
+        ),
         partitions=[
-            {
-                "partition": partition.partition_index,
-                "size": partition.partition_size,
-                "leader": partition.leader,
-                "replicas": partition.replicas,
-                "isr": partition.isr,
-                "offset_lag": partition.offset_lag,
-            }
+            PartitionDetail(
+                partition=partition.partition_index,
+                size=partition.partition_size,
+                leader=partition.leader,
+                replicas=partition.replicas,
+                isr=partition.isr,
+                offset_lag=partition.offset_lag,
+            )
             for partition in partitions
         ],
     )

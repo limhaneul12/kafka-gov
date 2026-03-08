@@ -1,7 +1,7 @@
 import React from 'react';
 import { NavLink, Outlet } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Database, LayoutDashboard, MessageSquare, Settings, Link as LinkIcon, ShieldCheck, Languages } from 'lucide-react';
+import { Database, LayoutDashboard, MessageSquare, Link as LinkIcon, ShieldCheck, Languages, Users } from 'lucide-react';
 
 // ... inside Sidebar ...
 const Sidebar = () => {
@@ -20,10 +20,11 @@ const Sidebar = () => {
       </div>
 
       <nav className="flex-1 p-4 space-y-6">
-        <div className="space-y-1">
-          <NavItem to="/topics" icon={MessageSquare} label="Topics" />
-          <NavItem to="/schemas" icon={Database} label="Schema Registry" />
-        </div>
+          <div className="space-y-1">
+            <NavItem to="/topics" icon={MessageSquare} label="Topics" />
+            <NavItem to="/schemas" icon={Database} label="Schema Registry" />
+            <NavItem to="/consumers" icon={Users} label="Consumers" />
+          </div>
 
         <div className="space-y-4">
           <div className="px-4 flex items-center gap-2 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
@@ -38,12 +39,12 @@ const Sidebar = () => {
 
         <div className="space-y-1 pt-4 border-t border-slate-100">
           <NavItem to="/connections" icon={LinkIcon} label="Connections" />
-          <NavItem to="/settings" icon={Settings} label="Settings" />
         </div>
       </nav>
 
       <div className="p-4 border-t border-slate-100 space-y-2">
         <button
+          type="button"
           onClick={toggleLanguage}
           className="flex items-center gap-3 px-4 py-2 w-full text-sm font-medium text-slate-600 hover:bg-slate-50 rounded-lg transition-colors"
         >

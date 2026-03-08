@@ -1,7 +1,9 @@
 
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import Layout from './components/layout/Sidebar';
-import Connections from './pages/Connections';
+import Connections from './pages/Connections/index';
+import ConsumerDetail from './pages/ConsumerDetail';
+import Consumers from './pages/Consumers';
 import GovernanceDashboard from './pages/governance/Dashboard';
 import Policies from './pages/Policies';
 import SchemaDetail from './pages/schemas/SchemaDetail';
@@ -24,6 +26,8 @@ function App() {
           <Route path="/schemas/:subject" element={<SchemaDetail />} />
           <Route path="/topics" element={<Topics />} />
           <Route path="/topics/:topicName" element={<TopicDetail />} />
+          <Route path="/consumers" element={<Consumers />} />
+          <Route path="/consumers/:groupId" element={<ConsumerDetail />} />
           <Route path="/connections" element={<Connections />} />
           <Route path="/policies" element={<Policies />} />
           <Route path="/schemas/policies" element={<SchemaPolicies />} />

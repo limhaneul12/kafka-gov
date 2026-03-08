@@ -23,6 +23,9 @@ AuditLogT = TypeVar("AuditLogT", AuditLogModel, SchemaAuditLogModel)
 ModelsToQuery = list[tuple[type[AuditLogModel] | type[SchemaAuditLogModel], str]]
 
 
+VISIBLE_AUDIT_STATUSES = (AuditStatus.COMPLETED, AuditStatus.PARTIALLY_COMPLETED)
+
+
 def _subquery_log_model[AuditLogT: (AuditLogModel, SchemaAuditLogModel)](
     model: type[AuditLogT], activity_type: str
 ) -> Select[Any]:
@@ -50,7 +53,7 @@ def _subquery_log_model[AuditLogT: (AuditLogModel, SchemaAuditLogModel)](
         model.message,
         model.snapshot,
         literal(activity_type).label("activity_type"),
-    ).where(model.status == AuditStatus.COMPLETED)
+    ).where(model.status.in_(VISIBLE_AUDIT_STATUSES))
 
 
 def _get_models_to_query(activity_type: str | None) -> ModelsToQuery:
@@ -183,7 +186,7 @@ class MySQLAuditActivityRepository(IAuditActivityRepository):
             model.message,
             model.snapshot,
             literal(activity_type).label("activity_type"),
-        ).where(model.status == AuditStatus.COMPLETED)
+        ).where(model.status.in_(VISIBLE_AUDIT_STATUSES))
 
         if from_date:
             query = query.where(model.timestamp >= from_date)

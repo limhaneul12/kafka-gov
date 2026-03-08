@@ -6,6 +6,8 @@ from typing import Annotated
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
+from app.shared.approval import ApprovalOverride
+
 from ..types import (
     ChangeId,
     CleanupPolicy,
@@ -45,11 +47,27 @@ class TopicMetadata(BaseModel):
 
     # Backward compatibility: owner 단일 값도 허용
     @classmethod
-    def model_validate(cls, obj: dict | object, **kwargs):  # type: ignore
+    def model_validate(
+        cls,
+        obj: dict[str, object] | object,
+        *,
+        strict: bool | None = None,
+        from_attributes: bool | None = None,
+        context: object | None = None,
+        by_alias: bool | None = None,
+        by_name: bool | None = None,
+    ):
         """단일 owner를 owners로 변환 (Backward compatibility)"""
         if isinstance(obj, dict) and "owner" in obj and "owners" not in obj:
             obj["owners"] = [obj.pop("owner")]
-        return super().model_validate(obj, **kwargs)
+        return super().model_validate(
+            obj,
+            strict=strict,
+            from_attributes=from_attributes,
+            context=context,
+            by_alias=by_alias,
+            by_name=by_name,
+        )
 
 
 class TopicConfig(BaseModel):
@@ -144,6 +162,11 @@ class TopicBatchYAMLRequest(BaseModel):
     yaml_content: str = Field(
         ..., min_length=1, description="YAML 형식의 토픽 배치 설정 (Backend에서 파싱)"
     )
+    approval_override: ApprovalOverride | None = Field(
+        default=None,
+        validation_alias="approvalOverride",
+        serialization_alias="approvalOverride",
+    )
 
 
 class TopicBatchRequest(BaseModel):
@@ -186,6 +209,11 @@ class TopicBatchRequest(BaseModel):
         list[TopicItem],
         Field(min_length=1, max_length=100, description="토픽 아이템 목록"),
     ]
+    approval_override: ApprovalOverride | None = Field(
+        default=None,
+        validation_alias="approvalOverride",
+        serialization_alias="approvalOverride",
+    )
 
     @field_validator("items")
     @classmethod
@@ -196,3 +224,24 @@ class TopicBatchRequest(BaseModel):
             duplicates = [name for name in names if names.count(name) > 1]
             raise ValueError(f"Duplicate topic names found: {duplicates}")
         return v
+
+
+class TopicBulkDeleteRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+    names: Annotated[list[TopicName], Field(min_length=1, max_length=100)]
+    approval_override: ApprovalOverride | None = Field(
+        default=None,
+        validation_alias="approvalOverride",
+        serialization_alias="approvalOverride",
+    )
+
+
+class TopicDeleteRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+    approval_override: ApprovalOverride | None = Field(
+        default=None,
+        validation_alias="approvalOverride",
+        serialization_alias="approvalOverride",
+    )

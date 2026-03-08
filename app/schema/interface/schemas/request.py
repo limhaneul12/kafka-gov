@@ -16,6 +16,8 @@ from pydantic import (
     model_validator,
 )
 
+from app.shared.approval import ApprovalOverride
+
 from ..types.enums import (
     CompatibilityMode,
     Environment,
@@ -156,6 +158,11 @@ class SchemaBatchRequest(BaseModel):
             serialization_alias="items",
         ),
     ]
+    approval_override: ApprovalOverride | None = Field(
+        default=None,
+        validation_alias=AliasChoices("approvalOverride", "approval_override"),
+        serialization_alias="approvalOverride",
+    )
 
     @field_validator("kind")
     @classmethod

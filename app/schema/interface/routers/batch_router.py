@@ -56,7 +56,13 @@ async def schema_batch_apply(
 ) -> SchemaBatchApplyResponse:
     """스키마 배치 Apply 실행"""
     batch = safe_convert_request_to_batch(request)
-    result = await apply_use_case.execute(registry_id, storage_id, batch, DEFAULT_USER)
+    result = await apply_use_case.execute(
+        registry_id,
+        storage_id,
+        batch,
+        DEFAULT_USER,
+        request.approval_override,
+    )
     return safe_convert_apply_result_to_response(result)
 
 

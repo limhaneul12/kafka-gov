@@ -2,6 +2,8 @@
 
 from redis.asyncio import Redis
 
+from app.shared.settings import settings
+
 
 async def init_redis() -> Redis:
     """Redis 클라이언트 초기화
@@ -10,7 +12,7 @@ async def init_redis() -> Redis:
         Redis 비동기 클라이언트 인스턴스
     """
     return Redis.from_url(
-        "redis://redis:6379/0",
+        settings.redis_url,
         encoding="utf-8",
         decode_responses=False,  # pickle 직렬화용
     )

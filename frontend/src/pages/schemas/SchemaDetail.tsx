@@ -19,7 +19,121 @@ import { Badge } from '../../components/common/Badge';
 import { useSchemaDetail } from '../../hooks/schema/useSchemaDetail';
 import { toast } from 'sonner';
 import { schemasAPI, clustersAPI } from '../../services/api';
+import type { SchemaRegistry } from '../../types';
+import type { SchemaHistoryResponse, ImpactGraphResponse } from '../../types/schema';
+import { promptApprovalOverride } from '../../utils/approvalOverride';
 import { formatDistanceToNow } from 'date-fns';
+
+interface SubjectViolation {
+    rule: string;
+    message: string;
+    severity: string;
+}
+
+interface SubjectDetailData {
+    subject: string;
+    version: number;
+    schema_id: number;
+    schema_str: string;
+    schema_type: string;
+    compatibility_mode: string;
+    owner: string | null;
+    updated_at: string;
+    violations: SubjectViolation[];
+    policy_score: number;
+}
+
+interface SchemaPlanDiff {
+    schema_type: string;
+    changes: string[];
+}
+
+interface SchemaPlanItem {
+    subject: string;
+    current_version: number | null;
+    target_version: number | null;
+    diff: SchemaPlanDiff;
+    current_schema: string | null;
+    schema: string | null;
+}
+
+interface SchemaCompatibilityIssue {
+    issue_type?: string;
+    type?: string;
+    message: string;
+}
+
+interface SchemaCompatibilityReport {
+    subject: string;
+    mode: string;
+    is_compatible: boolean;
+    issues: SchemaCompatibilityIssue[];
+}
+
+interface SchemaImpactRecord {
+    status: string;
+    error_message?: string | null;
+    topics: string[];
+    consumers: string[];
+}
+
+interface SchemaPlanResult {
+    change_id: string;
+    plan: SchemaPlanItem[];
+    compatibility: SchemaCompatibilityReport[];
+    impacts: SchemaImpactRecord[];
+}
+
+interface SchemaApplyItemRequest {
+    subject: string;
+    type: string;
+    compatibility: string | undefined;
+    schema: string;
+}
+
+interface SchemaBatchApplyRequest {
+    env: string;
+    change_id: string;
+    approvalOverride: ReturnType<typeof promptApprovalOverride>;
+    items: SchemaApplyItemRequest[];
+}
+
+interface AxiosLikeError {
+    response?: {
+        status?: number;
+        data?: {
+            detail?: string;
+        };
+    };
+    message?: string;
+}
+
+const readErrorDetail = (error: unknown, fallback: string): string => {
+    if (typeof error !== 'object' || error === null) {
+        return fallback;
+    }
+    const parsed = error as AxiosLikeError;
+    if (typeof parsed.response?.data?.detail === 'string' && parsed.response.data.detail.length > 0) {
+        return parsed.response.data.detail;
+    }
+    if (typeof parsed.message === 'string' && parsed.message.length > 0) {
+        return parsed.message;
+    }
+    return fallback;
+};
+
+const readErrorStatus = (error: unknown): number | undefined => {
+    if (typeof error !== 'object' || error === null) {
+        return undefined;
+    }
+    return (error as AxiosLikeError).response?.status;
+};
+
+const resolveActiveRegistry = async (): Promise<SchemaRegistry | null> => {
+    const registriesRes = await clustersAPI.listRegistries();
+    const registries = registriesRes.data as SchemaRegistry[];
+    return registries.find((registry) => registry.is_active) ?? registries[0] ?? null;
+};
 
 // --- Tab Navigation ---
 
@@ -40,6 +154,7 @@ const Tabs = ({
         <div className="flex border-b border-slate-200 mb-6">
             {tabs.map((tab) => (
                 <button
+                    type="button"
                     key={tab.id}
                     onClick={() => onTabChange(tab.id)}
                     className={`px-6 py-3 text-sm font-medium transition-colors border-b-2 ${activeTab === tab.id
@@ -57,39 +172,14 @@ const Tabs = ({
 // --- Overview ---
 const OverviewCode = ({ schemaStr }: { schemaStr: string }) => {
     let formattedSchema = schemaStr;
-    let isJson = false;
     try {
         if (schemaStr) {
             const parsed = JSON.parse(schemaStr);
             formattedSchema = JSON.stringify(parsed, null, 2);
-            isJson = true;
         }
-    } catch (e) {
+    } catch {
         // Not JSON
     }
-
-    const highlightJSON = (json: string) => {
-        if (!json) return json;
-        return json
-            .replace(/&/g, '&amp;')
-            .replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;')
-            .replace(/("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+-]?\d+)?)/g, (match) => {
-                let cls = 'text-[#d2a8ff]'; // number/bool (GitHub Dark numbers)
-                if (/^"/.test(match)) {
-                    if (/:$/.test(match)) {
-                        cls = 'text-[#79c0ff] font-medium'; // key (GitHub Dark keys)
-                    } else {
-                        cls = 'text-[#a5d6ff]'; // string (GitHub Dark strings)
-                    }
-                } else if (/true|false/.test(match)) {
-                    cls = 'text-[#ff7b72] font-semibold'; // boolean
-                } else if (/null/.test(match)) {
-                    cls = 'text-slate-500 italic'; // null
-                }
-                return `<span class="${cls}">${match}</span>`;
-            });
-    };
 
     const copyToClipboard = () => {
         navigator.clipboard.writeText(formattedSchema);
@@ -100,6 +190,7 @@ const OverviewCode = ({ schemaStr }: { schemaStr: string }) => {
         <div className="relative group">
             <div className="absolute top-4 right-4 z-10 flex gap-2">
                 <button
+                    type="button"
                     onClick={copyToClipboard}
                     className="opacity-0 group-hover:opacity-100 transition-all bg-white/10 hover:bg-white/20 text-white px-3 py-1.5 rounded-md text-xs font-medium backdrop-blur-md border border-white/10"
                 >
@@ -107,10 +198,9 @@ const OverviewCode = ({ schemaStr }: { schemaStr: string }) => {
                 </button>
             </div>
             <div className="bg-[#0d1117] rounded-xl p-8 overflow-x-auto shadow-sm border border-[#30363d] ring-1 ring-white/5 min-h-[400px]">
-                <pre
-                    className="text-sm leading-relaxed font-mono whitespace-pre text-[#c9d1d9]"
-                    dangerouslySetInnerHTML={{ __html: isJson ? highlightJSON(formattedSchema) : (formattedSchema || '// No schema found') }}
-                />
+                <pre className="text-sm leading-relaxed font-mono whitespace-pre text-[#c9d1d9]">
+                    <code>{formattedSchema || '// No schema found'}</code>
+                </pre>
             </div>
         </div>
     );
@@ -123,7 +213,7 @@ const JsonDiffHelper = ({ oldStr, newStr }: { oldStr: string | null, newStr: str
         try {
             if (!s) return [];
             return JSON.stringify(JSON.parse(s), null, 2).split('\n');
-        } catch (e) {
+        } catch {
             return s ? s.split('\n') : [];
         }
     };
@@ -149,9 +239,12 @@ const JsonDiffHelper = ({ oldStr, newStr }: { oldStr: string | null, newStr: str
     const usedNew: Record<string, number> = {};
 
     const renderLines = (lines: string[], otherFreqs: Record<string, number>, used: Record<string, number>, type: 'added' | 'removed') => {
+        const keyCounts: Record<string, number> = {};
+
         return lines.map((line, i) => {
             const trim = line.trim();
             used[trim] = (used[trim] || 0) + 1;
+            keyCounts[trim] = (keyCounts[trim] || 0) + 1;
 
             // A line is changed if it doesn't exist on the other side, 
             // or if we have more occurrences of it on this side than the other side
@@ -161,9 +254,10 @@ const JsonDiffHelper = ({ oldStr, newStr }: { oldStr: string | null, newStr: str
 
             const bgColor = type === 'added' ? 'bg-[#dafbe1] text-[#116329]' : 'bg-[#ffebe9] text-[#a51d2d]';
             const symbol = type === 'added' ? '+' : '-';
+            const lineKey = `${type}-${trim || 'empty'}-${keyCounts[trim]}`;
 
             return (
-                <div key={i} className={`flex group transition-colors hover:bg-black/[0.02] ${isChanged ? bgColor : 'text-[#24292f]'}`}>
+                <div key={lineKey} className={`flex group transition-colors hover:bg-black/[0.02] ${isChanged ? bgColor : 'text-[#24292f]'}`}>
                     <span className="w-10 shrink-0 text-right pr-2 select-none opacity-30 border-r border-[#d0d7de] mr-2 text-[9px] vertical-middle">{i + 1}</span>
                     <span className="w-4 shrink-0 text-center select-none font-bold opacity-60 text-[10px]">{isChanged ? symbol : ' '}</span>
                     <span className="whitespace-pre font-mono text-[11px]">{line}</span>
@@ -214,7 +308,19 @@ const JsonDiffHelper = ({ oldStr, newStr }: { oldStr: string | null, newStr: str
 };
 
 // --- Plan Result View ---
-const PlanResultView = ({ item, report, impact, onApply, onCancel }: any) => {
+const PlanResultView = ({
+    item,
+    report,
+    impact,
+    onApply,
+    onCancel,
+}: {
+    item: SchemaPlanItem;
+    report: SchemaCompatibilityReport;
+    impact: SchemaImpactRecord;
+    onApply: () => Promise<void>;
+    onCancel: () => void;
+}) => {
     const [showFullDiff, setShowFullDiff] = useState(false);
 
     return (
@@ -253,6 +359,7 @@ const PlanResultView = ({ item, report, impact, onApply, onCancel }: any) => {
                         </div>
                         <div className="flex items-center gap-3">
                             <button
+                                type="button"
                                 onClick={() => setShowFullDiff(!showFullDiff)}
                                 className="text-[10px] font-medium text-[#0969da] hover:underline"
                             >
@@ -266,8 +373,8 @@ const PlanResultView = ({ item, report, impact, onApply, onCancel }: any) => {
 
                     {!showFullDiff ? (
                         <div className="p-4 space-y-2.5">
-                            {item.diff.changes.map((change: string, i: number) => (
-                                <div key={i} className="flex items-start gap-3 group">
+                            {item.diff.changes.map((change: string) => (
+                                <div key={change} className="flex items-start gap-3 group">
                                     <div className={`mt-1.5 shrink-0 w-2 h-2 rounded-full ${change.toLowerCase().includes('added') ? 'bg-[#1a7f37]' :
                                         change.toLowerCase().includes('removed') ? 'bg-[#cf222e]' :
                                             'bg-[#9a6700]'
@@ -289,8 +396,8 @@ const PlanResultView = ({ item, report, impact, onApply, onCancel }: any) => {
                             <span className="font-semibold text-[#cf222e] text-xs">Policy Violations</span>
                         </div>
                         <div className="p-4 space-y-2">
-                            {report.issues.map((issue: any, i: number) => (
-                                <div key={i} className="text-xs text-[#cf222e] bg-white/50 p-2.5 rounded-md border border-[#cf222e]/10 flex gap-2">
+                            {report.issues.map((issue) => (
+                                <div key={`${issue.issue_type || issue.type}-${issue.message}`} className="text-xs text-[#cf222e] bg-white/50 p-2.5 rounded-md border border-[#cf222e]/10 flex gap-2">
                                     <span className="font-bold shrink-0">[{issue.issue_type || issue.type}]</span>
                                     <span>{issue.message}</span>
                                 </div>
@@ -375,24 +482,27 @@ export default function SchemaDetail() {
     const [isEditing, setIsEditing] = useState(false);
     const [editedSchema, setEditedSchema] = useState('');
     const [compatibility, setCompatibility] = useState('BACKWARD');
-    const [planResult, setPlanResult] = useState<any>(null);
+    const [planResult, setPlanResult] = useState<SchemaPlanResult | null>(null);
     const [isPlanning, setIsPlanning] = useState(false);
 
     const { detailData, historyData, graphData, loading, reload } = useSchemaDetail(subject, activeTab);
+    const typedDetailData = detailData as SubjectDetailData | null;
+    const typedHistoryData = historyData as SchemaHistoryResponse | null;
+    const typedGraphData = graphData as ImpactGraphResponse | null;
 
     // Initial value setup for edit
     const startEditing = () => {
-        if (detailData) {
-            let schema = detailData.schema_str;
+        if (typedDetailData) {
+            let schema = typedDetailData.schema_str;
             try {
                 if (schema) {
                     schema = JSON.stringify(JSON.parse(schema), null, 2);
                 }
-            } catch (e) {
+            } catch {
                 // Not JSON, keep as is
             }
             setEditedSchema(schema);
-            setCompatibility(detailData.compatibility_mode || 'BACKWARD');
+            setCompatibility(typedDetailData.compatibility_mode || 'BACKWARD');
             setIsEditing(true);
             setActiveTab('overview');
         }
@@ -402,9 +512,7 @@ export default function SchemaDetail() {
         if (!subject) return;
         try {
             setIsPlanning(true);
-            const registriesRes = await clustersAPI.listRegistries();
-            const registries = registriesRes.data;
-            const activeRegistry = registries?.find((r: any) => r.is_active) || registries?.[0];
+            const activeRegistry = await resolveActiveRegistry();
 
             if (!activeRegistry) {
                 toast.error('No Active Schema Registry found');
@@ -416,10 +524,10 @@ export default function SchemaDetail() {
                 new_schema: editedSchema,
                 compatibility
             });
-            setPlanResult(res.data);
+            setPlanResult(res.data as SchemaPlanResult);
             toast.success('Change plan generated');
-        } catch (e: any) {
-            toast.error(e.response?.data?.detail || 'Planning failed');
+        } catch (error) {
+            toast.error(readErrorDetail(error, 'Planning failed'));
         } finally {
             setIsPlanning(false);
         }
@@ -428,44 +536,54 @@ export default function SchemaDetail() {
     const handleApply = async () => {
         if (!planResult || !subject) return;
         try {
-            const registriesRes = await clustersAPI.listRegistries();
-            const registries = registriesRes.data;
-            const activeRegistry = registries?.find((r: any) => r.is_active) || registries?.[0];
+            const activeRegistry = await resolveActiveRegistry();
+            if (!activeRegistry) {
+                toast.error('No Active Schema Registry found');
+                return;
+            }
 
             // Format as batch request (backend expects batch)
-            const batchRequest = {
+            const batchRequest: SchemaBatchApplyRequest = {
                 env: subject.split('.')[0] || 'dev',
                 change_id: planResult.change_id,
-                items: planResult.plan.map((item: any) => ({
+                approvalOverride: promptApprovalOverride(`schema apply for ${subject}`),
+                items: planResult.plan.map((item) => ({
                     subject: item.subject,
-                    type: item.diff.schema_type,
-                    compatibility: planResult.compatibility.find((r: any) => r.subject === item.subject)?.mode,
+                    type: item.diff.schema_type || 'AVRO',
+                    compatibility: planResult.compatibility.find((report) => report.subject === item.subject)?.mode,
                     schema: editedSchema,
                 }))
             };
+
+            if (!batchRequest.approvalOverride) {
+                toast.error('Approval evidence is required for this schema change');
+                return;
+            }
 
             await schemasAPI.apply(activeRegistry.registry_id, batchRequest);
             toast.success('Schema successfully updated to next version');
             setIsEditing(false);
             setPlanResult(null);
             reload(); // Refresh data
-        } catch (e: any) {
-            toast.error(e.response?.data?.detail || 'Apply failed');
+        } catch (error) {
+            toast.error(readErrorDetail(error, 'Apply failed'));
         }
     };
 
     const handleRollback = async (version: number) => {
         if (!subject || !window.confirm(`Rollback to v${version}?`)) return;
         try {
-            const registriesRes = await clustersAPI.listRegistries();
-            const registries = registriesRes.data;
-            const activeRegistry = registries?.find((r: any) => r.is_active) || registries?.[0];
+            const activeRegistry = await resolveActiveRegistry();
+            if (!activeRegistry) {
+                toast.error('No Active Schema Registry found');
+                return;
+            }
 
             const res = await schemasAPI.planRollback(activeRegistry.registry_id, {
                 subject,
                 version
             });
-            const plan = res.data;
+            const plan = res.data as SchemaPlanResult;
 
             // For now, let's just use the planResult flow but specifically for rollback
             setPlanResult(plan);
@@ -475,7 +593,7 @@ export default function SchemaDetail() {
             if (oldSchema) {
                 try {
                     oldSchema = JSON.stringify(JSON.parse(oldSchema), null, 2);
-                } catch (e) {
+                } catch {
                     // Not JSON
                 }
                 setEditedSchema(oldSchema);
@@ -483,8 +601,8 @@ export default function SchemaDetail() {
 
             setActiveTab('overview');
             setIsEditing(true);
-        } catch (e: any) {
-            toast.error('Rollback plan failed');
+        } catch (error) {
+            toast.error(readErrorDetail(error, 'Rollback plan failed'));
         }
     };
 
@@ -493,9 +611,7 @@ export default function SchemaDetail() {
 
         try {
             setIsDeleting(true);
-            const registriesRes = await clustersAPI.listRegistries();
-            const registries = registriesRes.data;
-            const activeRegistry = registries?.find((r: any) => r.is_active) || registries?.[0];
+            const activeRegistry = await resolveActiveRegistry();
 
             if (!activeRegistry) {
                 toast.error('No Active Schema Registry found');
@@ -505,15 +621,16 @@ export default function SchemaDetail() {
             await schemasAPI.delete(activeRegistry.registry_id, subject);
             toast.success('Subject deleted successfully');
             navigate('/schemas');
-        } catch (e: any) {
-            const errorMsg = e.response?.data?.detail || 'Delete failed';
+        } catch (error) {
+            const errorMsg = readErrorDetail(error, 'Delete failed');
+            const errorStatus = readErrorStatus(error);
 
             // Check if it's a safety violation that can be forced
-            if (e.response?.status === 400 && errorMsg.includes('안전하지 않습니다')) {
+            if (errorStatus === 400 && errorMsg.includes('안전하지 않습니다')) {
                 setDeleteWarning(errorMsg);
                 setShowForceDeleteModal(true);
             } else {
-                console.error('Delete failed', e);
+                console.error('Delete failed', error);
                 toast.error(errorMsg);
             }
         } finally {
@@ -526,9 +643,7 @@ export default function SchemaDetail() {
 
         try {
             setIsDeleting(true);
-            const registriesRes = await clustersAPI.listRegistries();
-            const registries = registriesRes.data;
-            const activeRegistry = registries?.find((r: any) => r.is_active) || registries?.[0];
+            const activeRegistry = await resolveActiveRegistry();
 
             if (!activeRegistry) {
                 toast.error('No Active Schema Registry found');
@@ -540,9 +655,9 @@ export default function SchemaDetail() {
             toast.success('Subject force deleted successfully');
             setShowForceDeleteModal(false);
             navigate('/schemas');
-        } catch (e: any) {
-            console.error('Force delete failed', e);
-            toast.error(e.response?.data?.detail || 'Force delete failed');
+        } catch (error) {
+            console.error('Force delete failed', error);
+            toast.error(readErrorDetail(error, 'Force delete failed'));
         } finally {
             setIsDeleting(false);
         }
@@ -553,7 +668,13 @@ export default function SchemaDetail() {
             {/* Header / Breadcrumbs --- */}
             <div className="bg-white border-b border-[#d0d7de] pt-4 px-8 pb-4">
                 <nav className="flex items-center gap-2 text-sm text-[#57606a] mb-4">
-                    <span className="hover:text-[#0969da] cursor-pointer" onClick={() => navigate('/schemas')}>Schemas</span>
+                    <button
+                        type="button"
+                        onClick={() => navigate('/schemas')}
+                        className="hover:text-[#0969da]"
+                    >
+                        Schemas
+                    </button>
                     <span className="text-[#d0d7de]">/</span>
                     <div className="flex items-center gap-1.5 font-semibold text-[#24292f]">
                         <BookOpen className="w-4 h-4" />
@@ -571,11 +692,11 @@ export default function SchemaDetail() {
                                 <h1 className="text-xl font-bold text-[#24292f]">{subject}</h1>
                                 <Badge variant="outline" className="rounded-full text-[10px] font-normal border-[#d0d7de] text-[#57606a]">Public</Badge>
                             </div>
-                            {detailData && (
+                            {typedDetailData && (
                                 <div className="flex gap-4 mt-1 text-xs text-[#57606a]">
-                                    <span className="flex items-center gap-1.5">Latest: <span className="font-semibold text-[#24292f]">v{detailData.version}</span></span>
-                                    <span className="flex items-center gap-1.5 px-1.5 bg-[#f6f8fa] border border-[#d0d7de] rounded-md font-mono text-[10px]">{detailData.schema_type}</span>
-                                    {detailData.owner && <span className="flex items-center gap-1.5">Owner: <span className="font-semibold text-[#24292f]">{detailData.owner}</span></span>}
+                                    <span className="flex items-center gap-1.5">Latest: <span className="font-semibold text-[#24292f]">v{typedDetailData.version}</span></span>
+                                    <span className="flex items-center gap-1.5 px-1.5 bg-[#f6f8fa] border border-[#d0d7de] rounded-md font-mono text-[10px]">{typedDetailData.schema_type}</span>
+                                    {typedDetailData.owner && <span className="flex items-center gap-1.5">Owner: <span className="font-semibold text-[#24292f]">{typedDetailData.owner}</span></span>}
                                 </div>
                             )}
                         </div>
@@ -633,35 +754,35 @@ export default function SchemaDetail() {
                             </div>
                         ) : (
                             <>
-                                {activeTab === 'overview' && detailData && (
+                                {activeTab === 'overview' && typedDetailData && (
                                     <div className="space-y-4">
                                         {!isEditing ? (
                                             <>
                                                 <div className="flex items-center justify-between">
                                                     <h3 className="text-sm font-semibold text-[#24292f]">Schema Definition</h3>
                                                     <div className="flex items-center gap-2">
-                                                        {detailData.policy_score && (
+                                                        {typedDetailData.policy_score && (
                                                             <div className="flex items-center gap-1.5 mr-2">
                                                                 <span className="text-[10px] text-gray-500 uppercase font-bold">Policy Score:</span>
-                                                                <span className={`text-xs font-bold ${detailData.policy_score > 0.8 ? 'text-green-600' : 'text-amber-600'}`}>
-                                                                    {Math.round(detailData.policy_score * 100)}%
+                                                                <span className={`text-xs font-bold ${typedDetailData.policy_score > 0.8 ? 'text-green-600' : 'text-amber-600'}`}>
+                                                                    {Math.round(typedDetailData.policy_score * 100)}%
                                                                 </span>
                                                             </div>
                                                         )}
-                                                        <Badge variant="outline" className="text-[10px] font-mono">v{detailData.version}</Badge>
+                                                        <Badge variant="outline" className="text-[10px] font-mono">v{typedDetailData.version}</Badge>
                                                     </div>
                                                 </div>
 
                                                 {/* Violations Sidebar/Section */}
-                                                {detailData.violations && detailData.violations.length > 0 && (
+                                                {typedDetailData.violations && typedDetailData.violations.length > 0 && (
                                                     <div className="mt-2 mb-6 p-4 bg-rose-50 border border-rose-100 rounded-xl space-y-3">
                                                         <div className="flex items-center gap-2 text-rose-700">
                                                             <AlertCircle className="w-4 h-4" />
-                                                            <h4 className="text-xs font-bold uppercase tracking-wider">Policy Violations ({detailData.violations.length})</h4>
+                                                            <h4 className="text-xs font-bold uppercase tracking-wider">Policy Violations ({typedDetailData.violations.length})</h4>
                                                         </div>
                                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                                                            {detailData.violations.map((v: any, i: number) => (
-                                                                <div key={i} className="flex items-start gap-2 text-xs bg-white p-2.5 rounded-lg border border-rose-100 shadow-sm">
+                                                            {typedDetailData.violations.map((v) => (
+                                                                <div key={`${v.rule}-${v.message}-${v.severity}`} className="flex items-start gap-2 text-xs bg-white p-2.5 rounded-lg border border-rose-100 shadow-sm">
                                                                     <div className={`mt-0.5 shrink-0 px-1.5 py-0.5 rounded text-[9px] font-bold uppercase ${v.severity === 'critical' || v.severity === 'error' ? 'bg-rose-100 text-rose-600' : 'bg-amber-100 text-amber-600'}`}>
                                                                         {v.severity}
                                                                     </div>
@@ -675,7 +796,7 @@ export default function SchemaDetail() {
                                                     </div>
                                                 )}
 
-                                                <OverviewCode schemaStr={detailData.schema_str} />
+                                                <OverviewCode schemaStr={typedDetailData.schema_str} />
                                             </>
                                         ) : (
                                             <div className="space-y-6">
@@ -705,7 +826,7 @@ export default function SchemaDetail() {
                                                                     const start = e.currentTarget.selectionStart;
                                                                     const end = e.currentTarget.selectionEnd;
                                                                     const value = e.currentTarget.value;
-                                                                    const newValue = value.substring(0, start) + "  " + value.substring(end);
+                                                                    const newValue = `${value.substring(0, start)}  ${value.substring(end)}`;
                                                                     setEditedSchema(newValue);
                                                                     // Update cursor position in next tick
                                                                     setTimeout(() => {
@@ -746,16 +867,16 @@ export default function SchemaDetail() {
                                     </div>
                                 )}
 
-                                {activeTab === 'history' && historyData && (
+                                {activeTab === 'history' && typedHistoryData && (
                                     <div className="space-y-4">
                                         <div className="flex items-center justify-between mb-2">
                                             <h3 className="text-sm font-semibold text-[#24292f]">Version Activity</h3>
                                         </div>
                                         <div className="border border-[#d0d7de] rounded-lg overflow-hidden">
-                                            {historyData.history.map((item, idx) => (
+                                            {typedHistoryData.history.map((item, idx) => (
                                                 <div
                                                     key={item.version}
-                                                    className={`p-4 flex items-center justify-between hover:bg-[#f6f8fa] transition-colors ${idx !== historyData.history.length - 1 ? 'border-b border-[#d0d7de]' : ''}`}
+                                                    className={`p-4 flex items-center justify-between hover:bg-[#f6f8fa] transition-colors ${idx !== typedHistoryData.history.length - 1 ? 'border-b border-[#d0d7de]' : ''}`}
                                                 >
                                                     <div className="flex items-start gap-3">
                                                         <div className="mt-1 p-1.5 bg-[#f6f8fa] border border-[#d0d7de] rounded-md text-[#57606a]">
@@ -809,7 +930,7 @@ export default function SchemaDetail() {
                                     </div>
                                 )}
 
-                                {activeTab === 'impact' && graphData && (
+                                {activeTab === 'impact' && typedGraphData && (
                                     <div className="space-y-4">
                                         <div className="flex items-center justify-between">
                                             <h3 className="text-sm font-semibold text-[#24292f]">Dependency Graph</h3>
@@ -826,7 +947,7 @@ export default function SchemaDetail() {
                                             </div>
                                         </div>
                                         <div className="h-[600px] border border-[#d0d7de] rounded-lg overflow-hidden bg-[#f6f8fa]/30">
-                                            <ImpactGraph nodes={graphData.nodes} links={graphData.links} />
+                                            <ImpactGraph nodes={typedGraphData.nodes} links={typedGraphData.links} />
                                         </div>
                                     </div>
                                 )}

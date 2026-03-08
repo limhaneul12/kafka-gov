@@ -7,6 +7,7 @@ import logging
 from datetime import UTC, datetime
 from typing import Any
 
+from app.shared.approval import ApprovalOverride
 from app.shared.constants import ActivityType, AuditAction, AuditStatus
 from app.topic.domain.models import (
     DomainEnvironment,
@@ -40,7 +41,11 @@ class TopicBulkDeleteUseCase:
         self.logger = logging.getLogger(__name__)
 
     async def execute(
-        self, cluster_id: str, topic_names: list[TopicName], actor: str
+        self,
+        cluster_id: str,
+        topic_names: list[TopicName],
+        actor: str,
+        approval_override: ApprovalOverride | None = None,
     ) -> dict[str, Any]:
         """
         여러 토픽을 병렬로 삭제합니다.
@@ -82,7 +87,12 @@ class TopicBulkDeleteUseCase:
                 )
 
                 # Apply Use Case를 통해 삭제 (cluster_id 전달)
-                result = await self.apply_use_case.execute(cluster_id, batch, actor)
+                result = await self.apply_use_case.execute(
+                    cluster_id,
+                    batch,
+                    actor,
+                    approval_override,
+                )
                 success = name in result.applied
 
                 # 감사 로그 기록

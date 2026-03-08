@@ -7,16 +7,15 @@ from functools import wraps
 from typing import ParamSpec, TypeVar
 
 from fastapi import HTTPException, status
+from fastapi.exceptions import RequestValidationError
 from pydantic import ValidationError
 
 # 타입 변수 정의
 T = TypeVar("T")  # 반환 타입
 P = ParamSpec("P")  # 함수 파라미터
 
-ErrorHandlerType = Callable[[Callable[P, Awaitable[T]]], Callable[P, Awaitable[T]]]
 
-
-def format_validation_error(error: ValidationError) -> str:
+def format_validation_error(error: ValidationError | RequestValidationError) -> str:
     """
     Pydantic ValidationError를 사용자 친화적인 메시지로 변환
     """
@@ -81,7 +80,7 @@ def format_validation_error(error: ValidationError) -> str:
 def endpoint_error_handler(
     error_mappings: dict[type[Exception], tuple[int, str]] | None = None,
     default_message: str = "Internal server error",
-) -> ErrorHandlerType:
+) -> Callable[[Callable[P, Awaitable[T]]], Callable[P, Awaitable[T]]]:
     """
     다양한 예외를 HTTP 에러로 변환하는 범용 데코레이터
 
@@ -138,7 +137,7 @@ def endpoint_error_handler(
                 # 매핑되지 않은 예외는 500으로 처리 (보안을 위해 내부 에러 메시지 노출 방지)
                 raise HTTPException(
                     status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                    detail="An internal server error occurred",
+                    detail=default_message,
                 ) from exc
 
         return wrapper
@@ -150,7 +149,7 @@ def endpoint_error_handler(
 def handle_api_errors(
     validation_error_message: str = "Validation error",
     validation_status_code: int = status.HTTP_422_UNPROCESSABLE_ENTITY,
-) -> ErrorHandlerType:
+) -> Callable[[Callable[P, Awaitable[T]]], Callable[P, Awaitable[T]]]:
     """
     ValueError와 Exception을 처리하는 데코레이터 (하위 호환성 유지)
 
@@ -175,7 +174,9 @@ def handle_api_errors(
     )
 
 
-def handle_server_errors(error_message: str = "Internal server error") -> ErrorHandlerType:
+def handle_server_errors(
+    error_message: str = "Internal server error",
+) -> Callable[[Callable[P, Awaitable[T]]], Callable[P, Awaitable[T]]]:
     """
     Exception만 처리하는 데코레이터 (하위 호환성 유지)
 
