@@ -48,7 +48,11 @@ dependencies = [
     "flower>=2.0.1",
     "structlog>=25.5.0",
     "gunicorn>=23.0.0",
+    "typer>=0.16.1",
 ]
+
+[project.scripts]
+preflight = "app.preflight.interface.cli:main"
 
 [tool.pytest.ini_options]
 addopts = [
