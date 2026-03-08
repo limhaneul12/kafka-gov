@@ -3,15 +3,16 @@
 from typing import Annotated
 
 from dependency_injector.wiring import Provide, inject
-from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
+from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, UploadFile, status
 from fastapi.responses import StreamingResponse
 from fastapi_pagination import Page, Params, create_page
 
 from app.container import AppContainer
+from app.shared.actor import actor_context_dict, actor_context_from_headers
 from app.shared.error_handlers import handle_api_errors, handle_server_errors
-from app.shared.roles import DEFAULT_USER
 from app.topic.application.batch_use_cases.batch_apply_yaml import TopicBatchApplyFromYAMLUseCase
 from app.topic.interface.adapters import (
+    safe_convert_apply_result_to_response,
     safe_convert_plan_to_response,
     safe_convert_request_to_batch,
 )
@@ -32,6 +33,11 @@ from app.topic.interface.schemas import (
 )
 
 router = APIRouter(prefix="/v1/topics", tags=["topics"])
+
+
+def _resolve_actor(request: Request) -> tuple[str, dict[str, str] | None]:
+    actor_context = actor_context_from_headers(request.headers)
+    return actor_context.actor, actor_context_dict(actor_context)
 
 
 def _convert_owner_to_owners(topic_dict: dict[str, object]) -> list[str]:
@@ -134,6 +140,7 @@ async def list_topics(
 @handle_api_errors(validation_error_message="YAML validation error")
 async def upload_yaml_and_dry_run(
     file: Annotated[UploadFile, File(...)],
+    http_request: Request,
     cluster_id: str = Query(..., description="Kafka Cluster ID"),
     dry_run_use_case=Depends(Provide[AppContainer.topic_container.dry_run_use_case]),
 ) -> TopicBatchDryRunResponse:
@@ -146,12 +153,13 @@ async def upload_yaml_and_dry_run(
     yaml_data = await parse_yaml_content(content.decode("utf-8"))
 
     # 3. TopicBatchRequest로 변환
-    request = TopicBatchRequest(**yaml_data)
+    batch_request = TopicBatchRequest(**yaml_data)
 
     # 4. Dry-Run 실행
-    batch = safe_convert_request_to_batch(request)
-    plan = await dry_run_use_case.execute(cluster_id, batch, DEFAULT_USER)
-    return safe_convert_plan_to_response(plan, request)
+    batch = safe_convert_request_to_batch(batch_request)
+    actor, actor_context = _resolve_actor(http_request)
+    plan = await dry_run_use_case.execute(cluster_id, batch, actor, actor_context)
+    return safe_convert_plan_to_response(plan, batch_request)
 
 
 @router.post(
@@ -166,6 +174,7 @@ async def upload_yaml_and_dry_run(
 @handle_api_errors(validation_error_message="Validation error")
 async def topic_batch_dry_run_yaml(
     yaml_request: TopicBatchYAMLRequest,
+    request: Request,
     cluster_id: str = Query(..., description="Kafka Cluster ID"),
     dry_run_use_case=Depends(Provide[AppContainer.topic_container.dry_run_use_case]),
 ) -> TopicBatchDryRunResponse:
@@ -178,7 +187,8 @@ async def topic_batch_dry_run_yaml(
     batch = safe_convert_request_to_batch(batch_request)
 
     # 3. 비즈니스 로직 실행 (UseCase 호출)
-    plan = await dry_run_use_case.execute(cluster_id, batch, DEFAULT_USER)
+    actor, actor_context = _resolve_actor(request)
+    plan = await dry_run_use_case.execute(cluster_id, batch, actor, actor_context)
 
     # 4. Domain → DTO 변환 (Adapter 책임)
     return safe_convert_plan_to_response(plan, batch_request)
@@ -195,6 +205,7 @@ async def topic_batch_dry_run_yaml(
 @handle_api_errors(validation_error_message="Validation error")
 async def download_dry_run_report(
     batch_request: TopicBatchRequest,
+    request: Request,
     cluster_id: str = Query(..., description="Kafka Cluster ID"),
     format: str = Query("csv", regex="^(csv|json)$", description="Report format (csv/json)"),
     dry_run_use_case=Depends(Provide[AppContainer.topic_container.dry_run_use_case]),
@@ -206,7 +217,8 @@ async def download_dry_run_report(
     """
     # Dry-Run 실행
     batch = safe_convert_request_to_batch(batch_request)
-    plan = await dry_run_use_case.execute(cluster_id, batch, DEFAULT_USER)
+    actor, actor_context = _resolve_actor(request)
+    plan = await dry_run_use_case.execute(cluster_id, batch, actor, actor_context)
 
     # Plan -> Response 변환
     response = safe_convert_plan_to_response(plan, batch_request)
@@ -231,17 +243,20 @@ async def download_dry_run_report(
 @handle_api_errors(validation_error_message="YAML parsing or policy violation")
 async def topic_batch_apply_yaml(
     yaml_request: TopicBatchYAMLRequest,
+    request: Request,
     cluster_id: str = Query(..., description="Kafka Cluster ID"),
     apply_use_case=Depends(Provide[AppContainer.topic_container.apply_use_case]),
 ) -> TopicBatchApplyResponse:
     """YAML 기반 토픽 배치 Apply - UseCase에 위임"""
     # UseCase 생성 및 실행
     yaml_use_case = TopicBatchApplyFromYAMLUseCase(apply_use_case)
+    actor, actor_context = _resolve_actor(request)
     return await yaml_use_case.execute(
         cluster_id,
         yaml_request.yaml_content,
-        DEFAULT_USER,
+        actor,
         yaml_request.approval_override,
+        actor_context,
     )
 
 
@@ -257,26 +272,21 @@ async def topic_batch_apply_yaml(
 @handle_api_errors(validation_error_message="Policy violation")
 async def topic_batch_apply(
     batch_request: TopicBatchRequest,
+    request: Request,
     cluster_id: str = Query(..., description="Kafka Cluster ID"),
     apply_use_case=Depends(Provide[AppContainer.topic_container.apply_use_case]),
 ) -> TopicBatchApplyResponse:
     """토픽 배치 Apply"""
     batch = safe_convert_request_to_batch(batch_request)
+    actor, actor_context = _resolve_actor(request)
     result = await apply_use_case.execute(
         cluster_id,
         batch,
-        DEFAULT_USER,
+        actor,
         batch_request.approval_override,
+        actor_context,
     )
-    return TopicBatchApplyResponse(
-        env=batch_request.env,
-        change_id=batch_request.change_id,
-        applied=list(result.applied),
-        skipped=list(result.skipped),
-        failed=list(result.failed),
-        audit_id=result.audit_id,
-        summary=result.summary(),
-    )
+    return safe_convert_apply_result_to_response(result, batch_request)
 
 
 @router.post(
@@ -290,15 +300,18 @@ async def topic_batch_apply(
 @handle_server_errors(error_message="Failed to delete topics")
 async def bulk_delete_topics(
     request: TopicBulkDeleteRequest,
+    http_request: Request,
     cluster_id: str = Query(..., description="Kafka Cluster ID"),
     bulk_delete_use_case=Depends(Provide[AppContainer.topic_container.bulk_delete_use_case]),
 ) -> TopicBulkDeleteResponse:
     """토픽 일괄 삭제 - Use Case 패턴"""
+    actor, actor_context = _resolve_actor(http_request)
     result = await bulk_delete_use_case.execute(
         cluster_id,
         request.names,
-        DEFAULT_USER,
+        actor,
         request.approval_override,
+        actor_context,
     )
 
     return TopicBulkDeleteResponse(
@@ -319,12 +332,17 @@ async def bulk_delete_topics(
 async def update_topic_metadata(
     name: str,
     metadata: dict[str, str | list[str] | None],
+    request: Request,
     cluster_id: str = Query(..., description="Kafka Cluster ID"),
     metadata_repo=Depends(Provide[AppContainer.topic_container.metadata_repository]),
 ) -> dict[str, str]:
     """토픽 메타데이터 업데이트"""
     # metadata_repo는 save_topic_metadata를 사용하여 저장
-    await metadata_repo.save_topic_metadata(name, metadata)
+    actor, _actor_context = _resolve_actor(request)
+    metadata_payload = dict(metadata)
+    metadata_payload["created_by"] = actor
+    metadata_payload["updated_by"] = actor
+    await metadata_repo.save_topic_metadata(name, metadata_payload)
     return {"message": f"Topic metadata for '{name}' updated successfully"}
 
 
@@ -338,16 +356,19 @@ async def update_topic_metadata(
 @handle_server_errors(error_message="Failed to delete topic")
 async def delete_topic(
     name: str,
+    http_request: Request,
     request: TopicDeleteRequest | None = None,
     cluster_id: str = Query(..., description="Kafka Cluster ID"),
     bulk_delete_use_case=Depends(Provide[AppContainer.topic_container.bulk_delete_use_case]),
 ) -> dict[str, str]:
     """토픽 단일 삭제 - BulkDeleteUseCase 재사용"""
+    actor, actor_context = _resolve_actor(http_request)
     result = await bulk_delete_use_case.execute(
         cluster_id,
         [name],
-        DEFAULT_USER,
+        actor,
         request.approval_override if request is not None else None,
+        actor_context,
     )
 
     if result["failed"]:

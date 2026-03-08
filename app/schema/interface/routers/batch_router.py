@@ -1,5 +1,5 @@
 from dependency_injector.wiring import Provide, inject
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 
 from app.container import AppContainer
 from app.schema.interface.adapters import (
@@ -13,10 +13,15 @@ from app.schema.interface.schemas import (
     SchemaBatchRequest,
 )
 from app.schema.interface.types.type_hints import ChangeId
+from app.shared.actor import actor_context_dict, actor_context_from_headers
 from app.shared.error_handlers import handle_api_errors, handle_server_errors
-from app.shared.roles import DEFAULT_USER
 
 router = APIRouter(prefix="/v1/schemas", tags=["schema-batch"])
+
+
+def _resolve_actor(request: Request) -> tuple[str, dict[str, str] | None]:
+    actor_context = actor_context_from_headers(request.headers)
+    return actor_context.actor, actor_context_dict(actor_context)
 
 
 @router.post(
@@ -30,12 +35,14 @@ router = APIRouter(prefix="/v1/schemas", tags=["schema-batch"])
 @handle_api_errors(validation_error_message="Validation error")
 async def schema_batch_dry_run(
     request: SchemaBatchRequest,
+    http_request: Request,
     registry_id: str = Query(..., description="Schema Registry ID"),
     dry_run_use_case=Depends(Provide[AppContainer.schema_container.dry_run_use_case]),
 ) -> SchemaBatchDryRunResponse:
     """스키마 배치 Dry-Run 실행"""
     batch = safe_convert_request_to_batch(request)
-    plan = await dry_run_use_case.execute(registry_id, batch, DEFAULT_USER)
+    actor, actor_context = _resolve_actor(http_request)
+    plan = await dry_run_use_case.execute(registry_id, batch, actor, actor_context)
     return safe_convert_plan_to_response(plan)
 
 
@@ -50,18 +57,21 @@ async def schema_batch_dry_run(
 @handle_api_errors(validation_error_message="Policy violation")
 async def schema_batch_apply(
     request: SchemaBatchRequest,
+    http_request: Request,
     registry_id: str = Query(..., description="Schema Registry ID"),
     storage_id: str | None = Query(None, description="Object Storage ID (optional)"),
     apply_use_case=Depends(Provide[AppContainer.schema_container.apply_use_case]),
 ) -> SchemaBatchApplyResponse:
     """스키마 배치 Apply 실행"""
     batch = safe_convert_request_to_batch(request)
+    actor, actor_context = _resolve_actor(http_request)
     result = await apply_use_case.execute(
         registry_id,
         storage_id,
         batch,
-        DEFAULT_USER,
+        actor,
         request.approval_override,
+        actor_context,
     )
     return safe_convert_apply_result_to_response(result)
 

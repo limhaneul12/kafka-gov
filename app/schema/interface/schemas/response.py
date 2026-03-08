@@ -135,6 +135,7 @@ class SchemaBatchApplyResponse(BaseModel):
     registered: list[SubjectName] = Field(default_factory=list)
     skipped: list[SubjectName] = Field(default_factory=list)
     failed: list[dict[str, StrictStr]] = Field(default_factory=list)
+    details: list[dict[str, StrictStr | None]] = Field(default_factory=list)
     audit_id: AuditId
     artifacts: list[SchemaArtifact] = Field(default_factory=list)
     summary: dict[str, int] = Field(default_factory=dict)

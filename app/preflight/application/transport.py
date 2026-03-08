@@ -8,7 +8,14 @@ from app.topic.interface.schemas.request import TopicBatchRequest
 
 
 class TopicBatchTransport(Protocol):
-    async def dry_run(self, cluster_id: str, request: TopicBatchRequest, actor: str) -> object: ...
+    async def dry_run(
+        self,
+        cluster_id: str,
+        request: TopicBatchRequest,
+        actor: str,
+        *,
+        actor_context: dict[str, str] | None = None,
+    ) -> object: ...
 
     async def apply(
         self,
@@ -16,12 +23,19 @@ class TopicBatchTransport(Protocol):
         request: TopicBatchRequest,
         actor: str,
         approval_override: ApprovalOverride | None = None,
+        *,
+        actor_context: dict[str, str] | None = None,
     ) -> object: ...
 
 
 class SchemaBatchTransport(Protocol):
     async def dry_run(
-        self, registry_id: str, request: SchemaBatchRequest, actor: str
+        self,
+        registry_id: str,
+        request: SchemaBatchRequest,
+        actor: str,
+        *,
+        actor_context: dict[str, str] | None = None,
     ) -> object: ...
 
     async def apply(
@@ -30,6 +44,8 @@ class SchemaBatchTransport(Protocol):
         request: SchemaBatchRequest,
         actor: str,
         storage_id: str | None,
+        *,
+        actor_context: dict[str, str] | None = None,
     ) -> object: ...
 
 
@@ -43,9 +59,16 @@ class PreflightTransport:
         self._schema_transport: SchemaBatchTransport = schema_transport
 
     async def topic_dry_run(
-        self, cluster_id: str, request: TopicBatchRequest, actor: str
+        self,
+        cluster_id: str,
+        request: TopicBatchRequest,
+        actor: str,
+        *,
+        actor_context: dict[str, str] | None = None,
     ) -> object:
-        return await self._topic_transport.dry_run(cluster_id, request, actor)
+        return await self._topic_transport.dry_run(
+            cluster_id, request, actor, actor_context=actor_context
+        )
 
     async def topic_apply(
         self,
@@ -53,18 +76,28 @@ class PreflightTransport:
         request: TopicBatchRequest,
         actor: str,
         approval_override: ApprovalOverride | None = None,
+        *,
+        actor_context: dict[str, str] | None = None,
     ) -> object:
         return await self._topic_transport.apply(
             cluster_id,
             request,
             actor,
             approval_override,
+            actor_context=actor_context,
         )
 
     async def schema_dry_run(
-        self, registry_id: str, request: SchemaBatchRequest, actor: str
+        self,
+        registry_id: str,
+        request: SchemaBatchRequest,
+        actor: str,
+        *,
+        actor_context: dict[str, str] | None = None,
     ) -> object:
-        return await self._schema_transport.dry_run(registry_id, request, actor)
+        return await self._schema_transport.dry_run(
+            registry_id, request, actor, actor_context=actor_context
+        )
 
     async def schema_apply(
         self,
@@ -72,10 +105,13 @@ class PreflightTransport:
         request: SchemaBatchRequest,
         actor: str,
         storage_id: str | None,
+        *,
+        actor_context: dict[str, str] | None = None,
     ) -> object:
         return await self._schema_transport.apply(
             registry_id,
             request,
             actor,
             storage_id,
+            actor_context=actor_context,
         )

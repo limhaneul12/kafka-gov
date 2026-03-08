@@ -194,16 +194,32 @@ class SchemaPlannerService:
             current_info = current_subjects.get(spec.subject)
 
             # 1. 계획 아이템 생성
-            action = DomainPlanAction.UPDATE if current_info else DomainPlanAction.REGISTER
+            action = self._determine_plan_action(current_info, spec)
             current_version = current_info.version if current_info else None
             target_version = (
-                (current_info.version + 1)
+                current_version
+                if action is DomainPlanAction.NONE
+                else (current_info.version + 1)
                 if (current_info and current_info.version is not None)
                 else 1
             )
 
             # 스키마 diff 계산
-            diff = self._calculate_schema_diff(current_info, spec)
+            diff = (
+                DomainSchemaDiff(
+                    type="no_change",
+                    changes=("No schema change detected",),
+                    current_version=current_version,
+                    target_compatibility=spec.compatibility.value
+                    if hasattr(spec.compatibility, "value")
+                    else spec.compatibility,
+                    schema_type=spec.schema_type.value
+                    if hasattr(spec.schema_type, "value")
+                    else spec.schema_type,
+                )
+                if action is DomainPlanAction.NONE
+                else self._calculate_schema_diff(current_info, spec)
+            )
 
             plan_item = DomainSchemaPlanItem(
                 subject=spec.subject,
@@ -213,6 +229,7 @@ class SchemaPlannerService:
                 diff=diff,
                 schema=spec.schema,
                 current_schema=current_info.schema if current_info else None,
+                reason=spec.reason,
             )
             plan_items.append(plan_item)
 
@@ -242,6 +259,38 @@ class SchemaPlannerService:
             compatibility_reports=tuple(compatibility_reports),
             impacts=tuple(impacts),
             violations=tuple(all_violations),
+            requested_total=len(batch.specs),
+        )
+
+    def _determine_plan_action(
+        self,
+        current_info: SchemaVersionInfo | None,
+        spec: DomainSchemaSpec,
+    ) -> DomainPlanAction:
+        if current_info is None:
+            return DomainPlanAction.REGISTER
+
+        if self._schema_matches_current(current_info, spec):
+            return DomainPlanAction.NONE
+
+        return DomainPlanAction.UPDATE
+
+    def _schema_matches_current(
+        self,
+        current_info: SchemaVersionInfo,
+        spec: DomainSchemaSpec,
+    ) -> bool:
+        schema_type_value = (
+            spec.schema_type.value if hasattr(spec.schema_type, "value") else str(spec.schema_type)
+        )
+        if current_info.schema_type is not None and current_info.schema_type != schema_type_value:
+            return False
+
+        return _normalize_schema_text(
+            current_info.schema, schema_type_value
+        ) == _normalize_schema_text(
+            spec.schema,
+            schema_type_value,
         )
 
     def _calculate_schema_diff(
@@ -340,3 +389,17 @@ class SchemaPlannerService:
             schema_type=current_info.schema_type
             or (spec.schema_type.value if hasattr(spec.schema_type, "value") else spec.schema_type),
         )
+
+
+def _normalize_schema_text(schema_text: str | None, schema_type: str) -> str | None:
+    if schema_text is None:
+        return None
+
+    stripped = schema_text.strip()
+    if schema_type in {"AVRO", "JSON"}:
+        try:
+            return json.dumps(json.loads(stripped), sort_keys=True, separators=(",", ":"))
+        except json.JSONDecodeError:
+            return stripped
+
+    return stripped

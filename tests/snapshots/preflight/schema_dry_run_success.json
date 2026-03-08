@@ -1,0 +1,36 @@
+{
+  "contract_version": "preflight.v1",
+  "operation": {
+    "command": "preflight schema dry-run",
+    "mode": "dry-run",
+    "request_id": "chg-schema-snapshot-success-001",
+    "identifiers": {
+      "cluster_id": null,
+      "registry_id": "registry-a",
+      "storage_id": null
+    }
+  },
+  "risk": {
+    "level": "none",
+    "blocking": false,
+    "summary": "risk evaluation not provided by transport result"
+  },
+  "approval": {
+    "required": false,
+    "state": "not_required",
+    "summary": "approval state not provided by transport result"
+  },
+  "result": {
+    "status": "success",
+    "summary": "evaluated 1 schema changes",
+    "counts": {
+      "total": 1,
+      "planned": 1,
+      "applied": 0,
+      "unchanged": 0,
+      "failed": 0,
+      "warnings": 0
+    }
+  },
+  "error": null
+}

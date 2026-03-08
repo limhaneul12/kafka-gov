@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from dataclasses import replace
 from datetime import datetime
 
 from app.cluster.domain.services import IConnectionManager
@@ -41,6 +42,8 @@ class PlanSchemaChangeUseCase:
         new_schema: str,
         compatibility: str,
         actor: str,
+        reason: str | None = None,
+        actor_context: dict[str, str] | None = None,
     ) -> DomainSchemaPlan:
         """단일 스키마 변경 계획 수립 (Edit 용)"""
         # 1. 환경 추론 (subject naming 기준)
@@ -78,6 +81,7 @@ class PlanSchemaChangeUseCase:
             schema_type=domain_schema_type,
             compatibility=domain_compat,
             schema=new_schema,
+            reason=reason,
         )
 
         batch = DomainSchemaBatch(
@@ -90,6 +94,7 @@ class PlanSchemaChangeUseCase:
         # 3. 계획 수립
         planner_service = SchemaPlannerService(registry_repository)
         plan = await planner_service.create_plan(batch)
+        plan = replace(plan, actor_context=actor_context)
 
         # 4. 계획 저장
         await self.metadata_repository.save_plan(plan, actor)

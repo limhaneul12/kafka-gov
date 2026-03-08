@@ -9,61 +9,23 @@ from typer.testing import CliRunner
 
 from app.preflight.application.transport import PreflightTransport
 from app.preflight.interface import cli
-from app.schema.interface.schemas.request import SchemaBatchRequest
-from app.topic.domain.models import DomainTopicApplyResult, DomainTopicPlan, DomainTopicPlanItem
-from app.topic.domain.models.types_enum import DomainEnvironment, DomainPlanAction
+from app.schema.domain.models import (
+    DomainSchemaApplyResult,
+    DomainSchemaDiff,
+    DomainSchemaPlan,
+    DomainSchemaPlanItem,
+)
+from app.schema.domain.models.types_enum import DomainEnvironment, DomainPlanAction
+from app.topic.interface.schemas.request import TopicBatchRequest
 
 SNAPSHOT_DIR = Path(__file__).parent / "snapshots" / "preflight"
 
 
-class _UnusedSchemaTransport:
-    async def dry_run(
-        self,
-        registry_id: str,
-        request: SchemaBatchRequest,
-        actor: str,
-        *,
-        actor_context: dict[str, str] | None = None,
-    ) -> object:
-        _ = registry_id
-        _ = request
-        _ = actor
-        _ = actor_context
-        raise AssertionError("schema transport should not be called in topic snapshot tests")
-
-    async def apply(
-        self,
-        registry_id: str,
-        request: SchemaBatchRequest,
-        actor: str,
-        storage_id: str | None,
-        *,
-        actor_context: dict[str, str] | None = None,
-    ) -> object:
-        _ = registry_id
-        _ = request
-        _ = actor
-        _ = storage_id
-        _ = actor_context
-        raise AssertionError("schema transport should not be called in topic snapshot tests")
-
-
-class _TopicTransportStub:
-    def __init__(
-        self,
-        *,
-        dry_run_result: DomainTopicPlan,
-        apply_result: DomainTopicApplyResult | None = None,
-        apply_error: Exception | None = None,
-    ) -> None:
-        self._dry_run_result: DomainTopicPlan = dry_run_result
-        self._apply_result: DomainTopicApplyResult | None = apply_result
-        self._apply_error: Exception | None = apply_error
-
+class _UnusedTopicTransport:
     async def dry_run(
         self,
         cluster_id: str,
-        request: object,
+        request: TopicBatchRequest,
         actor: str,
         *,
         actor_context: dict[str, str] | None = None,
@@ -72,12 +34,12 @@ class _TopicTransportStub:
         _ = request
         _ = actor
         _ = actor_context
-        return self._dry_run_result
+        raise AssertionError("topic transport should not be called in schema snapshot tests")
 
     async def apply(
         self,
         cluster_id: str,
-        request: object,
+        request: TopicBatchRequest,
         actor: str,
         approval_override: object | None = None,
         *,
@@ -88,6 +50,49 @@ class _TopicTransportStub:
         _ = actor
         _ = approval_override
         _ = actor_context
+        raise AssertionError("topic transport should not be called in schema snapshot tests")
+
+
+class _SchemaTransportStub:
+    def __init__(
+        self,
+        *,
+        dry_run_result: DomainSchemaPlan,
+        apply_result: DomainSchemaApplyResult | None = None,
+        apply_error: Exception | None = None,
+    ) -> None:
+        self._dry_run_result = dry_run_result
+        self._apply_result = apply_result
+        self._apply_error = apply_error
+
+    async def dry_run(
+        self,
+        registry_id: str,
+        request: object,
+        actor: str,
+        *,
+        actor_context: dict[str, str] | None = None,
+    ) -> object:
+        _ = registry_id
+        _ = request
+        _ = actor
+        _ = actor_context
+        return self._dry_run_result
+
+    async def apply(
+        self,
+        registry_id: str,
+        request: object,
+        actor: str,
+        storage_id: str | None,
+        *,
+        actor_context: dict[str, str] | None = None,
+    ) -> object:
+        _ = registry_id
+        _ = request
+        _ = actor
+        _ = storage_id
+        _ = actor_context
         if self._apply_error is not None:
             raise self._apply_error
         if self._apply_result is None:
@@ -95,69 +100,65 @@ class _TopicTransportStub:
         return self._apply_result
 
 
-def _build_topic_payload(change_id: str) -> str:
+def _build_schema_payload(change_id: str) -> str:
     return json.dumps(
         {
-            "kind": "TopicBatch",
+            "kind": "SchemaBatch",
             "env": "dev",
             "change_id": change_id,
             "items": [
                 {
-                    "name": "dev.orders.created",
-                    "action": "create",
-                    "config": {
-                        "partitions": 3,
-                        "replication_factor": 2,
-                    },
-                    "metadata": {
-                        "owners": ["team-platform"],
-                    },
+                    "subject": "dev.orders.created-value",
+                    "type": "AVRO",
+                    "schema": '{"type":"record","name":"OrderCreated","fields":[{"name":"id","type":"string"}]}',
                 }
             ],
         }
     )
 
 
-def _build_plan(change_id: str) -> DomainTopicPlan:
-    return DomainTopicPlan(
+def _build_plan(change_id: str) -> DomainSchemaPlan:
+    return DomainSchemaPlan(
         change_id=change_id,
         env=DomainEnvironment.DEV,
         items=(
-            DomainTopicPlanItem(
-                name="dev.orders.created",
-                action=DomainPlanAction.CREATE,
-                diff={"partitions": "+3"},
-                current_config=None,
-                target_config={
-                    "partitions": "3",
-                    "replication.factor": "2",
-                },
+            DomainSchemaPlanItem(
+                subject="dev.orders.created-value",
+                action=DomainPlanAction.REGISTER,
+                current_version=None,
+                target_version=1,
+                diff=DomainSchemaDiff(
+                    type="new_registration",
+                    changes=("register subject",),
+                    current_version=None,
+                    target_compatibility="BACKWARD",
+                    schema_type="AVRO",
+                ),
             ),
         ),
-        violations=(),
     )
 
 
-def _build_apply_result(change_id: str) -> DomainTopicApplyResult:
-    return DomainTopicApplyResult(
+def _build_apply_result(change_id: str) -> DomainSchemaApplyResult:
+    return DomainSchemaApplyResult(
         change_id=change_id,
         env=DomainEnvironment.DEV,
-        applied=("dev.orders.created",),
+        registered=("dev.orders.created-value",),
         skipped=(),
         failed=(),
-        audit_id="audit-topic-snapshot-001",
+        audit_id="audit-schema-snapshot-001",
     )
 
 
 def _install_transport_stub(
-    monkeypatch: pytest.MonkeyPatch, topic_stub: _TopicTransportStub
+    monkeypatch: pytest.MonkeyPatch, schema_stub: _SchemaTransportStub
 ) -> None:
     monkeypatch.setattr(
         cli,
         "_build_transport",
         lambda: PreflightTransport(
-            topic_transport=topic_stub,
-            schema_transport=_UnusedSchemaTransport(),
+            topic_transport=_UnusedTopicTransport(),
+            schema_transport=schema_stub,
         ),
     )
 
@@ -177,47 +178,55 @@ def _load_snapshot(name: str) -> dict[str, object]:
     return cast(dict[str, object], payload)
 
 
-def test_topic_dry_run_cli_matches_success_contract_snapshot(
+def test_schema_dry_run_cli_matches_success_contract_snapshot(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     runner = CliRunner()
-    change_id = "chg-topic-snapshot-success-001"
+    change_id = "chg-schema-snapshot-success-001"
 
-    topic_stub = _TopicTransportStub(
+    schema_stub = _SchemaTransportStub(
         dry_run_result=_build_plan(change_id),
         apply_result=_build_apply_result(change_id),
     )
-    _install_transport_stub(monkeypatch, topic_stub)
+    _install_transport_stub(monkeypatch, schema_stub)
 
     result = runner.invoke(
         cli.cli_app,
-        ["topic", "dry-run", "--cluster-id", "cluster-a", "--json"],
-        input=_build_topic_payload(change_id),
+        ["schema", "dry-run", "--registry-id", "registry-a", "--json"],
+        input=_build_schema_payload(change_id),
     )
 
     assert result.exit_code == 0
-    assert _parse_envelope(result.stdout) == _load_snapshot("topic_dry_run_success.json")
+    assert _parse_envelope(result.stdout) == _load_snapshot("schema_dry_run_success.json")
 
 
-def test_topic_apply_cli_matches_approval_required_failure_contract_snapshot(
+def test_schema_apply_cli_matches_approval_required_failure_contract_snapshot(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     runner = CliRunner()
-    change_id = "chg-topic-snapshot-failure-001"
+    change_id = "chg-schema-snapshot-failure-001"
 
-    topic_stub = _TopicTransportStub(
+    schema_stub = _SchemaTransportStub(
         dry_run_result=_build_plan(change_id),
         apply_error=RuntimeError("approval_override is required for this operation"),
     )
-    _install_transport_stub(monkeypatch, topic_stub)
+    _install_transport_stub(monkeypatch, schema_stub)
 
     result = runner.invoke(
         cli.cli_app,
-        ["topic", "apply", "--cluster-id", "cluster-a", "--json"],
-        input=_build_topic_payload(change_id),
+        [
+            "schema",
+            "apply",
+            "--registry-id",
+            "registry-a",
+            "--storage-id",
+            "storage-a",
+            "--json",
+        ],
+        input=_build_schema_payload(change_id),
     )
 
     assert result.exit_code == 20
     assert _parse_envelope(result.stdout) == _load_snapshot(
-        "topic_apply_approval_required_failure.json"
+        "schema_apply_approval_required_failure.json"
     )

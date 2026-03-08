@@ -8,7 +8,10 @@ from pydantic import ValidationError
 from app.shared.approval import ApprovalOverride
 from app.topic.application.batch_use_cases.batch_apply import TopicBatchApplyUseCase
 from app.topic.domain.models import DomainTopicApplyResult
-from app.topic.interface.adapters import safe_convert_request_to_batch
+from app.topic.interface.adapters import (
+    safe_convert_apply_result_to_response,
+    safe_convert_request_to_batch,
+)
 from app.topic.interface.helpers import translate_usecase_failure, translate_validation_error
 from app.topic.interface.schemas import FailureDetail, TopicBatchApplyResponse, TopicBatchRequest
 from app.topic.interface.types import Environment
@@ -26,6 +29,7 @@ class TopicBatchApplyFromYAMLUseCase:
         yaml_content: str,
         actor: str,
         approval_override: ApprovalOverride | None = None,
+        actor_context: dict[str, str] | None = None,
     ) -> TopicBatchApplyResponse:
         """YAML 기반 토픽 배치 Apply 실행
 
@@ -124,24 +128,16 @@ class TopicBatchApplyFromYAMLUseCase:
                 batch=batch,
                 actor=actor,
                 approval_override=resolved_approval_override,
+                actor_context=actor_context,
             )
 
-            # UseCase 결과를 Response로 변환
+            response = safe_convert_apply_result_to_response(result, batch_request)
             failed_details: list[FailureDetail] = [
                 translate_usecase_failure(fail_item)
                 for fail_item in result.failed
                 if isinstance(fail_item, dict)
             ]
-
-            return TopicBatchApplyResponse(
-                env=batch_request.env,
-                change_id=batch_request.change_id,
-                applied=list(result.applied),
-                skipped=list(result.skipped),
-                failed=failed_details,
-                audit_id=result.audit_id,
-                summary=result.summary(),
-            )
+            return response.model_copy(update={"failed": failed_details})
         except Exception as e:
             # 예상치 못한 에러
             failure = FailureDetail(

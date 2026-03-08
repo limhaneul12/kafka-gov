@@ -83,7 +83,11 @@ class SchemaBatchItem(BaseModel):
     )
     references: list[SchemaReference] = Field(default_factory=list, max_length=16)
     metadata: SchemaMetadata | None = None
-    reason: ReasonText | None = None
+    reason: ReasonText | None = Field(
+        default=None,
+        validation_alias=AliasChoices("reason", "business_purpose", "businessPurpose"),
+        serialization_alias="reason",
+    )
     dry_run_only: StrictBool = Field(
         default=False, description="true이면 dry-run에서만 검증하고 apply 시 제외"
     )
@@ -215,6 +219,11 @@ class SchemaChangeRequest(BaseModel):
     subject: str
     new_schema: str
     compatibility: CompatibilityMode = CompatibilityMode.BACKWARD
+    reason: ReasonText | None = Field(
+        default=None,
+        validation_alias=AliasChoices("reason", "business_purpose", "businessPurpose"),
+        serialization_alias="reason",
+    )
 
 
 class RollbackRequest(BaseModel):
@@ -222,3 +231,8 @@ class RollbackRequest(BaseModel):
 
     subject: str
     version: int
+    reason: ReasonText | None = Field(
+        default=None,
+        validation_alias=AliasChoices("reason", "business_purpose", "businessPurpose"),
+        serialization_alias="reason",
+    )

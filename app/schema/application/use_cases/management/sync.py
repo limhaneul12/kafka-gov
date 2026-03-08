@@ -12,6 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.cluster.domain.services import IConnectionManager
 from app.schema.application.services.catalog_sync import CatalogSyncService
 from app.schema.infrastructure.schema_registry_adapter import ConfluentSchemaRegistryAdapter
+from app.shared.actor import merge_actor_metadata
 from app.shared.constants import AuditAction, AuditStatus, AuditTarget
 
 from ....domain.models import DomainSchemaArtifact
@@ -38,7 +39,12 @@ class SchemaSyncUseCase:
         self.audit_repository = audit_repository
         self.session_factory = session_factory
 
-    async def execute(self, registry_id: str, actor: str) -> dict[str, dict[str, int] | int]:
+    async def execute(
+        self,
+        registry_id: str,
+        actor: str,
+        actor_context: dict[str, str] | None = None,
+    ) -> dict[str, dict[str, int] | int]:
         """Schema Registry의 모든 스키마를 DB로 동기화
 
         Returns:
@@ -54,6 +60,7 @@ class SchemaSyncUseCase:
             actor=actor,
             status=AuditStatus.STARTED,
             message="Schema synchronization started",
+            snapshot=merge_actor_metadata(None, actor_context),
         )
 
         try:
@@ -97,10 +104,9 @@ class SchemaSyncUseCase:
                         subject,
                         {
                             "owner": "team",
-                            "compatibility_mode": info.compatibility_mode
-                            if hasattr(info, "compatibility_mode")
-                            else "BACKWARD",
+                            "compatibility_mode": "BACKWARD",
                             "created_by": actor,
+                            "updated_by": actor,
                         },
                     )
                     added_count += 1
@@ -139,7 +145,7 @@ class SchemaSyncUseCase:
                 actor=actor,
                 status=AuditStatus.COMPLETED,
                 message=f"Schema synchronization completed: {result['total']} total, {result['added']} added",
-                snapshot=result,
+                snapshot=merge_actor_metadata(result, actor_context),
             )
 
             return result
@@ -153,5 +159,6 @@ class SchemaSyncUseCase:
                 actor=actor,
                 status=AuditStatus.FAILED,
                 message=f"Schema synchronization failed: {exc!s}",
+                snapshot=merge_actor_metadata(None, actor_context),
             )
             raise

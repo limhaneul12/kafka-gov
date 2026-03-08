@@ -19,10 +19,18 @@ from app.topic.interface.schemas.request import TopicBatchRequest
 
 
 class _UnusedTopicTransport:
-    async def dry_run(self, cluster_id: str, request: TopicBatchRequest, actor: str) -> object:
+    async def dry_run(
+        self,
+        cluster_id: str,
+        request: TopicBatchRequest,
+        actor: str,
+        *,
+        actor_context: dict[str, str] | None = None,
+    ) -> object:
         _ = cluster_id
         _ = request
         _ = actor
+        _ = actor_context
         raise AssertionError("topic transport should not be called in schema tests")
 
     async def apply(
@@ -31,11 +39,14 @@ class _UnusedTopicTransport:
         request: TopicBatchRequest,
         actor: str,
         approval_override: object | None = None,
+        *,
+        actor_context: dict[str, str] | None = None,
     ) -> object:
         _ = cluster_id
         _ = request
         _ = actor
         _ = approval_override
+        _ = actor_context
         raise AssertionError("topic transport should not be called in schema tests")
 
 
@@ -52,8 +63,16 @@ class _SchemaTransportStub:
         self._apply_error: Exception | None = apply_error
         self.calls: list[tuple[str, str, str, str | None]] = []
 
-    async def dry_run(self, registry_id: str, request: object, actor: str) -> object:
+    async def dry_run(
+        self,
+        registry_id: str,
+        request: object,
+        actor: str,
+        *,
+        actor_context: dict[str, str] | None = None,
+    ) -> object:
         _ = request
+        _ = actor_context
         self.calls.append(("dry_run", registry_id, actor, None))
         return self._dry_run_result
 
@@ -63,8 +82,11 @@ class _SchemaTransportStub:
         request: object,
         actor: str,
         storage_id: str | None,
+        *,
+        actor_context: dict[str, str] | None = None,
     ) -> object:
         _ = request
+        _ = actor_context
         self.calls.append(("apply", registry_id, actor, storage_id))
         if self._apply_error is not None:
             raise self._apply_error

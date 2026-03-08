@@ -2,7 +2,17 @@ from dataclasses import asdict
 from typing import Annotated
 
 from dependency_injector.wiring import Provide, inject
-from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile, status
+from fastapi import (
+    APIRouter,
+    Depends,
+    File,
+    Form,
+    HTTPException,
+    Query,
+    Request,
+    UploadFile,
+    status,
+)
 
 from app.container import AppContainer
 from app.schema.domain.models import (
@@ -11,17 +21,23 @@ from app.schema.domain.models import (
     DomainSubjectStrategy,
 )
 from app.schema.interface.schemas import (
+    SchemaArtifact,
     SchemaDeleteImpactResponse,
     SchemaSyncResponse,
     SchemaUploadResponse,
 )
-from app.schema.interface.schemas.search import SchemaSearchResponse
+from app.schema.interface.schemas.search import SchemaSearchItem, SchemaSearchResponse
 from app.schema.interface.types.enums import CompatibilityMode, Environment
 from app.schema.interface.types.type_hints import ChangeId
+from app.shared.actor import actor_context_dict, actor_context_from_headers
 from app.shared.error_handlers import handle_api_errors, handle_server_errors
-from app.shared.roles import DEFAULT_USER
 
 router = APIRouter(prefix="/v1/schemas", tags=["schema-management"])
+
+
+def _resolve_actor(request: Request) -> tuple[str, dict[str, str] | None]:
+    actor_context = actor_context_from_headers(request.headers)
+    return actor_context.actor, actor_context_dict(actor_context)
 
 
 def _extract_schema_type_from_url(storage_url: str | None) -> str:
@@ -52,6 +68,7 @@ async def upload_schemas(
     change_id: Annotated[ChangeId, Form(..., description="변경 ID")],
     owner: Annotated[str, Form(..., description="소유 팀")],
     files: Annotated[list[UploadFile], File(..., description="업로드할 스키마 파일 목록")],
+    request: Request,
     registry_id: Annotated[
         str, Query(description="Schema Registry ID (기본값: default)")
     ] = "default",
@@ -76,6 +93,7 @@ async def upload_schemas(
     domain_compatibility = (
         DomainCompatibilityMode(compatibility_mode.value) if compatibility_mode else None
     )
+    actor, actor_context = _resolve_actor(request)
 
     result = await upload_use_case.execute(
         registry_id=registry_id,
@@ -84,21 +102,22 @@ async def upload_schemas(
         change_id=change_id,
         owner=owner,
         files=files,
-        actor=DEFAULT_USER,
+        actor=actor,
         compatibility_mode=domain_compatibility,
         strategy_id=strategy_id,
+        actor_context=actor_context,
     )
 
     # 도메인 객체를 Pydantic 응답으로 변환
     return SchemaUploadResponse(
         upload_id=result.upload_id,
         artifacts=[
-            {
-                "subject": artifact.subject,
-                "version": artifact.version,
-                "storage_url": artifact.storage_url,
-                "checksum": artifact.checksum,
-            }
+            SchemaArtifact(
+                subject=artifact.subject,
+                version=artifact.version,
+                storage_url=artifact.storage_url,
+                checksum=artifact.checksum,
+            )
             for artifact in result.artifacts
         ],
         summary=result.summary(),
@@ -116,6 +135,7 @@ async def upload_schemas(
 @handle_api_errors(validation_error_message="Validation error")
 async def analyze_schema_delete_impact(
     subject: str,
+    request: Request,
     registry_id: str = Query(..., description="Schema Registry ID"),
     strategy: str = "TopicNameStrategy",
     delete_use_case=Depends(Provide[AppContainer.schema_container.delete_use_case]),
@@ -123,11 +143,13 @@ async def analyze_schema_delete_impact(
     """스키마 삭제 영향도 분석"""
     # 영향도 분석 수행
     strategy_enum = DomainSubjectStrategy(strategy)
+    actor, actor_context = _resolve_actor(request)
     impact = await delete_use_case.analyze(
         registry_id=registry_id,
         subject=subject,
         strategy=strategy_enum,
-        actor=DEFAULT_USER,
+        actor=actor,
+        actor_context=actor_context,
     )
 
     # 응답 변환
@@ -155,6 +177,7 @@ async def analyze_schema_delete_impact(
 )
 async def delete_schema(
     subject: str,
+    request: Request,
     registry_id: str = Query(..., description="Schema Registry ID"),
     strategy: str = "TopicNameStrategy",
     force: bool = False,
@@ -163,12 +186,14 @@ async def delete_schema(
     """스키마 삭제"""
     # 삭제 실행
     strategy_enum = DomainSubjectStrategy(strategy)
+    actor, actor_context = _resolve_actor(request)
     impact = await delete_use_case.delete(
         registry_id=registry_id,
         subject=subject,
         strategy=strategy_enum,
-        actor=DEFAULT_USER,
+        actor=actor,
         force=force,
+        actor_context=actor_context,
     )
 
     # 응답 변환
@@ -223,11 +248,17 @@ async def list_schema_artifacts(
 @inject
 @handle_server_errors(error_message="Schema sync failed")
 async def sync_schemas(
+    request: Request,
     registry_id: str = Query(..., description="Schema Registry ID"),
     sync_use_case=Depends(Provide[AppContainer.schema_container.sync_use_case]),
 ) -> SchemaSyncResponse:
     """Schema Registry → DB 동기화"""
-    result = await sync_use_case.execute(registry_id=registry_id, actor=DEFAULT_USER)
+    actor, actor_context = _resolve_actor(request)
+    result = await sync_use_case.execute(
+        registry_id=registry_id,
+        actor=actor,
+        actor_context=actor_context,
+    )
     return SchemaSyncResponse.model_validate(result)
 
 
@@ -243,7 +274,7 @@ async def get_schema_detail(
     subject: str,
     registry_id: str = Query(..., description="Schema Registry ID"),
     detail_use_case=Depends(Provide[AppContainer.schema_container.subject_detail_use_case]),
-) -> dict:
+) -> dict[str, object]:
     """스키마 상세 조회"""
     detail = await detail_use_case.execute(registry_id=registry_id, subject=subject)
     return asdict(detail)
@@ -270,18 +301,16 @@ async def search_schemas(
 
     # DomainSchemaArtifact -> SchemaArtifactResponse 변환
     items = [
-        {
-            "subject": item.subject,
-            "version": item.version,
-            "storage_url": item.storage_url,
-            "checksum": item.checksum,
-            "schema_type": item.schema_type.value if item.schema_type else None,
-            "compatibility_mode": item.compatibility_mode.value
-            if item.compatibility_mode
-            else None,
-            "owner": item.owner,
-            "created_at": item.created_at.isoformat() if item.created_at else None,
-        }
+        SchemaSearchItem(
+            subject=item.subject,
+            version=item.version if item.version is not None else 1,
+            storage_url=item.storage_url,
+            checksum=item.checksum,
+            schema_type=item.schema_type.value if item.schema_type else None,
+            compatibility_mode=item.compatibility_mode.value if item.compatibility_mode else None,
+            owner=item.owner,
+            created_at=item.created_at.isoformat() if item.created_at else None,
+        )
         for item in result.items
     ]
 

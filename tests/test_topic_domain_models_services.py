@@ -24,6 +24,7 @@ from app.topic.domain.models.types_enum import (
     DomainPlanAction,
     DomainTopicAction,
 )
+from app.topic.domain.repositories.interfaces import ITopicRepository
 from app.topic.domain.services import TopicDiffService, TopicPlannerService
 from app.topic.domain.utils import (
     calculate_dict_diff,
@@ -32,7 +33,6 @@ from app.topic.domain.utils import (
     validate_partition_change,
     validate_replication_factor_change,
 )
-from app.topic.domain.repositories.interfaces import ITopicRepository
 
 
 class FakeTopicRepository(ITopicRepository):
@@ -49,15 +49,15 @@ class FakeTopicRepository(ITopicRepository):
         return {spec.name: None for spec in specs}
 
     async def delete_topics(self, names: list[str]) -> dict[str, Exception | None]:
-        return {name: None for name in names}
+        return dict.fromkeys(names)
 
     async def alter_topic_configs(
         self, configs: dict[str, dict[str, str]]
     ) -> dict[str, Exception | None]:
-        return {name: None for name in configs}
+        return dict.fromkeys(configs)
 
     async def create_partitions(self, partitions: dict[str, int]) -> dict[str, Exception | None]:
-        return {name: None for name in partitions}
+        return dict.fromkeys(partitions)
 
     async def describe_topics(self, names: list[str]) -> dict[str, dict[str, Any]]:
         return {name: self._current[name] for name in names if name in self._current}
@@ -216,9 +216,11 @@ def test_topic_plan_and_apply_result_helpers() -> None:
     )
     assert result.summary() == {
         "total_items": 3,
+        "planned_count": 2,
         "applied_count": 1,
         "skipped_count": 1,
         "failed_count": 1,
+        "warning_count": 0,
     }
 
 

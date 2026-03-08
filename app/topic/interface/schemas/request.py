@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import AliasChoices, BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from app.shared.approval import ApprovalOverride
 
@@ -18,6 +18,7 @@ from ..types import (
     TopicAction,
     TopicName,
 )
+from ..types.type_hints import ReasonText
 
 
 class TopicMetadata(BaseModel):
@@ -130,6 +131,7 @@ class TopicItem(BaseModel):
                     "owner": "team-commerce",
                     "doc": "https://wiki.company.com/streams/orders",
                 },
+                "reason": "Increase partitions for seasonal traffic",
             }
         },
     )
@@ -138,6 +140,11 @@ class TopicItem(BaseModel):
     action: TopicAction
     config: TopicConfig | None = None
     metadata: TopicMetadata | None = None
+    reason: ReasonText | None = Field(
+        default=None,
+        validation_alias=AliasChoices("reason", "business_purpose", "businessPurpose"),
+        serialization_alias="reason",
+    )
 
     @model_validator(mode="after")
     def validate_action_requirements(self) -> TopicItem:

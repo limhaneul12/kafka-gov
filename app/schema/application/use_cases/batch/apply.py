@@ -6,7 +6,9 @@ import uuid
 from datetime import datetime
 
 from app.cluster.domain.services import IConnectionManager
+from app.schema.domain.policies.policy_pack import DefaultSchemaPolicyPackV1
 from app.schema.infrastructure.schema_registry_adapter import ConfluentSchemaRegistryAdapter
+from app.shared.actor import merge_actor_metadata
 from app.shared.approval import ApprovalOverride, assess_schema_batch_risk, ensure_approval
 from app.shared.constants import AuditAction, AuditStatus, AuditTarget
 from app.shared.domain.events import SchemaRegisteredEvent
@@ -14,9 +16,11 @@ from app.shared.infrastructure.event_bus import get_event_bus
 
 from ....domain.models import (
     ChangeId,
+    DomainPlanAction,
     DomainSchemaApplyResult,
     DomainSchemaArtifact,
     DomainSchemaBatch,
+    DomainSchemaPlan,
     DomainSchemaSpec,
 )
 from ....domain.repositories.interfaces import (
@@ -50,6 +54,7 @@ class SchemaBatchApplyUseCase:
         batch: DomainSchemaBatch,
         actor: str,
         approval_override: ApprovalOverride | None = None,
+        actor_context: dict[str, str] | None = None,
     ) -> DomainSchemaApplyResult:
         audit_id = str(uuid.uuid4())
         approval_context = {
@@ -65,6 +70,7 @@ class SchemaBatchApplyUseCase:
             actor=actor,
             status=AuditStatus.STARTED,
             message=f"Schema apply started for {len(batch.specs)} subjects",
+            snapshot=merge_actor_metadata(None, actor_context),
         )
 
         try:
@@ -77,24 +83,59 @@ class SchemaBatchApplyUseCase:
                 registry_repository=registry_repository, policy_repository=self.policy_repository
             )  # type: ignore[arg-type]
             plan = await planner_service.create_plan(batch)
+            policy_pack_result = DefaultSchemaPolicyPackV1().evaluate(batch, plan)
+            plan = DomainSchemaPlan(
+                change_id=plan.change_id,
+                env=plan.env,
+                items=plan.items,
+                compatibility_reports=plan.compatibility_reports,
+                impacts=plan.impacts,
+                violations=policy_pack_result.violations,
+                risk=policy_pack_result.evaluation.risk_metadata(),
+                approval=policy_pack_result.evaluation.approval_metadata(
+                    mode="apply",
+                    approval_override_present=approval_override is not None,
+                ),
+                policy_evaluation=policy_pack_result.evaluation,
+                requested_total=plan.requested_total,
+                actor_context=actor_context,
+            )
+            await self.metadata_repository.save_plan(plan, actor)
 
             approval_context = ensure_approval(
-                assess_schema_batch_risk(batch, plan),
+                plan.policy_evaluation
+                if plan.policy_evaluation is not None
+                else assess_schema_batch_risk(batch, plan),
                 approval_override,
             )
 
             if not plan.can_apply:
+                if plan.policy_evaluation is not None:
+                    reasons = "; ".join(plan.policy_evaluation.reasons[:3])
+                    raise RuntimeError(f"policy blocked: {reasons}")
                 raise ValueError("Policy violations or incompatibilities detected; apply aborted")
 
             registered: list[str] = []
             skipped: list[str] = []
             failed: list[dict[str, str]] = []
             artifacts: list[DomainSchemaArtifact] = []
+            specs_by_subject = {spec.subject: spec for spec in batch.specs}
+            actionable_items = [
+                item
+                for item in plan.items
+                if item.action is not DomainPlanAction.NONE
+                and not specs_by_subject[item.subject].dry_run_only
+            ]
 
-            for spec in batch.specs:
-                if spec.dry_run_only:
-                    skipped.append(spec.subject)
-                    continue
+            skipped.extend(
+                item.subject
+                for item in plan.items
+                if item.action is DomainPlanAction.NONE
+                or specs_by_subject[item.subject].dry_run_only
+            )
+
+            for item in actionable_items:
+                spec = specs_by_subject[item.subject]
 
                 try:
                     version, schema_id = await registry_repository.register_schema(spec)  # type: ignore[arg-type]
@@ -124,6 +165,20 @@ class SchemaBatchApplyUseCase:
                 failed=tuple(failed),
                 audit_id=audit_id,
                 artifacts=tuple(artifacts),
+                risk=plan.policy_evaluation.risk_metadata()
+                if plan.policy_evaluation is not None
+                else None,
+                approval=approval_context.get("approval")
+                if isinstance(approval_context.get("approval"), dict)
+                else None,
+                policy_evaluation=plan.policy_evaluation,
+                requested_total=len(batch.specs),
+                planned_total=len(actionable_items),
+                warning_total=plan.policy_evaluation.warning_count
+                if plan.policy_evaluation is not None
+                else None,
+                details=tuple(self._build_result_details(batch, plan, registered, skipped, failed)),
+                actor_context=actor_context,
             )
 
             await self.metadata_repository.save_apply_result(result, actor)
@@ -134,7 +189,23 @@ class SchemaBatchApplyUseCase:
                 actor=actor,
                 status=AuditStatus.COMPLETED,
                 message="Schema apply completed",
-                snapshot={"summary": result.summary(), **approval_context},
+                snapshot=merge_actor_metadata(
+                    {
+                        "summary": result.summary(),
+                        "requested_items": [
+                            {
+                                "subject": spec.subject,
+                                "reason": spec.reason,
+                            }
+                            for spec in batch.specs
+                        ],
+                        "policy_pack": plan.policy_evaluation.to_audit_dict()
+                        if plan.policy_evaluation is not None
+                        else None,
+                        **approval_context,
+                    },
+                    actor_context,
+                ),
             )
 
             return result
@@ -146,9 +217,47 @@ class SchemaBatchApplyUseCase:
                 actor=actor,
                 status=AuditStatus.FAILED,
                 message=f"Schema apply failed: {exc!s}",
-                snapshot=approval_context,
+                snapshot=merge_actor_metadata(approval_context, actor_context),
             )
             raise
+
+    def _build_result_details(
+        self,
+        batch: DomainSchemaBatch,
+        plan: DomainSchemaPlan,
+        registered: list[str],
+        skipped: list[str],
+        failed: list[dict[str, str]],
+    ) -> list[dict[str, str | None]]:
+        plan_items_by_subject = {item.subject: item for item in plan.items}
+        failed_by_subject = {
+            item.get("subject"): item.get("error")
+            for item in failed
+            if isinstance(item.get("subject"), str)
+        }
+        details: list[dict[str, str | None]] = []
+
+        for spec in batch.specs:
+            plan_item = plan_items_by_subject.get(spec.subject)
+            details.append(
+                {
+                    "subject": spec.subject,
+                    "action": plan_item.action.value
+                    if plan_item is not None
+                    else DomainPlanAction.NONE.value,
+                    "status": (
+                        "applied"
+                        if spec.subject in registered
+                        else "failed"
+                        if spec.subject in failed_by_subject
+                        else "skipped"
+                    ),
+                    "reason": spec.reason,
+                    "error_message": failed_by_subject.get(spec.subject),
+                }
+            )
+
+        return details
 
     async def _persist_artifact(
         self,

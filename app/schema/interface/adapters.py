@@ -27,7 +27,7 @@ from .schemas import (
     SchemaImpactRecord,
     SchemaPlanItem,
 )
-from .types.enums import Environment
+from .types.enums import CompatibilityMode, Environment
 
 
 class SchemaConverter:
@@ -163,6 +163,7 @@ class SchemaConverter:
                 },
                 schema_definition=item.schema,
                 current_schema=item.current_schema,
+                reason=item.reason,
             )
             for item in plan.items
         ]
@@ -171,15 +172,13 @@ class SchemaConverter:
         compatibility_reports: list[SchemaCompatibilityReport] = [
             SchemaCompatibilityReport(
                 subject=report.subject,
-                mode=report.mode.value if hasattr(report.mode, "value") else report.mode,
+                mode=CompatibilityMode(report.mode.value),
                 is_compatible=report.is_compatible,
                 issues=[
                     SchemaCompatibilityIssue(
                         path=issue.path,
                         message=issue.message,
-                        type=getattr(
-                            issue, "issue_type", issue.type if hasattr(issue, "type") else "unknown"
-                        ),
+                        type=issue.issue_type,
                     )
                     for issue in report.issues
                 ],
@@ -238,6 +237,7 @@ class SchemaConverter:
             registered=list(result.registered),
             skipped=list(result.skipped),
             failed=list(result.failed),  # tuple of dicts → list (no copy needed, immutable)
+            details=list(result.details),
             audit_id=result.audit_id,
             artifacts=artifacts,
             summary=result.summary(),

@@ -38,6 +38,7 @@ class TopicPlanItem(BaseModel):
     diff: dict[str, str] = Field(default_factory=dict, description="변경 사항")
     current_config: dict[str, Any] | None = None
     target_config: dict[str, Any] | None = None
+    reason: StrictStr | None = Field(default=None, description="변경 사유")
 
 
 class PolicyViolation(BaseModel):

@@ -7,6 +7,7 @@ import logging
 from datetime import UTC, datetime
 from typing import Any
 
+from app.shared.actor import merge_actor_metadata
 from app.shared.approval import ApprovalOverride
 from app.shared.constants import ActivityType, AuditAction, AuditStatus
 from app.topic.domain.models import (
@@ -46,6 +47,7 @@ class TopicBulkDeleteUseCase:
         topic_names: list[TopicName],
         actor: str,
         approval_override: ApprovalOverride | None = None,
+        actor_context: dict[str, str] | None = None,
     ) -> dict[str, Any]:
         """
         여러 토픽을 병렬로 삭제합니다.
@@ -92,6 +94,7 @@ class TopicBulkDeleteUseCase:
                     batch,
                     actor,
                     approval_override,
+                    actor_context,
                 )
                 success = name in result.applied
 
@@ -103,7 +106,7 @@ class TopicBulkDeleteUseCase:
                     actor=actor,
                     status=AuditStatus.COMPLETED if success else AuditStatus.FAILED,
                     message=f"Deleted topic: {name}" if success else f"Failed to delete: {name}",
-                    snapshot={"topic_name": name},
+                    snapshot=merge_actor_metadata({"topic_name": name}, actor_context),
                     team=team,
                 )
 
@@ -126,7 +129,9 @@ class TopicBulkDeleteUseCase:
                     actor=actor,
                     status=AuditStatus.FAILED,
                     message=f"Exception during delete: {e!s}",
-                    snapshot={"topic_name": name, "error": str(e)},
+                    snapshot=merge_actor_metadata(
+                        {"topic_name": name, "error": str(e)}, actor_context
+                    ),
                     team=team,
                 )
                 return (name, False)

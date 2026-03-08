@@ -33,6 +33,7 @@ from .request import (
 # Response 스키마
 from .response import (
     FailureDetail,
+    TopicApplyItem,
     TopicBatchApplyResponse,
     TopicBatchDryRunResponse,
     TopicBulkDeleteResponse,
@@ -42,23 +43,19 @@ from .response import (
 )
 
 __all__ = [
-    # Policy Request
     "ActivatePolicyRequest",
     "CreatePolicyRequest",
-    # Topic Response
     "FailureDetail",
-    # Common
     "KafkaCoreMetadata",
-    # Policy Response
     "PolicyDeleteResponse",
     "PolicyListResponse",
     "PolicyResponse",
     "PolicyVersionListResponse",
     "PolicyViolation",
     "RollbackPolicyRequest",
+    "TopicApplyItem",
     "TopicBatchApplyResponse",
     "TopicBatchDryRunResponse",
-    # Topic Request
     "TopicBatchRequest",
     "TopicBatchYAMLRequest",
     "TopicBulkDeleteRequest",
