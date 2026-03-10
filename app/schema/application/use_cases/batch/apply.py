@@ -9,7 +9,13 @@ from app.cluster.domain.services import IConnectionManager
 from app.schema.domain.policies.policy_pack import DefaultSchemaPolicyPackV1
 from app.schema.infrastructure.schema_registry_adapter import ConfluentSchemaRegistryAdapter
 from app.shared.actor import merge_actor_metadata
-from app.shared.approval import ApprovalOverride, assess_schema_batch_risk, ensure_approval
+from app.shared.application.use_cases import CreateApprovalRequestUseCase
+from app.shared.approval import (
+    ApprovalOverride,
+    ApprovalRequiredError,
+    assess_schema_batch_risk,
+    ensure_approval,
+)
 from app.shared.constants import AuditAction, AuditStatus, AuditTarget
 from app.shared.domain.events import SchemaRegisteredEvent
 from app.shared.infrastructure.event_bus import get_event_bus
@@ -40,11 +46,13 @@ class SchemaBatchApplyUseCase:
         metadata_repository: ISchemaMetadataRepository,
         audit_repository: ISchemaAuditRepository,
         policy_repository: ISchemaPolicyRepository | None = None,
+        approval_request_use_case: CreateApprovalRequestUseCase | None = None,
     ) -> None:
         self.connection_manager = connection_manager
         self.metadata_repository = metadata_repository
         self.audit_repository = audit_repository
         self.policy_repository = policy_repository
+        self.approval_request_use_case = approval_request_use_case
         self.event_bus = get_event_bus()
 
     async def execute(
@@ -209,6 +217,29 @@ class SchemaBatchApplyUseCase:
             )
 
             return result
+        except ApprovalRequiredError as exc:
+            request = await self._create_approval_request(
+                registry_id=registry_id,
+                batch=batch,
+                actor=actor,
+                error=exc,
+            )
+            approval_context = {
+                **approval_context,
+                "risk": exc.risk,
+                "approval": exc.approval,
+                "approval_request": request,
+            }
+            await self.audit_repository.log_operation(
+                change_id=batch.change_id,
+                action=AuditAction.APPLY,
+                target=AuditTarget.BATCH,
+                actor=actor,
+                status=AuditStatus.FAILED,
+                message=f"Schema apply failed: {exc!s}",
+                snapshot=merge_actor_metadata(approval_context, actor_context),
+            )
+            raise
         except Exception as exc:
             await self.audit_repository.log_operation(
                 change_id=batch.change_id,
@@ -220,6 +251,41 @@ class SchemaBatchApplyUseCase:
                 snapshot=merge_actor_metadata(approval_context, actor_context),
             )
             raise
+
+    async def _create_approval_request(
+        self,
+        *,
+        registry_id: str,
+        batch: DomainSchemaBatch,
+        actor: str,
+        error: ApprovalRequiredError,
+    ) -> dict[str, str] | None:
+        if self.approval_request_use_case is None:
+            return None
+
+        resource_name = batch.specs[0].subject if len(batch.specs) == 1 else batch.change_id
+        summary = error.approval.get("summary")
+        request = await self.approval_request_use_case.execute(
+            resource_type="schema",
+            resource_name=resource_name,
+            change_type="apply",
+            change_ref=batch.change_id,
+            summary=summary if isinstance(summary, str) else "approval required for schema apply",
+            justification="approval required for high-risk schema apply",
+            requested_by=actor,
+            metadata={
+                "registry_id": registry_id,
+                "env": batch.env.value,
+                "requested_items": [spec.subject for spec in batch.specs],
+                "risk": error.risk,
+                "approval": error.approval,
+            },
+        )
+        return {
+            "request_id": request.request_id,
+            "status": request.status,
+            "resource_type": request.resource_type,
+        }
 
     def _build_result_details(
         self,

@@ -5,7 +5,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from datetime import datetime
 
-from .models import AuditActivity, ClusterStatus
+from .models import ApprovalRequest, AuditActivity, ClusterStatus
 
 
 class IAuditActivityRepository(ABC):
@@ -63,3 +63,31 @@ class IClusterRepository(ABC):
             클러스터 상태 정보 (브로커, 토픽, 파티션 수)
         """
         ...
+
+
+class IApprovalRequestRepository(ABC):
+    @abstractmethod
+    async def create(self, request: ApprovalRequest) -> ApprovalRequest: ...
+
+    @abstractmethod
+    async def get(self, request_id: str) -> ApprovalRequest | None: ...
+
+    @abstractmethod
+    async def list(
+        self,
+        *,
+        status: str | None = None,
+        resource_type: str | None = None,
+        requested_by: str | None = None,
+        limit: int = 100,
+    ) -> list[ApprovalRequest]: ...
+
+    @abstractmethod
+    async def update_status(
+        self,
+        *,
+        request_id: str,
+        status: str,
+        approver: str,
+        decision_reason: str | None,
+    ) -> ApprovalRequest: ...

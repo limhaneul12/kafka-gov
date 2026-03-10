@@ -9,7 +9,13 @@ from dataclasses import asdict
 
 from app.cluster.domain.services import IConnectionManager
 from app.shared.actor import merge_actor_metadata
-from app.shared.approval import ApprovalOverride, assess_topic_batch_risk, ensure_approval
+from app.shared.application.use_cases import CreateApprovalRequestUseCase
+from app.shared.approval import (
+    ApprovalOverride,
+    ApprovalRequiredError,
+    assess_topic_batch_risk,
+    ensure_approval,
+)
 from app.shared.constants import AuditAction, AuditStatus, AuditTarget, MethodType
 from app.shared.domain.policy_types import (
     DomainPolicySeverity,
@@ -91,11 +97,13 @@ class TopicBatchApplyUseCase:
         metadata_repository: ITopicMetadataRepository,
         audit_repository: IAuditRepository,
         policy_repository: IPolicyRepository,
+        approval_request_use_case: CreateApprovalRequestUseCase | None = None,
     ) -> None:
         self.connection_manager = connection_manager
         self.metadata_repository = metadata_repository
         self.audit_repository = audit_repository
         self.policy_repository = policy_repository
+        self.approval_request_use_case = approval_request_use_case
 
     async def execute(
         self,
@@ -312,6 +320,29 @@ class TopicBatchApplyUseCase:
             # 부분 실패 허용 - 결과 반환 (failed 포함)
             return result
 
+        except ApprovalRequiredError as exc:
+            request = await self._create_approval_request(
+                cluster_id=cluster_id,
+                batch=batch,
+                actor=actor,
+                error=exc,
+            )
+            approval_context = {
+                **approval_context,
+                "risk": exc.risk,
+                "approval": exc.approval,
+                "approval_request": request,
+            }
+            await self.audit_repository.log_topic_operation(
+                change_id=batch.change_id,
+                action=AuditAction.APPLY,
+                target=AuditTarget.BATCH,
+                actor=actor,
+                status=AuditStatus.FAILED,
+                message=f"Apply failed: {exc!s}",
+                snapshot=merge_actor_metadata(approval_context, actor_context),
+            )
+            raise
         except Exception as e:
             # 감사 로그 기록
             await self.audit_repository.log_topic_operation(
@@ -324,6 +355,41 @@ class TopicBatchApplyUseCase:
                 snapshot=merge_actor_metadata(approval_context, actor_context),
             )
             raise
+
+    async def _create_approval_request(
+        self,
+        *,
+        cluster_id: str,
+        batch: DomainTopicBatch,
+        actor: str,
+        error: ApprovalRequiredError,
+    ) -> dict[str, str] | None:
+        if self.approval_request_use_case is None:
+            return None
+
+        resource_name = batch.specs[0].name if len(batch.specs) == 1 else batch.change_id
+        summary = error.approval.get("summary")
+        request = await self.approval_request_use_case.execute(
+            resource_type="topic",
+            resource_name=resource_name,
+            change_type="apply",
+            change_ref=batch.change_id,
+            summary=summary if isinstance(summary, str) else "approval required for topic apply",
+            justification="approval required for high-risk topic apply",
+            requested_by=actor,
+            metadata={
+                "cluster_id": cluster_id,
+                "env": batch.env.value,
+                "requested_items": [spec.name for spec in batch.specs],
+                "risk": error.risk,
+                "approval": error.approval,
+            },
+        )
+        return {
+            "request_id": request.request_id,
+            "status": request.status,
+            "resource_type": request.resource_type,
+        }
 
     def _build_result_details(
         self,

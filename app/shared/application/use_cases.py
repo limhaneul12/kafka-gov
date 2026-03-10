@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import UTC, datetime
+from uuid import uuid4
 
 from app.cluster.domain.services import IConnectionManager
-from app.shared.domain.models import AuditActivity, ClusterStatus
-from app.shared.domain.repositories import IAuditActivityRepository
+from app.shared.domain.models import ApprovalRequest, AuditActivity, ClusterStatus
+from app.shared.domain.repositories import IApprovalRequestRepository, IAuditActivityRepository
 
 
 class GetRecentActivitiesUseCase:
@@ -150,4 +151,97 @@ class GetClusterStatusUseCase:
             brokers=tuple(brokers_dict.values()),
             total_topics=len([t for t in metadata.topics.values() if not t.error]),
             total_partitions=total_partitions,
+        )
+
+
+class CreateApprovalRequestUseCase:
+    def __init__(self, approval_repository: IApprovalRequestRepository) -> None:
+        self.approval_repository = approval_repository
+
+    async def execute(
+        self,
+        *,
+        resource_type: str,
+        resource_name: str,
+        change_type: str,
+        summary: str,
+        justification: str,
+        requested_by: str,
+        change_ref: str | None = None,
+        metadata: dict[str, object] | None = None,
+    ) -> ApprovalRequest:
+        request = ApprovalRequest(
+            request_id=str(uuid4()),
+            resource_type=resource_type,
+            resource_name=resource_name,
+            change_type=change_type,
+            change_ref=change_ref,
+            summary=summary,
+            justification=justification,
+            requested_by=requested_by,
+            status="pending",
+            metadata=metadata,
+            requested_at=datetime.now(UTC),
+        )
+        return await self.approval_repository.create(request)
+
+
+class ListApprovalRequestsUseCase:
+    def __init__(self, approval_repository: IApprovalRequestRepository) -> None:
+        self.approval_repository = approval_repository
+
+    async def execute(
+        self,
+        *,
+        status: str | None = None,
+        resource_type: str | None = None,
+        requested_by: str | None = None,
+        limit: int = 100,
+    ) -> list[ApprovalRequest]:
+        return await self.approval_repository.list(
+            status=status,
+            resource_type=resource_type,
+            requested_by=requested_by,
+            limit=limit,
+        )
+
+
+class GetApprovalRequestUseCase:
+    def __init__(self, approval_repository: IApprovalRequestRepository) -> None:
+        self.approval_repository = approval_repository
+
+    async def execute(self, request_id: str) -> ApprovalRequest:
+        request = await self.approval_repository.get(request_id)
+        if request is None:
+            raise ValueError(f"approval request not found: {request_id}")
+        return request
+
+
+class ApproveApprovalRequestUseCase:
+    def __init__(self, approval_repository: IApprovalRequestRepository) -> None:
+        self.approval_repository = approval_repository
+
+    async def execute(
+        self, *, request_id: str, approver: str, decision_reason: str | None = None
+    ) -> ApprovalRequest:
+        return await self.approval_repository.update_status(
+            request_id=request_id,
+            status="approved",
+            approver=approver,
+            decision_reason=decision_reason,
+        )
+
+
+class RejectApprovalRequestUseCase:
+    def __init__(self, approval_repository: IApprovalRequestRepository) -> None:
+        self.approval_repository = approval_repository
+
+    async def execute(
+        self, *, request_id: str, approver: str, decision_reason: str | None = None
+    ) -> ApprovalRequest:
+        return await self.approval_repository.update_status(
+            request_id=request_id,
+            status="rejected",
+            approver=approver,
+            decision_reason=decision_reason,
         )

@@ -147,7 +147,6 @@ async def get_cluster_metrics(
     description="메모리 캐시에 있는 메트릭 스냅샷을 강제로 갱신합니다. DB 저장은 /sync를 사용하세요.",
     response_description="갱신 완료 메시지",
 )
-@inject
 @handle_server_errors(error_message="메트릭 캐시 갱신 실패")
 async def refresh_metrics(cluster_id: str) -> dict[str, str]:
     """메트릭 동기화 태스크 트리거 (스냅샷 수집)"""
@@ -162,7 +161,6 @@ async def refresh_metrics(cluster_id: str) -> dict[str, str]:
     description="Celery 태스크를 통해 비동기로 메트릭을 수집하고 DB에 저장합니다. 사용자가 동기화 버튼을 눌렀을 때 호출됩니다.",
     response_description="동기화 태스크 시작 메시지",
 )
-@inject
 @handle_server_errors(error_message="메트릭 동기화 시작 실패")
 async def sync_metrics_to_db(cluster_id: str) -> dict[str, str]:
     """메트릭 동기화 (DB 저장 포함)"""

@@ -42,3 +42,21 @@ class ClusterStatus:
     brokers: tuple[BrokerInfo, ...]  # 브로커 목록
     total_topics: int  # 전체 토픽 수
     total_partitions: int  # 전체 파티션 수
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class ApprovalRequest:
+    request_id: str
+    resource_type: str
+    resource_name: str
+    change_type: str
+    change_ref: str | None = None
+    summary: str
+    justification: str
+    requested_by: str
+    status: str
+    approver: str | None = None
+    decision_reason: str | None = None
+    metadata: dict[str, Any] | None = None
+    requested_at: datetime
+    decided_at: datetime | None = None
