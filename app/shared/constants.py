@@ -17,6 +17,7 @@ class ActivityType:
 
     TOPIC = "topic"
     SCHEMA = "schema"
+    APPROVAL = "approval"
 
 
 class AuditAction:
@@ -34,6 +35,10 @@ class AuditAction:
     REGISTER = "REGISTER"
     UPLOAD = "UPLOAD"
     SYNC = "SYNC"
+
+    REQUESTED = "REQUESTED"
+    APPROVED = "APPROVED"
+    REJECTED = "REJECTED"
 
 
 class AuditTarget:
@@ -69,6 +74,11 @@ ACTION_MESSAGES = {
         AuditAction.DELETE: "삭제됨",
         AuditAction.DRY_RUN: "검증됨",
         AuditAction.APPLY: "적용됨",
+    },
+    ActivityType.APPROVAL: {
+        AuditAction.REQUESTED: "승인 요청됨",
+        AuditAction.APPROVED: "승인됨",
+        AuditAction.REJECTED: "반려됨",
     },
 }
 

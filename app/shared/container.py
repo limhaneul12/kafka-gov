@@ -5,11 +5,19 @@ from __future__ import annotations
 from dependency_injector import containers, providers
 
 from app.shared.application.use_cases import (
+    ApproveApprovalRequestUseCase,
+    CreateApprovalRequestUseCase,
     GetActivityHistoryUseCase,
+    GetApprovalRequestUseCase,
     GetClusterStatusUseCase,
     GetRecentActivitiesUseCase,
+    ListApprovalRequestsUseCase,
+    RejectApprovalRequestUseCase,
 )
-from app.shared.infrastructure.repository import MySQLAuditActivityRepository
+from app.shared.infrastructure.repository import (
+    MySQLAuditActivityRepository,
+    SQLApprovalRequestRepository,
+)
 
 from .cache import init_redis
 from .database import DatabaseManager
@@ -44,6 +52,10 @@ class InfrastructureContainer(containers.DeclarativeContainer):
         MySQLAuditActivityRepository,
         session_factory=database_manager.provided.get_db_session,
     )
+    approval_request_repository = providers.Factory(
+        SQLApprovalRequestRepository,
+        session_factory=database_manager.provided.get_db_session,
+    )
 
     # Use Cases
     get_recent_activities_use_case = providers.Factory(
@@ -54,6 +66,31 @@ class InfrastructureContainer(containers.DeclarativeContainer):
     get_activity_history_use_case = providers.Factory(
         GetActivityHistoryUseCase,
         audit_repository=audit_activity_repository,
+    )
+
+    create_approval_request_use_case = providers.Factory(
+        CreateApprovalRequestUseCase,
+        approval_repository=approval_request_repository,
+    )
+
+    list_approval_requests_use_case = providers.Factory(
+        ListApprovalRequestsUseCase,
+        approval_repository=approval_request_repository,
+    )
+
+    get_approval_request_use_case = providers.Factory(
+        GetApprovalRequestUseCase,
+        approval_repository=approval_request_repository,
+    )
+
+    approve_approval_request_use_case = providers.Factory(
+        ApproveApprovalRequestUseCase,
+        approval_repository=approval_request_repository,
+    )
+
+    reject_approval_request_use_case = providers.Factory(
+        RejectApprovalRequestUseCase,
+        approval_repository=approval_request_repository,
     )
 
     get_cluster_status_use_case = providers.Factory(

@@ -77,6 +77,7 @@ class SchemaContainer(containers.DeclarativeContainer):
         metadata_repository=metadata_repository,
         audit_repository=audit_repository,
         policy_repository=policy_repository,
+        approval_request_use_case=infrastructure.create_approval_request_use_case,
     )
 
     plan_use_case: providers.Provider[SchemaPlanUseCase] = providers.Factory(

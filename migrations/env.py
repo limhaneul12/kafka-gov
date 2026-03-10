@@ -4,45 +4,22 @@ from logging.config import fileConfig
 from alembic import context
 from sqlalchemy.ext.asyncio import create_async_engine
 
-# ---- Project metadata import ----
-# NOTE: Base.metadata must include all Table definitions for autogenerate.
-from app.shared.settings import settings
+import app.cluster.infrastructure.models as cluster_models
+import app.consumer.infrastructure.models as consumer_models
+import app.schema.infrastructure.catalog_models as schema_catalog_models
+import app.schema.infrastructure.models as schema_models
+import app.shared.infrastructure.models as shared_models
+import app.topic.infrastructure.models as topic_models
 from app.shared.database import Base
+from app.shared.settings import settings
 
-# If needed, import models so they are registered on Base.metadata
-from app.topic.infrastructure.models import (
-    TopicMetadataModel,
-    TopicPlanModel,
-    TopicApplyResultModel,
-    AuditLogModel,
-    TopicPartitionMetrics,
-    LeaderDistribution,
-    MetricsSnapshot,
-    PolicyModel,
-)
-from app.schema.infrastructure.models import (
-    SchemaApplyResultModel,
-    SchemaMetadataModel,
-    SchemaPlanModel,
-    SchemaArtifactModel,
-    SchemaUploadResultModel,
-    SchemaAuditLogModel,
-)
-from app.schema.infrastructure.catalog_models import (
-    SchemaSubjectModel,
-    SchemaVersionModel,
-    ObservedUsageModel,
-)
-from app.cluster.infrastructure.models import (
-    KafkaClusterModel,
-    SchemaRegistryModel,
-)
-from app.consumer.infrastructure.models import (
-    ConsumerGroupSnapshotModel,
-    ConsumerMemberSnapshotModel,
-    ConsumerPartitionSnapshotModel,
-    ConsumerGroupRebalanceDeltaModel,
-    ConsumerGroupRebalanceRollupModel,
+REGISTERED_MODEL_MODULES = (
+    topic_models,
+    schema_models,
+    schema_catalog_models,
+    cluster_models,
+    shared_models,
+    consumer_models,
 )
 
 config = context.config

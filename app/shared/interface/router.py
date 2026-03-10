@@ -8,7 +8,13 @@ from fastapi import APIRouter, Depends, Query
 
 from app.container import AppContainer
 from app.shared.error_handlers import endpoint_error_handler
-from app.shared.interface.schema import BrokerResponse, ClusterStatusResponse
+from app.shared.interface.schema import (
+    ApprovalDecisionRequest,
+    ApprovalRequestCreateRequest,
+    ApprovalRequestResponse,
+    BrokerResponse,
+    ClusterStatusResponse,
+)
 
 router = APIRouter(prefix="/v1", tags=["shared"])
 
@@ -19,6 +25,21 @@ ActivityHistoryResponse = Depends(
     Provide[AppContainer.infrastructure_container.get_activity_history_use_case]
 )
 ClusterStatus = Depends(Provide[AppContainer.infrastructure_container.get_cluster_status_use_case])
+CreateApprovalRequest = Depends(
+    Provide[AppContainer.infrastructure_container.create_approval_request_use_case]
+)
+ListApprovalRequests = Depends(
+    Provide[AppContainer.infrastructure_container.list_approval_requests_use_case]
+)
+GetApprovalRequest = Depends(
+    Provide[AppContainer.infrastructure_container.get_approval_request_use_case]
+)
+ApproveApprovalRequest = Depends(
+    Provide[AppContainer.infrastructure_container.approve_approval_request_use_case]
+)
+RejectApprovalRequest = Depends(
+    Provide[AppContainer.infrastructure_container.reject_approval_request_use_case]
+)
 
 
 @router.get("/audit/recent")
@@ -145,3 +166,85 @@ async def get_cluster_status(
         total_topics=cluster_status.total_topics,
         total_partitions=cluster_status.total_partitions,
     )
+
+
+@router.post("/approval-requests", response_model=ApprovalRequestResponse)
+@inject
+@endpoint_error_handler(default_message="Failed to create approval request")
+async def create_approval_request(
+    request: ApprovalRequestCreateRequest,
+    use_case=CreateApprovalRequest,
+) -> ApprovalRequestResponse:
+    created = await use_case.execute(
+        resource_type=request.resource_type,
+        resource_name=request.resource_name,
+        change_type=request.change_type,
+        change_ref=request.change_ref,
+        summary=request.summary,
+        justification=request.justification,
+        requested_by=request.requested_by,
+        metadata=request.metadata,
+    )
+    return ApprovalRequestResponse.model_validate(created)
+
+
+@router.get("/approval-requests", response_model=list[ApprovalRequestResponse])
+@inject
+@endpoint_error_handler(default_message="Failed to list approval requests")
+async def list_approval_requests(
+    use_case=ListApprovalRequests,
+    status: str | None = Query(default=None),
+    resource_type: str | None = Query(default=None),
+    requested_by: str | None = Query(default=None),
+    limit: int = Query(default=100, ge=1, le=500),
+) -> list[ApprovalRequestResponse]:
+    requests = await use_case.execute(
+        status=status,
+        resource_type=resource_type,
+        requested_by=requested_by,
+        limit=limit,
+    )
+    return [ApprovalRequestResponse.model_validate(item) for item in requests]
+
+
+@router.get("/approval-requests/{request_id}", response_model=ApprovalRequestResponse)
+@inject
+@endpoint_error_handler(default_message="Failed to retrieve approval request")
+async def get_approval_request(
+    request_id: str,
+    use_case=GetApprovalRequest,
+) -> ApprovalRequestResponse:
+    request = await use_case.execute(request_id)
+    return ApprovalRequestResponse.model_validate(request)
+
+
+@router.post("/approval-requests/{request_id}/approve", response_model=ApprovalRequestResponse)
+@inject
+@endpoint_error_handler(default_message="Failed to approve approval request")
+async def approve_approval_request(
+    request_id: str,
+    decision: ApprovalDecisionRequest,
+    use_case=ApproveApprovalRequest,
+) -> ApprovalRequestResponse:
+    request = await use_case.execute(
+        request_id=request_id,
+        approver=decision.approver,
+        decision_reason=decision.decision_reason,
+    )
+    return ApprovalRequestResponse.model_validate(request)
+
+
+@router.post("/approval-requests/{request_id}/reject", response_model=ApprovalRequestResponse)
+@inject
+@endpoint_error_handler(default_message="Failed to reject approval request")
+async def reject_approval_request(
+    request_id: str,
+    decision: ApprovalDecisionRequest,
+    use_case=RejectApprovalRequest,
+) -> ApprovalRequestResponse:
+    request = await use_case.execute(
+        request_id=request_id,
+        approver=decision.approver,
+        decision_reason=decision.decision_reason,
+    )
+    return ApprovalRequestResponse.model_validate(request)

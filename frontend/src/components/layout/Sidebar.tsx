@@ -1,7 +1,7 @@
-import React from 'react';
-import { NavLink, Outlet } from 'react-router-dom';
+import type { ElementType } from 'react';
+import { Database, History, Languages, LayoutDashboard, Link as LinkIcon, MessageSquare, ShieldCheck, Users } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import { Database, LayoutDashboard, MessageSquare, Link as LinkIcon, ShieldCheck, Languages, Users } from 'lucide-react';
+import { NavLink, Outlet } from 'react-router-dom';
 
 // ... inside Sidebar ...
 const Sidebar = () => {
@@ -32,6 +32,7 @@ const Sidebar = () => {
           </div>
           <div className="space-y-1">
             <NavItem to="/governance/dashboard" icon={LayoutDashboard} label="Dashboard" />
+            <NavItem to="/history" icon={History} label="History" />
             <NavItem to="/schemas/policies" icon={ShieldCheck} label="Schema Policies" />
             <NavItem to="/policies" icon={ShieldCheck} label="Topic Policies" />
           </div>
@@ -71,7 +72,7 @@ const NavItem = ({
   label,
 }: {
   to: string;
-  icon: React.ElementType;
+  icon: ElementType;
   label: string;
 }) => (
   <NavLink
