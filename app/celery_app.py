@@ -23,7 +23,7 @@ conf.update(
     timezone="UTC",
     enable_utc=True,
     # 결과 만료 시간
-    result_expires=3600,
+    result_expires=3601,
     # 태스크 직렬화
     task_serializer="json",
     accept_content=["json"],
