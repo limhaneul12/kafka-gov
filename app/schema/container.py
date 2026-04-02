@@ -43,9 +43,6 @@ class SchemaContainer(containers.DeclarativeContainer):
     # Cluster 컨테이너 참조 (ConnectionManager 사용)
     cluster = providers.DependenciesContainer()
 
-    # Consumer 컨테이너 참조 (GetTopicConsumersUseCase 사용)
-    consumer = providers.DependenciesContainer()
-
     # MySQL 기반 구현체들 (Session Factory 패턴)
     metadata_repository: providers.Provider[ISchemaMetadataRepository] = providers.Factory(
         MySQLSchemaMetadataRepository,  # type: ignore[arg-type]
@@ -126,7 +123,6 @@ class SchemaContainer(containers.DeclarativeContainer):
     impact_graph_use_case: providers.Provider[GetImpactGraphUseCase] = providers.Factory(
         GetImpactGraphUseCase,
         connection_manager=cluster.connection_manager,
-        get_topic_consumers_use_case=consumer.get_topic_consumers_use_case,
     )
 
     subject_detail_use_case: providers.Provider[GetSubjectDetailUseCase] = providers.Factory(

@@ -5,7 +5,6 @@ from alembic import context
 from sqlalchemy.ext.asyncio import create_async_engine
 
 import app.cluster.infrastructure.models as cluster_models
-import app.consumer.infrastructure.models as consumer_models
 import app.schema.infrastructure.catalog_models as schema_catalog_models
 import app.schema.infrastructure.models as schema_models
 import app.shared.infrastructure.models as shared_models
@@ -19,7 +18,6 @@ REGISTERED_MODEL_MODULES = (
     schema_catalog_models,
     cluster_models,
     shared_models,
-    consumer_models,
 )
 
 config = context.config

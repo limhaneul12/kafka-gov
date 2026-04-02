@@ -12,11 +12,6 @@ from fastapi.responses import ORJSONResponse
 
 from .celery_app import celery_app
 from .cluster.interface.router import router as cluster_router
-from .consumer.interface.routers import (
-    router as consumer_router,
-    topic_router as consumer_topic_router,
-)
-from .consumer.interface.routers.websocket_routes import router as consumer_websocket_router
 from .container import AppContainer
 from .schema.interface.router import router as schema_router
 from .schema.interface.routers.policy_router import router as schema_policy_router
@@ -141,7 +136,6 @@ def create_app() -> FastAPI:
     app.state.infrastructure_container = container.infrastructure_container()
     app.state.cluster_container = container.cluster_container()
     app.state.topic_container = container.topic_container()
-    app.state.consumer_container = container.consumer_container()
     app.state.schema_container = container.schema_container()
 
     # ✅ (중요) 와이어링 - wiring_config가 있으면 생략 가능하지만,
@@ -151,7 +145,6 @@ def create_app() -> FastAPI:
             # 라우터/핸들러 패키지들
             "app.cluster.interface",
             "app.topic.interface",
-            "app.consumer.interface",
             "app.schema.interface",
             "app.schema.interface.routers",
             "app.shared.interface",
@@ -166,11 +159,6 @@ def create_app() -> FastAPI:
     app.include_router(policy_router, prefix="/api")  # Policy API
     app.include_router(schema_router, prefix="/api")
     app.include_router(schema_policy_router, prefix="/api")
-    # Consumer REST routes (already prefixed with /api)
-    app.include_router(consumer_router)
-    app.include_router(consumer_topic_router)
-    # Consumer WebSocket routes
-    app.include_router(consumer_websocket_router)
 
     @app.get("/api")
     @app.get("/api/")
