@@ -4,7 +4,8 @@ from __future__ import annotations
 
 import logging
 
-from app.cluster.domain.services import IConnectionManager
+from app.infra.kafka.connection_manager import IConnectionManager
+from app.infra.kafka.kafka_adapter import KafkaTopicAdapter
 from app.shared.actor import merge_actor_metadata
 from app.shared.constants import AuditAction, AuditStatus, AuditTarget
 from app.shared.domain.policy_types import (
@@ -23,7 +24,6 @@ from app.topic.domain.policies.policy_pack import DefaultTopicPolicyPackV1
 from app.topic.domain.policies.validation import PolicyResolver
 from app.topic.domain.repositories import IAuditRepository, ITopicMetadataRepository
 from app.topic.domain.services import TopicPlannerService
-from app.topic.infrastructure.adapter.kafka_adapter import KafkaTopicAdapter
 
 
 def _translate_policy_error(error: Exception) -> str:

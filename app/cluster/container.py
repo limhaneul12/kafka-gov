@@ -18,11 +18,11 @@ from app.cluster.application.use_cases import (
     UpdateKafkaClusterUseCase,
     UpdateSchemaRegistryUseCase,
 )
-from app.cluster.domain.services import ConnectionManager
 from app.cluster.infrastructure.repositories import (
     MySQLKafkaClusterRepository,
     MySQLSchemaRegistryRepository,
 )
+from app.infra.kafka.connection_manager import ConnectionManager
 
 
 class ClusterContainer(containers.DeclarativeContainer):

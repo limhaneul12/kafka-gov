@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-from app.cluster.domain.services import IConnectionManager
+from app.infra.kafka.connection_manager import IConnectionManager
+from app.infra.kafka.schema_registry_adapter import ConfluentSchemaRegistryAdapter
 from app.schema.domain.policies.policy_pack import DefaultSchemaPolicyPackV1
-from app.schema.infrastructure.schema_registry_adapter import ConfluentSchemaRegistryAdapter
 from app.shared.actor import merge_actor_metadata
 from app.shared.constants import AuditAction, AuditStatus, AuditTarget
 
@@ -56,8 +56,9 @@ class SchemaBatchDryRunUseCase:
 
             # 2. Planner Service 생성 및 계획 수립
             planner_service = SchemaPlannerService(
-                registry_repository, policy_repository=self.policy_repository
-            )  # type: ignore[arg-type]
+                registry_repository,
+                policy_repository=self.policy_repository,
+            )
             plan = await planner_service.create_plan(batch)
             policy_pack_result = DefaultSchemaPolicyPackV1().evaluate(batch, plan)
             plan = DomainSchemaPlan(

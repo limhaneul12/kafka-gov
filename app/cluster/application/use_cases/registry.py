@@ -7,7 +7,7 @@ from datetime import datetime
 
 from app.cluster.domain.models import ConnectionTestResult, SchemaRegistry
 from app.cluster.domain.repositories import ISchemaRegistryRepository
-from app.cluster.domain.services import IConnectionManager
+from app.infra.kafka.connection_manager import IConnectionManager
 from app.shared.security import get_encryption_service
 
 logger = logging.getLogger(__name__)

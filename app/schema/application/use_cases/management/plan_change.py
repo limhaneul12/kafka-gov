@@ -6,7 +6,8 @@ import logging
 from dataclasses import replace
 from datetime import datetime
 
-from app.cluster.domain.services import IConnectionManager
+from app.infra.kafka.connection_manager import IConnectionManager
+from app.infra.kafka.schema_registry_adapter import ConfluentSchemaRegistryAdapter
 from app.schema.domain.models import (
     DomainCompatibilityMode,
     DomainEnvironment,
@@ -20,7 +21,6 @@ from app.schema.domain.repositories.interfaces import (
     ISchemaMetadataRepository,
 )
 from app.schema.domain.services import SchemaPlannerService
-from app.schema.infrastructure.schema_registry_adapter import ConfluentSchemaRegistryAdapter
 
 
 class PlanSchemaChangeUseCase:

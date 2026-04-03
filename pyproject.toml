@@ -51,9 +51,6 @@ dependencies = [
     "typer>=0.16.1",
 ]
 
-[project.scripts]
-preflight = "app.preflight.interface.cli:main"
-
 [tool.pytest.ini_options]
 addopts = [
     "-v",

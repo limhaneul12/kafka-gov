@@ -11,7 +11,8 @@ from typing import Protocol, cast
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.cluster.domain.services import IConnectionManager
+from app.infra.kafka.connection_manager import IConnectionManager
+from app.infra.kafka.schema_registry_adapter import ConfluentSchemaRegistryAdapter
 from app.schema.domain.models import (
     SchemaHistoryItem,
     SchemaVersionInfo,
@@ -26,7 +27,6 @@ from app.schema.infrastructure.models import (
     SchemaAuditLogModel,
     SchemaPlanModel,
 )
-from app.schema.infrastructure.schema_registry_adapter import ConfluentSchemaRegistryAdapter
 
 
 class _MetadataRepositoryWithSessionFactory(Protocol):

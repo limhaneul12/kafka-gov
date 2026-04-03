@@ -7,8 +7,6 @@ from typing import Any
 
 from app.cluster.domain.models.entities import KafkaCluster, SchemaRegistry
 from app.cluster.domain.models.types_enum import SaslMechanism, SecurityProtocol
-from app.consumer.domain.models.group import ConsumerGroup, LagStats
-from app.consumer.domain.types_enum import GroupState, PartitionAssignor
 from app.schema.domain.models.plan_result import (
     DomainSchemaDiff,
     DomainSchemaPlan,
@@ -208,32 +206,6 @@ class DomainMockFactory:
         )
 
     @staticmethod
-    def consumer_group(
-        *,
-        state: GroupState = GroupState.STABLE,
-        member_count: int = 3,
-        total_lag: int = 120,
-        p95_lag: int = 80,
-    ) -> ConsumerGroup:
-        return ConsumerGroup(
-            cluster_id="cluster-a",
-            group_id="group-orders",
-            ts=datetime(2026, 1, 1, tzinfo=UTC),
-            state=state,
-            partition_assignor=PartitionAssignor.STICKY,
-            member_count=member_count,
-            topic_count=2,
-            lag_stats=LagStats(
-                total_lag=total_lag,
-                mean_lag=float(total_lag) / 3,
-                p50_lag=max(0, p95_lag // 2),
-                p95_lag=p95_lag,
-                max_lag=max(p95_lag, total_lag),
-                partition_count=3,
-            ),
-        )
-
-    @staticmethod
     def approval_override(hours: int = 1) -> ApprovalOverride:
         return ApprovalOverride(
             reason="Emergency production governance change",
@@ -352,37 +324,6 @@ def build_domain_case_matrix() -> dict[str, list[dict[str, Any]]]:
         ).build(),
     ]
 
-    consumer_cases = [
-        DomainCaseBuilder(
-            domain="consumer",
-            name="consumer_group_attention_when_rebalancing",
-            payload={
-                "run": lambda: factory.consumer_group(
-                    state=GroupState.REBALANCING
-                ).needs_attention(),
-                "assert": lambda needs_attention: needs_attention is True,
-            },
-        ).build(),
-        DomainCaseBuilder(
-            domain="consumer",
-            name="consumer_group_attention_when_empty",
-            payload={
-                "run": lambda: factory.consumer_group(
-                    state=GroupState.EMPTY, member_count=0
-                ).needs_attention(),
-                "assert": lambda needs_attention: needs_attention is True,
-            },
-        ).build(),
-        DomainCaseBuilder(
-            domain="consumer",
-            name="consumer_group_healthy_stable_case",
-            payload={
-                "run": lambda: factory.consumer_group().needs_attention(),
-                "assert": lambda needs_attention: needs_attention is False,
-            },
-        ).build(),
-    ]
-
     shared_cases = [
         DomainCaseBuilder(
             domain="shared",
@@ -427,6 +368,5 @@ def build_domain_case_matrix() -> dict[str, list[dict[str, Any]]]:
         "cluster": cluster_cases,
         "topic": topic_cases,
         "schema": schema_cases,
-        "consumer": consumer_cases,
         "shared": shared_cases,
     }

@@ -4,10 +4,10 @@ from __future__ import annotations
 
 from typing import Any
 
-from app.cluster.domain.services import IConnectionManager
+from app.infra.kafka.connection_manager import IConnectionManager
+from app.infra.kafka.kafka_adapter import KafkaTopicAdapter
 from app.topic.domain.models import TopicName
 from app.topic.domain.repositories.interfaces import ITopicMetadataRepository
-from app.topic.infrastructure.adapter.kafka_adapter import KafkaTopicAdapter
 
 KafkaMetaDescription = dict[TopicName, dict[str, Any]]
 TopicDescription = list[dict[str, Any]]

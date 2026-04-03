@@ -7,7 +7,8 @@ import uuid
 from collections import defaultdict
 from dataclasses import asdict
 
-from app.cluster.domain.services import IConnectionManager
+from app.infra.kafka.connection_manager import IConnectionManager
+from app.infra.kafka.kafka_adapter import KafkaTopicAdapter
 from app.shared.actor import merge_actor_metadata
 from app.shared.application.use_cases import CreateApprovalRequestUseCase
 from app.shared.approval import (
@@ -41,7 +42,6 @@ from app.topic.domain.policies.policy_pack import DefaultTopicPolicyPackV1
 from app.topic.domain.policies.validation import PolicyResolver
 from app.topic.domain.repositories.interfaces import IAuditRepository, ITopicMetadataRepository
 from app.topic.domain.services import TopicPlannerService
-from app.topic.infrastructure.adapter.kafka_adapter import KafkaTopicAdapter
 
 
 def _translate_policy_error(error: Exception) -> str:

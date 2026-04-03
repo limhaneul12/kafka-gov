@@ -9,7 +9,7 @@ import pytest
 
 import app.schema.application.use_cases.batch.apply as schema_apply_module
 import app.topic.application.batch_use_cases.batch_apply as topic_apply_module
-from app.cluster.domain.services import IConnectionManager
+from app.infra.kafka.connection_manager import IConnectionManager
 from app.schema.application.use_cases.batch.apply import SchemaBatchApplyUseCase
 from app.schema.domain.models import (
     DomainCompatibilityMode,
