@@ -5,7 +5,8 @@ from __future__ import annotations
 import logging
 from datetime import datetime
 
-from app.cluster.domain.services import IConnectionManager
+from app.infra.kafka.connection_manager import IConnectionManager
+from app.infra.kafka.schema_registry_adapter import ConfluentSchemaRegistryAdapter
 from app.schema.domain.models import (
     DomainCompatibilityMode,
     DomainSchemaSpec,
@@ -17,7 +18,6 @@ from app.schema.domain.repositories.interfaces import (
     ISchemaMetadataRepository,
     ISchemaPolicyRepository,
 )
-from app.schema.infrastructure.schema_registry_adapter import ConfluentSchemaRegistryAdapter
 
 
 class GetSubjectDetailUseCase:

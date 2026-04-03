@@ -4,7 +4,8 @@ from __future__ import annotations
 
 import logging
 
-from app.cluster.domain.services import IConnectionManager
+from app.infra.kafka.connection_manager import IConnectionManager
+from app.infra.kafka.kafka_adapter import KafkaTopicAdapter
 from app.schema.domain.models import (
     GraphLink,
     GraphNode,
@@ -12,7 +13,6 @@ from app.schema.domain.models import (
     SubjectName,
 )
 from app.shared.domain.subject_utils import SubjectStrategy, extract_topics_from_subject
-from app.topic.infrastructure.adapter.kafka_adapter import KafkaTopicAdapter
 
 
 class GetImpactGraphUseCase:

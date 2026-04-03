@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from uuid import uuid4
 
-from app.cluster.domain.services import IConnectionManager
+from app.infra.kafka.connection_manager import IConnectionManager
 from app.shared.domain.models import ApprovalRequest, AuditActivity, ClusterStatus
 from app.shared.domain.repositories import IApprovalRequestRepository, IAuditActivityRepository
 

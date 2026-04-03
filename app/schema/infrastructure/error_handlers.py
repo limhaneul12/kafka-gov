@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-from collections.abc import Awaitable, Callable
+from collections.abc import Awaitable, Callable, Coroutine
 from contextlib import suppress
 from functools import wraps
 from typing import Any, ParamSpec, TypeVar
@@ -19,7 +19,7 @@ R = TypeVar("R")
 
 def handle_schema_registry_error(
     operation: str, context_builder: Callable[..., str] | None = None
-) -> Callable[[Callable[P, Awaitable[R]]], Callable[P, Awaitable[R]]]:
+) -> Callable[[Callable[P, Awaitable[R]]], Callable[P, Coroutine[Any, Any, R]]]:
     """Schema Registry 에러를 자동으로 처리하는 데코레이터
 
     **이식성**: 이 데코레이터는 다른 모듈/프로젝트에서도 재사용 가능
@@ -54,7 +54,7 @@ def handle_schema_registry_error(
             return await self.client.some_method(param)
     """
 
-    def decorator(func: Callable[P, Awaitable[R]]) -> Callable[P, Awaitable[R]]:
+    def decorator(func: Callable[P, Awaitable[R]]) -> Callable[P, Coroutine[Any, Any, R]]:
         @wraps(func)
         async def async_wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
             try:

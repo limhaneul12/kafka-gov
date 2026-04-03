@@ -5,8 +5,8 @@ from __future__ import annotations
 import logging
 import uuid
 
-from app.cluster.domain.services import IConnectionManager
-from app.schema.infrastructure.schema_registry_adapter import ConfluentSchemaRegistryAdapter
+from app.infra.kafka.connection_manager import IConnectionManager
+from app.infra.kafka.schema_registry_adapter import ConfluentSchemaRegistryAdapter
 from app.shared.actor import merge_actor_metadata
 
 from ....domain.models import DomainSchemaDeleteImpact, DomainSubjectStrategy, SubjectName

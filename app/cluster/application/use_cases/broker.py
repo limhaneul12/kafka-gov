@@ -12,7 +12,7 @@ from app.cluster.domain.models import (
     SecurityProtocol,
 )
 from app.cluster.domain.repositories import IKafkaClusterRepository
-from app.cluster.domain.services import IConnectionManager
+from app.infra.kafka.connection_manager import IConnectionManager
 from app.shared.security import get_encryption_service
 
 logger = logging.getLogger(__name__)

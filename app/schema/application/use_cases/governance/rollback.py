@@ -4,7 +4,8 @@ from __future__ import annotations
 
 import logging
 
-from app.cluster.domain.services import IConnectionManager
+from app.infra.kafka.connection_manager import IConnectionManager
+from app.infra.kafka.schema_registry_adapter import ConfluentSchemaRegistryAdapter
 from app.schema.application.use_cases.management.plan_change import PlanSchemaChangeUseCase
 from app.schema.domain.models import (
     DomainSchemaPlan,
@@ -12,7 +13,6 @@ from app.schema.domain.models import (
 from app.schema.domain.repositories.interfaces import (
     ISchemaMetadataRepository,
 )
-from app.schema.infrastructure.schema_registry_adapter import ConfluentSchemaRegistryAdapter
 
 
 class RollbackSchemaUseCase:
