@@ -74,31 +74,3 @@ class SubjectHistory:
 
     subject: str
     history: list[SchemaHistoryItem]
-
-
-@dataclass(frozen=True, slots=True, kw_only=True)
-class GraphNode:
-    """영향도 그래프 노드 도메인 모델"""
-
-    id: str
-    type: str
-    label: str
-    metadata: dict[str, Any] = field(default_factory=dict)
-
-
-@dataclass(frozen=True, slots=True, kw_only=True)
-class GraphLink:
-    """영향도 그래프 링크 도메인 모델"""
-
-    source: str
-    target: str
-    relation: str
-
-
-@dataclass(frozen=True, slots=True, kw_only=True)
-class ImpactGraph:
-    """영향도 그래프 도메인 모델"""
-
-    subject: str
-    nodes: list[GraphNode]
-    links: list[GraphLink]

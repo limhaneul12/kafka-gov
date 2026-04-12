@@ -12,8 +12,8 @@
 | Route map | `frontend/src/App.tsx` | BrowserRouter + layout + top-level pages |
 | Shared API calls | `frontend/src/services/api.ts` | Axios instance, endpoint helpers, `/api/` base URL |
 | Route-level screens | `frontend/src/pages/` | page orchestration and screen composition |
-| Shared UI | `frontend/src/components/` | layout, consumer, schema, topic, ui building blocks |
-| Reusable client logic | `frontend/src/hooks/` | websocket, toast, schema hooks |
+| Shared UI | `frontend/src/components/` | layout, schema, and general UI building blocks |
+| Reusable client logic | `frontend/src/hooks/` | toast and schema hooks |
 | Localization | `frontend/src/i18n/index.ts` | Korean default, localStorage-backed language |
 | Dev server behavior | `frontend/vite.config.ts` | port `3000`, `/api` proxy to backend `8000` |
 
@@ -23,7 +23,7 @@
 - Use the shared Axios client in `frontend/src/services/api.ts` instead of ad hoc fetch wrappers.
 - Keep imports relative; this repo does not define TS path aliases in `frontend/tsconfig.json`.
 - Expect translations to default to Korean unless `localStorage.language` overrides it.
-- Reuse existing toast and hook patterns before adding new notification or websocket plumbing.
+- Reuse existing toast and hook patterns before adding new notification or client-side data plumbing.
 
 ## ANTI-PATTERNS
 

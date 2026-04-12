@@ -128,12 +128,8 @@ export default function History() {
 
   const getActivityTypeColor = (type: string) => {
     switch (type?.toLowerCase()) {
-      case "topic":
-        return "info";
       case "schema":
         return "success";
-      case "policy":
-        return "warning";
       case "approval":
         return "info";
       default:
@@ -296,9 +292,7 @@ export default function History() {
                 className="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
               >
                 <option value="all">All Resources</option>
-                <option value="topic">Topic</option>
                 <option value="schema">Schema</option>
-                <option value="policy">Policy</option>
                 <option value="approval">Approval</option>
               </select>
               <select

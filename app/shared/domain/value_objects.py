@@ -26,6 +26,7 @@ from app.shared.types import (
 
 # re-export: 기존 import 경로 호환성 유지
 __all__ = [
+    "SLO",
     "CompatibilityMode",
     "ContractId",
     "DataClassification",
@@ -36,14 +37,13 @@ __all__ = [
     "LineageDirection",
     "ProductId",
     "QualityDimension",
+    "QualityThreshold",
     "RetentionPolicy",
     "SchemaFormat",
-    "SLO",
     "Tag",
     "TagValue",
     "TeamId",
     "TeamOwnership",
-    "QualityThreshold",
 ]
 
 

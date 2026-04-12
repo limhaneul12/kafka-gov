@@ -8,12 +8,10 @@ import app.cluster.infrastructure.models as cluster_models
 import app.schema.infrastructure.catalog_models as schema_catalog_models
 import app.schema.infrastructure.models as schema_models
 import app.shared.infrastructure.models as shared_models
-import app.topic.infrastructure.models as topic_models
 from app.shared.database import Base
 from app.shared.settings import settings
 
 REGISTERED_MODEL_MODULES = (
-    topic_models,
     schema_models,
     schema_catalog_models,
     cluster_models,

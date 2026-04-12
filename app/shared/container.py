@@ -9,7 +9,6 @@ from app.shared.application.use_cases import (
     CreateApprovalRequestUseCase,
     GetActivityHistoryUseCase,
     GetApprovalRequestUseCase,
-    GetClusterStatusUseCase,
     GetRecentActivitiesUseCase,
     ListApprovalRequestsUseCase,
     RejectApprovalRequestUseCase,
@@ -33,9 +32,6 @@ class InfrastructureContainer(containers.DeclarativeContainer):
     """
 
     infra_container = providers.Object(settings)
-
-    # Cluster Container (외부 주입)
-    cluster = providers.DependenciesContainer()
 
     # Database Manager - Singleton
     database_manager = providers.Singleton(
@@ -91,9 +87,4 @@ class InfrastructureContainer(containers.DeclarativeContainer):
     reject_approval_request_use_case = providers.Factory(
         RejectApprovalRequestUseCase,
         approval_repository=approval_request_repository,
-    )
-
-    get_cluster_status_use_case = providers.Factory(
-        GetClusterStatusUseCase,
-        connection_manager=cluster.connection_manager,
     )

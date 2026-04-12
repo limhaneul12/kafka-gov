@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
-from types import SimpleNamespace
 from typing import Any
 
 from app.cluster.domain.models.entities import KafkaCluster, SchemaRegistry
@@ -24,21 +23,7 @@ from app.schema.domain.models.types_enum import (
     DomainSubjectStrategy,
 )
 from app.schema.domain.models.value_objects import DomainSchemaSource
-from app.shared.approval import (
-    ApprovalOverride,
-    assess_schema_batch_risk,
-    assess_topic_batch_risk,
-    ensure_approval,
-)
-from app.topic.domain.models.config import DomainTopicConfig, DomainTopicMetadata
-from app.topic.domain.models.plan import DomainTopicPlan, DomainTopicPlanItem
-from app.topic.domain.models.spec_batch import DomainTopicBatch, DomainTopicSpec
-from app.topic.domain.models.types_enum import (
-    DomainCleanupPolicy,
-    DomainEnvironment as TopicEnvironment,
-    DomainPlanAction as TopicPlanAction,
-    DomainTopicAction,
-)
+from app.shared.approval import ApprovalOverride, assess_schema_batch_risk, ensure_approval
 
 
 def _fixture_test_value(label: str) -> str:
@@ -75,70 +60,6 @@ class DomainMockFactory:
             auth_password=_fixture_test_value("schema-registry") if with_auth else None,
             created_at=datetime(2026, 1, 1, tzinfo=UTC),
             updated_at=datetime(2026, 1, 1, tzinfo=UTC),
-        )
-
-    @staticmethod
-    def topic_spec(
-        *,
-        action: DomainTopicAction = DomainTopicAction.CREATE,
-        name: str = "dev.orders.created",
-        with_config: bool = True,
-        with_metadata: bool = True,
-    ) -> DomainTopicSpec:
-        config = (
-            DomainTopicConfig(
-                partitions=3,
-                replication_factor=2,
-                cleanup_policy=DomainCleanupPolicy.DELETE,
-                retention_ms=3600000,
-                min_insync_replicas=1,
-            )
-            if with_config
-            else None
-        )
-        metadata = (
-            DomainTopicMetadata(
-                owners=("team-platform",),
-                doc="https://wiki.local/topic/orders",
-                tags=("critical",),
-            )
-            if with_metadata
-            else None
-        )
-        return DomainTopicSpec(name=name, action=action, config=config, metadata=metadata)
-
-    @staticmethod
-    def topic_batch(specs: tuple[DomainTopicSpec, ...]) -> DomainTopicBatch:
-        return DomainTopicBatch(change_id="chg-topic-001", env=TopicEnvironment.DEV, specs=specs)
-
-    @staticmethod
-    def topic_plan(
-        *, include_delete: bool = False, reduce_durability: bool = False
-    ) -> DomainTopicPlan:
-        create_item = DomainTopicPlanItem(
-            name="dev.orders.created",
-            action=TopicPlanAction.CREATE,
-            diff={"partitions": "+2"},
-            current_config={"replication.factor": "3", "min.insync.replicas": "2"},
-            target_config={
-                "replication.factor": "2" if reduce_durability else "3",
-                "min.insync.replicas": "1" if reduce_durability else "2",
-            },
-        )
-        items: tuple[DomainTopicPlanItem, ...] = (create_item,)
-        if include_delete:
-            items += (
-                DomainTopicPlanItem(
-                    name="dev.orders.to-delete",
-                    action=TopicPlanAction.DELETE,
-                    diff={"op": "delete"},
-                ),
-            )
-        return DomainTopicPlan(
-            change_id="plan-topic-001",
-            env=TopicEnvironment.DEV,
-            items=items,
-            violations=(),
         )
 
     @staticmethod
@@ -255,42 +176,6 @@ def build_domain_case_matrix() -> dict[str, list[dict[str, Any]]]:
         ).build(),
     ]
 
-    topic_cases = [
-        DomainCaseBuilder(
-            domain="topic",
-            name="topic_spec_fingerprint_and_env",
-            payload={
-                "run": lambda: factory.topic_spec().fingerprint(),
-                "assert": lambda fp: isinstance(fp, str) and len(fp) == 16,
-            },
-        ).build(),
-        DomainCaseBuilder(
-            domain="topic",
-            name="topic_batch_rejects_duplicate_names",
-            payload={
-                "expect_error": ValueError,
-                "run": lambda: factory.topic_batch(
-                    (
-                        factory.topic_spec(name="dev.orders.created"),
-                        factory.topic_spec(name="dev.orders.created"),
-                    )
-                ),
-            },
-        ).build(),
-        DomainCaseBuilder(
-            domain="topic",
-            name="topic_delete_rejects_config",
-            payload={
-                "expect_error": ValueError,
-                "run": lambda: factory.topic_spec(
-                    action=DomainTopicAction.DELETE,
-                    with_config=True,
-                    with_metadata=False,
-                ),
-            },
-        ).build(),
-    ]
-
     schema_cases = [
         DomainCaseBuilder(
             domain="schema",
@@ -331,9 +216,17 @@ def build_domain_case_matrix() -> dict[str, list[dict[str, Any]]]:
             payload={
                 "expect_error": ValueError,
                 "run": lambda: ensure_approval(
-                    assess_topic_batch_risk(
-                        SimpleNamespace(env=SimpleNamespace(value="prod")),
-                        factory.topic_plan(include_delete=True),
+                    assess_schema_batch_risk(
+                        factory.schema_batch(
+                            (
+                                factory.schema_spec(
+                                    subject="prod.orders-value",
+                                    compatibility=DomainCompatibilityMode.NONE,
+                                ),
+                            ),
+                            env=SchemaEnvironment.PROD,
+                        ),
+                        factory.schema_plan(compatible=True),
                     ),
                     approval_override=None,
                 ),
@@ -366,7 +259,6 @@ def build_domain_case_matrix() -> dict[str, list[dict[str, Any]]]:
 
     return {
         "cluster": cluster_cases,
-        "topic": topic_cases,
         "schema": schema_cases,
         "shared": shared_cases,
     }

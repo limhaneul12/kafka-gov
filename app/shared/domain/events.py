@@ -26,7 +26,7 @@ class DomainEvent:
 
 @dataclass(frozen=True, slots=True)
 class SchemaRegisteredEvent:
-    """스키마 등록 이벤트 - Schema Context → Topic/Analysis Context"""
+    """스키마 등록 이벤트 - Schema Context → shared consumers"""
 
     event_id: EventId
     aggregate_id: AggregateId  # change_id
@@ -49,47 +49,3 @@ class SchemaRegisteredEvent:
     # 기본값이 있는 필드는 마지막에
     event_type: str = "schema.registered"
     actor_role: str = UserRole.ADMIN.value
-
-
-@dataclass(frozen=True, slots=True)
-class TopicCreatedEvent:
-    """토픽 생성 이벤트 - Topic Context → Analysis Context"""
-
-    event_id: EventId
-    aggregate_id: AggregateId  # change_id
-    occurred_at: datetime
-
-    # Topic 정보
-    topic_name: str
-    partitions: int
-    replication_factor: int
-
-    # 메타데이터
-    environment: str
-    actor: Actor
-
-    # 기본값이 있는 필드는 마지막에
-    event_type: str = "topic.created"
-    actor_role: str = UserRole.ADMIN.value
-
-
-@dataclass(frozen=True, slots=True)
-class TopicSchemaLinkedEvent:
-    """토픽-스키마 연결 이벤트 - Analysis Context 발행"""
-
-    event_id: EventId
-    aggregate_id: AggregateId
-    occurred_at: datetime
-
-    # 연결 정보
-    topic_name: str
-    schema_subject: str
-    schema_type: str  # "key" or "value"
-    link_source: str  # "auto" or "manual"
-
-    # 메타데이터
-    environment: str
-
-    # 기본값이 있는 필드는 마지막에
-    event_type: str = "topic_schema.linked"
-    confidence_score: float = 1.0  # 자동 연결 신뢰도

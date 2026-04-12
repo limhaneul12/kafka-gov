@@ -171,10 +171,10 @@ def get_logger(name: str | None = None) -> structlog.stdlib.BoundLogger:
 
     Example:
         logger = get_logger(__name__)
-        logger.info("topic_created",
-                    topic_name="prod.orders",
-                    cluster_id="prod-kafka",
-                    partitions=12)
+        logger.info("schema_registered",
+                    subject="prod.orders-value",
+                    registry_id="default",
+                    version=12)
     """
     return structlog.stdlib.get_logger(name)
 

@@ -99,7 +99,6 @@ class MySQLSchemaMetadataRepository(ISchemaMetadataRepository):
                         {
                             "subject": impact.subject,
                             "topics": list(impact.topics),
-                            "consumers": list(impact.consumers),
                         }
                         for impact in plan.impacts
                     ],
@@ -207,7 +206,6 @@ class MySQLSchemaMetadataRepository(ISchemaMetadataRepository):
                     DomainSchemaImpactRecord(
                         subject=impact["subject"],
                         topics=tuple(impact["topics"]),
-                        consumers=tuple(impact["consumers"]),
                     )
                     for impact in plan_data.get("impacts", [])
                 ]

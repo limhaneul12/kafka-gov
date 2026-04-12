@@ -13,6 +13,7 @@ interface AddConnectionModalProps {
 }
 
 type ConnectionType = "kafka" | "registry";
+type ConnectionFormData = Record<string, string>;
 
 export default function AddConnectionModal({
   isOpen,
@@ -23,13 +24,17 @@ export default function AddConnectionModal({
   editMode = false,
   initialData,
 }: AddConnectionModalProps) {
-  const [connectionType, setConnectionType] = useState<ConnectionType>((defaultType as ConnectionType) || "kafka");
-  const [formData, setFormData] = useState<Record<string, any>>(initialData || {});
+  const initialConnectionType: ConnectionType = defaultType === "registry" ? "registry" : "kafka";
+  const initialFormData: ConnectionFormData = Object.fromEntries(
+    Object.entries(initialData ?? {}).map(([key, value]) => [key, typeof value === "string" ? value : value == null ? "" : String(value)])
+  );
+  const [connectionType, setConnectionType] = useState<ConnectionType>(initialConnectionType);
+  const [formData, setFormData] = useState<ConnectionFormData>(initialFormData);
   const [loading, setLoading] = useState(false);
 
   // Edit 모드일 때 initialData로 form 초기화
   if (editMode && initialData && Object.keys(formData).length === 0) {
-    setFormData(initialData);
+    setFormData(initialFormData);
   }
 
   if (!isOpen) return null;
@@ -41,11 +46,11 @@ export default function AddConnectionModal({
       if (editMode && onUpdate) {
         // Edit 모드: update API 호출
         const idField = connectionType === "kafka" ? "cluster_id" : "registry_id";
-        const id = formData[idField] as string;
+        const id = formData[idField] || "";
         await onUpdate(connectionType, id, formData);
       } else {
         // Add 모드: create API 호출
-        await onSubmit(connectionType, formData as Record<string, string>);
+        await onSubmit(connectionType, formData);
       }
       handleClose();
     } catch (error) {
@@ -73,10 +78,11 @@ export default function AddConnectionModal({
         return (
           <>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label htmlFor="connection-cluster-id" className="block text-sm font-medium text-gray-700 mb-2">
                 Cluster ID *
               </label>
               <input
+                id="connection-cluster-id"
                 type="text"
                 value={formData.cluster_id || ""}
                 onChange={(e) =>
@@ -88,10 +94,11 @@ export default function AddConnectionModal({
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label htmlFor="connection-kafka-name" className="block text-sm font-medium text-gray-700 mb-2">
                 Name *
               </label>
               <input
+                id="connection-kafka-name"
                 type="text"
                 value={formData.name || ""}
                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
@@ -101,10 +108,11 @@ export default function AddConnectionModal({
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label htmlFor="connection-bootstrap-servers" className="block text-sm font-medium text-gray-700 mb-2">
                 Bootstrap Servers *
               </label>
               <input
+                id="connection-bootstrap-servers"
                 type="text"
                 value={formData.bootstrap_servers || ""}
                 onChange={(e) =>
@@ -116,10 +124,11 @@ export default function AddConnectionModal({
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label htmlFor="connection-security-protocol" className="block text-sm font-medium text-gray-700 mb-2">
                 Security Protocol
               </label>
               <select
+                id="connection-security-protocol"
                 value={formData.security_protocol || "PLAINTEXT"}
                 onChange={(e) =>
                   setFormData({ ...formData, security_protocol: e.target.value })
@@ -133,10 +142,11 @@ export default function AddConnectionModal({
               </select>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label htmlFor="connection-kafka-description" className="block text-sm font-medium text-gray-700 mb-2">
                 Description
               </label>
               <textarea
+                id="connection-kafka-description"
                 value={formData.description || ""}
                 onChange={(e) =>
                   setFormData({ ...formData, description: e.target.value })
@@ -153,10 +163,11 @@ export default function AddConnectionModal({
         return (
           <>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label htmlFor="connection-registry-id" className="block text-sm font-medium text-gray-700 mb-2">
                 Registry ID *
               </label>
               <input
+                id="connection-registry-id"
                 type="text"
                 value={formData.registry_id || ""}
                 onChange={(e) =>
@@ -168,10 +179,11 @@ export default function AddConnectionModal({
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label htmlFor="connection-registry-name" className="block text-sm font-medium text-gray-700 mb-2">
                 Name *
               </label>
               <input
+                id="connection-registry-name"
                 type="text"
                 value={formData.name || ""}
                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
@@ -181,10 +193,11 @@ export default function AddConnectionModal({
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label htmlFor="connection-registry-url" className="block text-sm font-medium text-gray-700 mb-2">
                 URL *
               </label>
               <input
+                id="connection-registry-url"
                 type="url"
                 value={formData.url || ""}
                 onChange={(e) => setFormData({ ...formData, url: e.target.value })}
@@ -194,10 +207,11 @@ export default function AddConnectionModal({
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label htmlFor="connection-registry-description" className="block text-sm font-medium text-gray-700 mb-2">
                 Description
               </label>
               <textarea
+                id="connection-registry-description"
                 value={formData.description || ""}
                 onChange={(e) =>
                   setFormData({ ...formData, description: e.target.value })
@@ -227,6 +241,7 @@ export default function AddConnectionModal({
               </p>
             </div>
             <button
+              type="button"
               onClick={handleClose}
               className="rounded-lg p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
             >
@@ -239,9 +254,9 @@ export default function AddConnectionModal({
           <div className="p-6 space-y-6 overflow-y-auto flex-1">
             {/* Connection Type Selection */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-3">
+              <div className="block text-sm font-medium text-gray-700 mb-3">
                 Connection Type *
-              </label>
+              </div>
               <div className="grid grid-cols-2 gap-3">
                 {connectionTypes.map((type) => {
                   const Icon = type.icon;

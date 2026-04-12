@@ -36,8 +36,7 @@ STORAGE_ACCESS_KEY=CHANGE_ME
 STORAGE_SECRET_KEY=CHANGE_ME_STRONG_SECRET
 
 # Redis
-CELERY_BROKER_URL=redis://redis:6379/0
-CELERY_RESULT_BACKEND=redis://redis:6379/0
+REDIS_URL=redis://redis:6379/0
 ```
 
 ### Optional Environment Variables
@@ -55,7 +54,7 @@ DOCS_AUTH_PASSWORD=CHANGE_ME_SECURE_PASSWORD
 ### 2.1 API Documentation Protection
 
 **Production Environment:**
-- When `APP_ENVIRONMENT=production`, `/docs`, `/redoc`, `/openapi.json` are automatically disabled
+- When `APP_ENVIRONMENT=production`, `/swagger`, `/redoc`, `/openapi.json` are automatically disabled
 - FastAPI doesn't create these endpoints, so nginx returns 404
 
 **Development/Staging Environment:**
@@ -70,7 +69,7 @@ DOCS_AUTH_PASSWORD=CHANGE_ME_SECURE_PASSWORD
 
 **Development Environment:**
 ```bash
-APP_CORS_ORIGINS=http://localhost:3000,http://localhost:5173,http://localhost:80
+APP_CORS_ORIGINS=http://localhost:3000,http://localhost:80
 ```
 
 **Production Environment:**
@@ -251,7 +250,7 @@ nginx logs are stored in JSON format at `/var/log/nginx`:
   "time": "2025-01-01T00:00:00+00:00",
   "remote_addr": "1.2.3.4",
   "request_method": "GET",
-  "request_uri": "/api/v1/topics",
+  "request_uri": "/api/v1/schemas",
   "status": 200,
   "request_time": 0.123,
   "upstream_response_time": "0.120"
@@ -282,7 +281,6 @@ nginx logs are stored in JSON format at `/var/log/nginx`:
 
 ## 9. References
 
-- [FastAPI Production Checklist](./fastapi_production_checklist.md)
 - [Docker Compose Reference](https://docs.docker.com/compose/)
 - [Gunicorn Settings](https://docs.gunicorn.org/en/stable/settings.html)
 - [nginx Best Practices](https://nginx.org/en/docs/)

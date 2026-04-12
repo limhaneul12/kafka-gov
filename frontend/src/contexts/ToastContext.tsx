@@ -1,4 +1,4 @@
-import { createContext, useContext, type ReactNode } from "react";
+import { createContext, type ReactNode } from "react";
 import ToastContainer from "../components/ui/Toast";
 import { useToast } from "../hooks/useToast";
 
@@ -20,12 +20,4 @@ export function ToastProvider({ children }: { children: ReactNode }) {
       <ToastContainer toasts={toasts} onClose={removeToast} />
     </ToastContext.Provider>
   );
-}
-
-export function useToastContext() {
-  const context = useContext(ToastContext);
-  if (!context) {
-    throw new Error("useToastContext must be used within ToastProvider");
-  }
-  return context;
 }

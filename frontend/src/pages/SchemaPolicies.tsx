@@ -5,6 +5,7 @@ import { Plus, RefreshCw, Layers } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardContent } from "../components/ui/Card";
 import Button from "../components/ui/Button";
 import schemaApi from "../services/schemaApi";
+import type { SchemaPolicyFormInput, SchemaPolicyRecord } from "../types/schemaPolicy";
 
 // New specialized components
 import SchemaPolicyList from "../components/schema/policies/SchemaPolicyList";
@@ -12,12 +13,12 @@ import SchemaPolicyDetailModal from "../components/schema/policies/SchemaPolicyD
 import SchemaPolicyComposer from "../components/schema/policies/SchemaPolicyComposer";
 
 export default function SchemaPolicies() {
-  const [policies, setPolicies] = useState<any[]>([]);
+  const [policies, setPolicies] = useState<SchemaPolicyRecord[]>([]);
   const [loading, setLoading] = useState(true);
 
   // Modals state
-  const [selectedPolicy, setSelectedPolicy] = useState<any | null>(null);
-  const [policyHistory, setPolicyHistory] = useState<any[]>([]);
+  const [selectedPolicy, setSelectedPolicy] = useState<SchemaPolicyRecord | null>(null);
+  const [policyHistory, setPolicyHistory] = useState<SchemaPolicyRecord[]>([]);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [isComposerOpen, setIsComposerOpen] = useState(false);
 
@@ -27,7 +28,7 @@ export default function SchemaPolicies() {
       setLoading(true);
       const data = await schemaApi.listPolicies();
       setPolicies(data);
-    } catch (err) {
+    } catch {
       toast.error("Failed to load schema policies");
     } finally {
       setLoading(false);
@@ -39,35 +40,35 @@ export default function SchemaPolicies() {
   }, [fetchPolicies]);
 
   // 2. Action Handlers
-  const handleViewDetail = async (policy: any) => {
+  const handleViewDetail = async (policy: SchemaPolicyRecord) => {
     setSelectedPolicy(policy);
     setIsDetailOpen(true);
     try {
       const history = await schemaApi.getPolicyHistory(policy.policy_id);
       setPolicyHistory(history);
-    } catch (err) {
+    } catch {
       toast.error("Failed to load policy history");
     }
   };
 
-  const handleActivate = async (policy: any) => {
+  const handleActivate = async (policy: SchemaPolicyRecord) => {
     try {
       await schemaApi.updatePolicyStatus(policy.policy_id, policy.version, "active");
       toast.success(`Policy ${policy.name} v${policy.version} is now ACTIVE`);
       fetchPolicies();
-    } catch (err) {
+    } catch {
       toast.error("Failed to activate policy");
     }
   };
 
-  const handleCreateSubmit = async (data: any) => {
+  const handleCreateSubmit = async (data: SchemaPolicyFormInput) => {
     try {
       await schemaApi.createPolicy(data);
       toast.success("Policy created successfully (as DRAFT)");
       fetchPolicies();
-    } catch (err) {
+    } catch {
       toast.error("Failed to create policy");
-      throw err; // Composer will handle loading state
+      throw new Error("Failed to create policy");
     }
   };
 
@@ -78,7 +79,7 @@ export default function SchemaPolicies() {
       toast.success(`Success! Rolled back to v${version}`);
       setIsDetailOpen(false);
       fetchPolicies();
-    } catch (err) {
+    } catch {
       toast.error("Failed to rollback version");
     }
   };
@@ -145,7 +146,7 @@ export default function SchemaPolicies() {
                   await schemaApi.deletePolicy(policy.policy_id);
                   toast.success(`Policy ${policy.name} deleted`);
                   fetchPolicies();
-                } catch (err) {
+                } catch {
                   toast.error("Failed to delete policy");
                 }
               }

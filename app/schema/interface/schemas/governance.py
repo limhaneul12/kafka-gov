@@ -118,50 +118,16 @@ class SchemaHistoryResponse(BaseModel):
     history: list[SchemaHistoryItem] = Field(..., description="변경 이력 목록 (최신순)")
 
 
-class GraphNode(BaseModel):
-    """그래프 노드"""
-
-    model_config = ConfigDict(frozen=True)
-
-    id: str = Field(..., description="노드 고유 ID")
-    type: str = Field(..., description="노드 타입 (SCHEMA, TOPIC, CONSUMER)")
-    label: str = Field(..., description="화면에 표시할 라벨")
-    metadata: dict[str, str | int] = Field(
-        default_factory=dict, description="추가 메타데이터 (레이어, 상태 등)"
-    )
-
-
-class GraphLink(BaseModel):
-    """그래프 링크"""
-
-    model_config = ConfigDict(frozen=True)
-
-    source: str = Field(..., description="시작 노드 ID")
-    target: str = Field(..., description="도착 노드 ID")
-    relation: str = Field(..., description="관계 유형 (WRITES_TO, READS_FROM)")
-
-
-class ImpactGraphResponse(BaseModel):
-    """영향도 그래프 응답"""
-
+class KnownTopicNamesResponse(BaseModel):
     model_config = ConfigDict(
         frozen=True,
         json_schema_extra={
             "example": {
                 "subject": "order.payment",
-                "nodes": [
-                    {"id": "order.payment", "type": "SCHEMA", "label": "order.payment"},
-                    {"id": "orders", "type": "TOPIC", "label": "orders"},
-                    {"id": "shipping-app", "type": "CONSUMER", "label": "shipping-app"},
-                ],
-                "links": [
-                    {"source": "order.payment", "target": "orders", "relation": "WRITES_TO"},
-                    {"source": "orders", "target": "shipping-app", "relation": "READS_FROM"},
-                ],
+                "topic_names": ["order.payment"],
             }
         },
     )
 
     subject: str = Field(..., description="중심 노드 (Subject)")
-    nodes: list[GraphNode] = Field(..., description="그래프 노드 목록")
-    links: list[GraphLink] = Field(..., description="그래프 링크 목록")
+    topic_names: list[str] = Field(..., description="읽기 전용 토픽명 힌트 목록")

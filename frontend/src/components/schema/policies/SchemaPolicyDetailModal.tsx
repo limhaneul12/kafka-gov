@@ -1,12 +1,13 @@
 import { X, History, User, Clock, ShieldCheck, FileCode } from "lucide-react";
 import Button from "../../ui/Button";
 import Badge from "../../ui/Badge";
+import type { SchemaPolicyRecord, SchemaPolicyRule } from "../../../types/schemaPolicy";
 
 interface SchemaPolicyDetailModalProps {
     isOpen: boolean;
     onClose: () => void;
-    policy: any;
-    history: any[];
+    policy: SchemaPolicyRecord | null;
+    history: SchemaPolicyRecord[];
     onActivateVersion: (version: number) => void;
 }
 
@@ -33,7 +34,7 @@ export default function SchemaPolicyDetailModal({
                             <p className="text-sm text-gray-500">ID: {policy.policy_id}</p>
                         </div>
                     </div>
-                    <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-full">
+                    <button type="button" onClick={onClose} className="p-2 hover:bg-gray-100 rounded-full">
                         <X className="h-6 w-6 text-gray-400" />
                     </button>
                 </div>
@@ -55,22 +56,23 @@ export default function SchemaPolicyDetailModal({
                                 {/* Rule sets */}
                                 {policy.content?.rules && (
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                        {Object.entries(policy.content.rules).map(([ruleName, rule]: [string, any]) => (
-                                            rule.enabled && (
+                                        {Object.entries(policy.content.rules).map(([ruleName, rule]) => {
+                                            const typedRule = rule as SchemaPolicyRule;
+                                            return typedRule.enabled && (
                                                 <div key={ruleName} className="p-3 bg-white border border-gray-100 rounded-xl shadow-sm flex items-center justify-between">
                                                     <div className="flex flex-col">
                                                         <span className="text-xs font-bold text-gray-900">{ruleName}</span>
-                                                        <span className="text-[10px] text-gray-400">Severity: {rule.severity || 'warning'}</span>
+                                                        <span className="text-[10px] text-gray-400">Severity: {typedRule.severity || 'warning'}</span>
                                                     </div>
                                                     <Badge
-                                                        variant={rule.severity === 'error' || rule.severity === 'critical' ? 'danger' : 'warning'}
+                                                        variant={typedRule.severity === 'error' || typedRule.severity === 'critical' ? 'danger' : 'warning'}
                                                         className="text-[9px] uppercase"
                                                     >
-                                                        {rule.severity || 'warning'}
+                                                        {typedRule.severity || 'warning'}
                                                     </Badge>
                                                 </div>
-                                            )
-                                        ))}
+                                            );
+                                        })}
                                     </div>
                                 )}
 
@@ -94,7 +96,7 @@ export default function SchemaPolicyDetailModal({
                                 )}
 
                                 <div className="bg-gray-950 rounded-lg p-2 font-mono text-[10px] text-blue-300 opacity-50 hover:opacity-100 transition-opacity">
-                                    <p className="text-[9px] text-gray-600 mb-1 font-sans italic">// Raw Configuration Source</p>
+                                    <p className="text-[9px] text-gray-600 mb-1 font-sans italic">Raw Configuration Source</p>
                                     <pre className="max-h-40 overflow-auto custom-scrollbar">{JSON.stringify(policy.content, null, 2)}</pre>
                                 </div>
                             </div>

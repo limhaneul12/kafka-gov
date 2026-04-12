@@ -130,54 +130,6 @@ class SchemaRegistryResponse(BaseModel):
 
 
 # ============================================================================
-# Kafka Connect Schemas
-# ============================================================================
-
-
-class KafkaConnectCreateRequest(BaseModel):
-    """Kafka Connect 생성 요청"""
-
-    connect_id: str = Field(..., description="Connect ID (고유)", min_length=1, max_length=100)
-    cluster_id: str = Field(
-        ..., description="연관된 Kafka Cluster ID", min_length=1, max_length=100
-    )
-    name: str = Field(..., description="Connect 이름", min_length=1, max_length=255)
-    url: str = Field(..., description="Connect URL (예: http://localhost:8083)")
-    description: str | None = Field(None, description="설명")
-    auth_username: str | None = Field(None, description="인증 사용자명")
-    auth_password: str | None = Field(None, description="인증 비밀번호")
-
-
-class KafkaConnectUpdateRequest(BaseModel):
-    """Kafka Connect 수정 요청"""
-
-    name: str = Field(..., description="Connect 이름", min_length=1, max_length=255)
-    url: str = Field(..., description="Connect URL")
-    description: str | None = Field(None, description="설명")
-    auth_username: str | None = Field(None, description="인증 사용자명")
-    auth_password: str | None = Field(None, description="인증 비밀번호")
-    is_active: bool = Field(default=True, description="활성화 여부")
-
-
-class KafkaConnectResponse(BaseModel):
-    """Kafka Connect 응답"""
-
-    connect_id: str
-    cluster_id: str
-    name: str
-    url: str
-    description: str | None
-    auth_username: str | None
-    # auth_password: 보안상 응답에서 제외
-    is_active: bool
-    created_at: datetime
-    updated_at: datetime
-
-    class Config:
-        from_attributes = True
-
-
-# ============================================================================
 # Connection Test Schemas
 # ============================================================================
 

@@ -6,7 +6,7 @@
 
 ## OVERVIEW
 
-Kafka-Gov is a mixed FastAPI + React repository for Kafka governance, schema workflows, consumer monitoring, and policy-aware batch operations.
+Kafka-Gov is a mixed FastAPI + React repository for schema workflows, cluster/registry connection management, and governance policy management.
 Use this file for repo-wide entrypoints and commands; use child `AGENTS.md` files for backend, frontend, and test-local rules.
 
 ## STRUCTURE
@@ -29,15 +29,14 @@ kafka-gov/
 |------|----------|-------|
 | Backend app bootstrap | `app/main.py` | FastAPI creation, router registration, lifespan startup |
 | Backend composition root | `app/container.py` | dependency-injector wiring lives here |
-| Runtime settings | `app/shared/settings.py` | `.env` loading, DB URL precedence, Redis/Celery URLs |
+| Runtime settings | `app/shared/settings.py` | `.env` loading, DB URL precedence, Redis/cache URLs |
 | Frontend bootstrap | `frontend/src/main.tsx` | React root mount |
 | Frontend routes | `frontend/src/App.tsx` | BrowserRouter and top-level page map |
 | Frontend API client | `frontend/src/services/api.ts` | Axios base URL and shared endpoint helpers |
-| CLI entry | `app/preflight/interface/cli.py` | `preflight` Typer command tree |
 | Migrations | `script/migrate.sh`, `migrations/env.py` | app settings drive Alembic target DB |
-| CI contract | `.github/workflows/ci.yml` | Ruff, pyrefly, preflight tests, full pytest |
+| CI contract | `.github/workflows/ci.yml` | Ruff, pyrefly, frontend build, full pytest |
 | Test bootstrap | `tests/conftest.py` | opt-in e2e spins backend and frontend subprocesses |
-| Module-specific feature detail | `app/topic/README.md`, `app/schema/README.md`, `app/consumer/README.md` | prefer README over duplicating details here |
+| Module-specific feature detail | `app/schema/README.md` | prefer README over duplicating details here |
 
 ## CONVENTIONS
 
@@ -56,9 +55,7 @@ kafka-gov/
 
 ## UNIQUE STYLES
 
-- The backend starts a metrics backfill on app startup when a cluster lacks a snapshot; this behavior is wired through FastAPI lifespan and Celery.
 - The frontend dev server proxies `/api` to `http://localhost:8000` and runs on port `3000`.
-- Preflight is a first-class CLI surface exposed from `pyproject.toml`, not an ad hoc script.
 
 ## COMMANDS
 

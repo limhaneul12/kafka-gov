@@ -193,8 +193,6 @@ class SchemaCompatibilityReport(BaseModel):
 
 
 class SchemaImpactRecord(BaseModel):
-    """스키마 영향도 정보"""
-
     model_config = ConfigDict(
         extra="forbid",
         frozen=True,
@@ -202,14 +200,12 @@ class SchemaImpactRecord(BaseModel):
             "example": {
                 "subject": "prod.orders.created-value",
                 "topics": ["prod.orders.created"],
-                "consumers": ["consumer-group-1"],
             }
         },
     )
 
     subject: SubjectName
     topics: list[StrictStr] = Field(default_factory=list, max_length=50)
-    consumers: list[StrictStr] = Field(default_factory=list, max_length=50)
     status: StrictStr = Field(default="success")
     error_message: StrictStr | None = Field(default=None)
 

@@ -1,7 +1,5 @@
 {
   "error": {
-    "topic_not_found": "Topic '{name}' not found",
-    "topic_already_exists": "Topic '{name}' already exists",
     "schema_not_found": "Schema '{subject}' not found",
     "cluster_not_found": "Cluster '{id}' not found",
     "connection_failed": "Connection failed: {reason}",
@@ -14,9 +12,6 @@
     "general": "An error occurred"
   },
   "success": {
-    "topic_created": "Topic '{name}' created successfully",
-    "topic_updated": "Topic '{name}' updated successfully",
-    "topic_deleted": "Topic '{name}' deleted successfully",
     "schema_uploaded": "Schema '{subject}' uploaded successfully",
     "policy_created": "Policy '{name}' created successfully",
     "policy_activated": "Policy '{name}' activated successfully",
@@ -28,8 +23,7 @@
     "invalid_format": "Invalid format for {field}",
     "min_value": "{field} must be at least {min}",
     "max_value": "{field} must be at most {max}",
-    "invalid_environment": "Invalid environment: {env}",
-    "invalid_naming": "Topic name violates naming policy: {reason}"
+    "invalid_environment": "Invalid environment: {env}"
   },
   "policy": {
     "naming_violation": "Naming policy violation: {reason}",
@@ -50,29 +44,5 @@
     "processing": "Processing...",
     "no_data": "No data available",
     "cluster_selected": "Cluster '{name}' selected"
-  },
-  "consumer": {
-    "log": {
-      "filtering_topic": "Filtering {count} consumer groups for topic '{topic}'",
-      "group_partitions": "Group '{group_id}' has {count} partitions: {partitions}",
-      "group_consumes_topic": "Group '{group_id}' consumes topic '{topic}' ({count} partitions)",
-      "found_consumer_groups": "Found {count} consumer groups for topic '{topic}'",
-      "processing_group": "Processing consumer group: {group_id}",
-      "got_summary": "Got summary for '{group_id}': state={state}, members={members}",
-      "added_health": "Added health for '{group_id}'",
-      "failed_health": "Failed to get health for group '{group_id}': {error}",
-      "total_health_list": "Total consumer health list size: {count}"
-    },
-    "governance": {
-      "slo_violation": "SLO violation (current: {current}%, threshold: {threshold}%)",
-      "stuck_partitions": "Stuck partitions detected ({count} partitions)",
-      "rebalance_instability": "Rebalance instability (score: {score}/100)",
-      "unfair_distribution": "Unfair partition distribution (Gini: {gini})",
-      "summary_slo_violation": "{count} Consumer Group(s) violating SLO",
-      "summary_stuck_partitions": "{count} Stuck Partition(s) detected",
-      "summary_unconsumed_partitions": "{count} partition(s) not consumed",
-      "summary_all_healthy": "All Consumer Groups are healthy",
-      "summary_partial_consumption": "Only {consumed} out of {total} partitions consumed"
-    }
   }
 }

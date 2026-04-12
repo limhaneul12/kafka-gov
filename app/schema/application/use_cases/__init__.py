@@ -5,7 +5,7 @@ from .batch.dry_run import SchemaBatchDryRunUseCase
 from .batch.get_plan import SchemaPlanUseCase
 from .governance.detail import GetSubjectDetailUseCase
 from .governance.history import GetSchemaHistoryUseCase
-from .governance.impact import GetImpactGraphUseCase
+from .governance.impact import GetKnownTopicNamesUseCase
 from .governance.rollback import RollbackSchemaUseCase
 
 # Governance use cases (previously combined in GovernanceUseCase)
@@ -19,7 +19,7 @@ from .policy.management import SchemaPolicyUseCase
 
 __all__ = [
     "GetGovernanceStatsUseCase",
-    "GetImpactGraphUseCase",
+    "GetKnownTopicNamesUseCase",
     "GetSchemaHistoryUseCase",
     "GetSubjectDetailUseCase",
     "PlanSchemaChangeUseCase",

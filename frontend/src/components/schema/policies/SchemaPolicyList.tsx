@@ -1,24 +1,15 @@
 import Badge from "../../ui/Badge";
 import Button from "../../ui/Button";
 import { Eye, History, Play, Trash2 } from "lucide-react";
-
-interface Policy {
-    policy_id: string;
-    name: string;
-    policy_type: "lint" | "guardrail";
-    status: "draft" | "active" | "archived";
-    version: number;
-    target_environment: string;
-    created_at: string;
-}
+import type { SchemaPolicyRecord } from "../../../types/schemaPolicy";
 
 interface SchemaPolicyListProps {
-    policies: Policy[];
+    policies: SchemaPolicyRecord[];
     loading: boolean;
-    onViewDetail: (policy: Policy) => void;
-    onViewHistory: (policy: Policy) => void;
-    onActivate: (policy: Policy) => void;
-    onDelete: (policy: Policy) => void;
+    onViewDetail: (policy: SchemaPolicyRecord) => void;
+    onViewHistory: (policy: SchemaPolicyRecord) => void;
+    onActivate: (policy: SchemaPolicyRecord) => void;
+    onDelete: (policy: SchemaPolicyRecord) => void;
 }
 
 export default function SchemaPolicyList({

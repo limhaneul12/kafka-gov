@@ -5,7 +5,7 @@ Get Kafka-Gov running in 5 minutes!
 ## Prerequisites
 
 - Docker & Docker Compose (recommended)
-- OR: Python 3.12+, Node.js 18+, MySQL 8.0+
+- OR: Python 3.12+, Node.js 18+
 
 ---
 
@@ -22,18 +22,20 @@ cd kafka-gov
 cp .env.example .env
 # Edit .env file with your Kafka connection details
 
-# 3. Start all services (Kafka, MySQL, MinIO, Backend, Frontend)
+# 3. Start the shipped services (app, frontend, nginx, redis)
+#    Kafka and Schema Registry are expected on the external `kafka-network`
+#    Metadata defaults to SQLite in /app/data unless KAFKA_GOV_DATABASE_URL is overridden
 docker-compose up -d
 
 # 4. Access web UI
-open http://localhost:8000
+open http://localhost:90
 ```
 
 **Main Endpoints:**
-- 🌐 **Web UI**: http://localhost:8000
-- 📚 **API Docs**: http://localhost:8000/docs (Swagger UI)
-- 📖 **ReDoc**: http://localhost:8000/redoc (Alternative API docs)
-- 💚 **Health Check**: http://localhost:8000/health
+- 🌐 **Web UI**: http://localhost:90
+- 📚 **API Docs**: http://localhost:90/swagger (Swagger UI)
+- 📖 **ReDoc**: http://localhost:90/redoc (Alternative API docs)
+- 💚 **Health Check**: http://localhost:90/health
 
 **Default Credentials:**
 - No authentication required in development mode
@@ -58,6 +60,8 @@ uv run alembic upgrade head
 uv run uvicorn app.main:app --reload --port 8000
 ```
 
+Backend docs are available at `http://localhost:8000/swagger`.
+
 ### Frontend (React 19)
 ```bash
 # Install Node.js dependencies
@@ -66,19 +70,7 @@ npm install
 
 # Start development server
 npm run dev
-# Access at http://localhost:5173
-```
-
----
-
-## Test Your First Batch Upload
-
-```bash
-# Test batch creation with YAML file
-curl -X POST "http://localhost:8000/api/v1/topics/batch/upload" \
-  -F "file=@example/batch_topics.yml"
-
-# Result: Dry-run preview → Review policy violations → Click "Apply Changes"
+# Access at http://localhost:3000
 ```
 
 ---
@@ -86,9 +78,9 @@ curl -X POST "http://localhost:8000/api/v1/topics/batch/upload" \
 ## Next Steps
 
 1. **Register Cluster**: UI → Connections → Add Cluster
-2. **Configure Policy**: Policies → Create Policy
-3. **Create Topics**: Topics → Create Topic (single) or Upload YAML (batch)
-4. **Upload Schemas**: Schemas → Upload Schema
+2. **Configure Schema Policy**: Schema Policies → New Policy
+3. **Upload Schemas**: Schemas → Upload Schema
+4. **Review History**: History → Inspect approvals, overrides, and audit entries
 
 ---
 
@@ -118,4 +110,4 @@ telnet localhost 9092
 # Verify KAFKA_BOOTSTRAP_SERVERS in .env
 ```
 
-For more help, see [Troubleshooting Guide](../operations/troubleshooting.md).
+For more help, review the deployment notes in [Deployment Guide](../operations/deployment.md).

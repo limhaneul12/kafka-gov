@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Badge } from '../../components/common/Badge';
 import { SearchBar } from '../../components/schema/SearchBar';
 import { useSchemaList } from '../../hooks/schema/useSchemaList';
+import type { SchemaRegistry } from '../../types';
 import type { SchemaArtifactResponse } from '../../types/schema';
 import { formatDistanceToNow } from 'date-fns';
 
@@ -10,9 +11,10 @@ import { formatDistanceToNow } from 'date-fns';
 
 const SchemaItem = ({ schema, onClick }: { schema: SchemaArtifactResponse; onClick: () => void }) => {
     return (
-        <div
+        <button
+            type="button"
             onClick={onClick}
-            className="flex items-center justify-between p-4 border-b border-[#d0d7de] hover:bg-[#f6f8fa] group transition-colors cursor-pointer last:border-b-0"
+            className="flex w-full items-center justify-between p-4 border-b border-[#d0d7de] hover:bg-[#f6f8fa] group transition-colors cursor-pointer last:border-b-0 text-left bg-transparent"
         >
             <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 mb-1">
@@ -52,7 +54,7 @@ const SchemaItem = ({ schema, onClick }: { schema: SchemaArtifactResponse; onCli
                 </Badge>
                 <ChevronRight className="w-4 h-4 text-[#d0d7de] group-hover:text-[#57606a] transition-colors" />
             </div>
-        </div>
+        </button>
     );
 };
 
@@ -76,7 +78,7 @@ export default function SchemaList() {
         fetchSchemas();
         // Get active registry for upload/sync
         clustersAPI.listRegistries().then(res => {
-            const active = res.data?.find((r: any) => r.is_active) || res.data?.[0];
+            const active = res.data.find((registry: SchemaRegistry) => registry.is_active) || res.data[0];
             if (active) setActiveRegistryId(active.registry_id);
         });
     }, [fetchSchemas]);
@@ -90,7 +92,7 @@ export default function SchemaList() {
             await schemasAPI.sync(activeRegistryId);
             toast.success('Sync successful');
             fetchSchemas();
-        } catch (e) {
+        } catch {
             toast.error('Sync failed');
         }
     };
@@ -100,9 +102,9 @@ export default function SchemaList() {
             await schemasAPI.upload(regId, formData);
             toast.success('Upload successful');
             fetchSchemas();
-        } catch (e) {
+        } catch (error: unknown) {
             toast.error('Upload failed');
-            throw e;
+            throw error;
         }
     };
 

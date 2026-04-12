@@ -134,25 +134,6 @@ def ensure_approval(
     }
 
 
-def assess_topic_batch_risk(batch, plan) -> HighRiskAssessment:
-    reasons: list[str] = []
-
-    env_value = getattr(batch.env, "value", str(batch.env)).lower()
-    if env_value == "prod":
-        reasons.append("production topic change")
-
-    if any(
-        getattr(item.action, "value", str(item.action)).lower() == "delete" for item in plan.items
-    ):
-        reasons.append("topic deletion")
-
-    if any(_topic_durability_reduced(item) for item in plan.items):
-        reasons.append("durability reduction")
-
-    unique_reasons = tuple(dict.fromkeys(reasons))
-    return HighRiskAssessment(requires_approval=bool(unique_reasons), reasons=unique_reasons)
-
-
 def assess_schema_batch_risk(batch, plan) -> HighRiskAssessment:
     reasons: list[str] = []
 
@@ -174,29 +155,3 @@ def assess_schema_batch_risk(batch, plan) -> HighRiskAssessment:
 
     unique_reasons = tuple(dict.fromkeys(reasons))
     return HighRiskAssessment(requires_approval=bool(unique_reasons), reasons=unique_reasons)
-
-
-def _topic_durability_reduced(plan_item) -> bool:
-    current = getattr(plan_item, "current_config", None) or {}
-    target = getattr(plan_item, "target_config", None) or {}
-
-    current_rf = _config_int(current, "replication_factor", "replication.factor")
-    target_rf = _config_int(target, "replication_factor", "replication.factor")
-    if current_rf is not None and target_rf is not None and target_rf < current_rf:
-        return True
-
-    current_isr = _config_int(current, "min_insync_replicas", "min.insync.replicas")
-    target_isr = _config_int(target, "min_insync_replicas", "min.insync.replicas")
-    return current_isr is not None and target_isr is not None and target_isr < current_isr
-
-
-def _config_int(config: dict[str, Any], *keys: str) -> int | None:
-    for key in keys:
-        value = config.get(key)
-        if value is None:
-            continue
-        try:
-            return int(value)
-        except (TypeError, ValueError):
-            continue
-    return None

@@ -1,13 +1,13 @@
 import axios from 'axios';
 import {
     type DashboardResponse,
-    type ImpactGraphResponse,
+    type KnownTopicNamesResponse,
     type SchemaHistoryResponse,
     type SchemaSearchParams,
     type SchemaSearchResponse,
 } from '../types/schema';
-
-type SchemaPolicyRecord = Record<string, unknown>;
+import type { SchemaPolicyStatus } from '../types/schemaPolicy';
+import type { SchemaPolicyFormInput, SchemaPolicyRecord } from '../types/schemaPolicy';
 
 // Vite Proxy 설정으로 가정 (/api -> Backend)
 const BASE_URL = '/api/v1/schemas';
@@ -45,9 +45,8 @@ const schemaApi = {
         return response.data;
     },
 
-    // 스키마 영향도 그래프 조회
-    getImpactGraph: async (subject: string, registryId: string = 'default'): Promise<ImpactGraphResponse> => {
-        const response = await axios.get<ImpactGraphResponse>(`${BASE_URL}/impact/${encodeURIComponent(subject)}`, {
+    getKnownTopicNames: async (subject: string, registryId: string = 'default'): Promise<KnownTopicNamesResponse> => {
+        const response = await axios.get<KnownTopicNamesResponse>(`${BASE_URL}/known-topics/${encodeURIComponent(subject)}`, {
             params: { registry_id: registryId },
         });
         return response.data;
@@ -55,28 +54,28 @@ const schemaApi = {
 
     // --- 정책 관리 (Policy Management) ---
     listPolicies: async (params?: { env?: string; policy_type?: string }): Promise<SchemaPolicyRecord[]> => {
-        const response = await axios.get(`/api/v1/schemas/policies`, { params });
+        const response = await axios.get<SchemaPolicyRecord[]>(`/api/v1/schemas/policies`, { params });
         return response.data;
     },
 
-    createPolicy: async (data: SchemaPolicyRecord): Promise<SchemaPolicyRecord> => {
-        const response = await axios.post(`/api/v1/schemas/policies`, data);
+    createPolicy: async (data: SchemaPolicyFormInput): Promise<SchemaPolicyRecord> => {
+        const response = await axios.post<SchemaPolicyRecord>(`/api/v1/schemas/policies`, data);
         return response.data;
     },
 
     getPolicyDetail: async (policyId: string, version?: number): Promise<SchemaPolicyRecord> => {
-        const response = await axios.get(`/api/v1/schemas/policies/${policyId}`, {
+        const response = await axios.get<SchemaPolicyRecord>(`/api/v1/schemas/policies/${policyId}`, {
             params: { version }
         });
         return response.data;
     },
 
     getPolicyHistory: async (policyId: string): Promise<SchemaPolicyRecord[]> => {
-        const response = await axios.get(`/api/v1/schemas/policies/${policyId}/history`);
+        const response = await axios.get<SchemaPolicyRecord[]>(`/api/v1/schemas/policies/${policyId}/history`);
         return response.data;
     },
 
-    updatePolicyStatus: async (policyId: string, version: number, status: string): Promise<void> => {
+    updatePolicyStatus: async (policyId: string, version: number, status: SchemaPolicyStatus): Promise<void> => {
         await axios.patch(`/api/v1/schemas/policies/status`, {
             policy_id: policyId,
             version,

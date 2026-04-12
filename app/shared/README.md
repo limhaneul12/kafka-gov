@@ -13,8 +13,7 @@ shared/
 │   └── repositories.py    # Repository interfaces
 ├── infrastructure/
 │   ├── event_bus.py       # In-memory async event bus
-│   ├── repository.py
-│   └── cluster_repository.py
+│   └── repository.py
 ├── application/
 │   └── use_cases.py
 └── interface/
@@ -30,4 +29,4 @@ shared/
 
 ## API Endpoints
 
-- `GET /api/health` - Health check
+- `GET /health` - Health check

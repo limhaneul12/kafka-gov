@@ -131,14 +131,6 @@ class AppSettings(BaseSettings):
         return f"redis://{host}:{port}/{db}"
 
     @property
-    def celery_broker_url(self) -> str:
-        return os.getenv("CELERY_BROKER_URL") or self.redis_url
-
-    @property
-    def celery_result_backend(self) -> str:
-        return os.getenv("CELERY_RESULT_BACKEND") or self.redis_url
-
-    @property
     def is_production(self) -> bool:
         """프로덕션 환경 여부"""
         return self.environment.lower() in ("prod", "production")

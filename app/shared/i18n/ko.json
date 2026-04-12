@@ -1,7 +1,5 @@
 {
   "error": {
-    "topic_not_found": "토픽 '{name}'을(를) 찾을 수 없습니다",
-    "topic_already_exists": "토픽 '{name}'이(가) 이미 존재합니다",
     "schema_not_found": "스키마 '{subject}'을(를) 찾을 수 없습니다",
     "cluster_not_found": "클러스터 '{id}'을(를) 찾을 수 없습니다",
     "connection_failed": "연결에 실패했습니다: {reason}",
@@ -14,9 +12,6 @@
     "general": "오류가 발생했습니다"
   },
   "success": {
-    "topic_created": "토픽 '{name}'이(가) 생성되었습니다",
-    "topic_updated": "토픽 '{name}'이(가) 업데이트되었습니다",
-    "topic_deleted": "토픽 '{name}'이(가) 삭제되었습니다",
     "schema_uploaded": "스키마 '{subject}'이(가) 업로드되었습니다",
     "policy_created": "정책 '{name}'이(가) 생성되었습니다",
     "policy_activated": "정책 '{name}'이(가) 활성화되었습니다",
@@ -28,8 +23,7 @@
     "invalid_format": "{field}의 형식이 올바르지 않습니다",
     "min_value": "{field}은(는) {min} 이상이어야 합니다",
     "max_value": "{field}은(는) {max} 이하여야 합니다",
-    "invalid_environment": "올바르지 않은 환경: {env}",
-    "invalid_naming": "토픽명이 네이밍 정책에 위배됩니다: {reason}"
+    "invalid_environment": "올바르지 않은 환경: {env}"
   },
   "policy": {
     "naming_violation": "네이밍 정책 위반: {reason}",
@@ -50,29 +44,5 @@
     "processing": "처리 중...",
     "no_data": "데이터가 없습니다",
     "cluster_selected": "클러스터 '{name}' 선택됨"
-  },
-  "consumer": {
-    "log": {
-      "filtering_topic": "토픽 '{topic}'에 대해 {count}개 컨슈머 그룹 필터링 중",
-      "group_partitions": "그룹 '{group_id}'에 {count}개 파티션: {partitions}",
-      "group_consumes_topic": "그룹 '{group_id}'가 토픽 '{topic}' 소비 ({count}개 파티션)",
-      "found_consumer_groups": "토픽 '{topic}'에 대해 {count}개 컨슈머 그룹 발견",
-      "processing_group": "컨슈머 그룹 처리 중: {group_id}",
-      "got_summary": "'{group_id}' 요약 조회 완료: state={state}, members={members}",
-      "added_health": "'{group_id}' 헬스 추가 완료",
-      "failed_health": "'{group_id}' 그룹 헬스 조회 실패: {error}",
-      "total_health_list": "전체 컨슈머 헬스 리스트 크기: {count}"
-    },
-    "governance": {
-      "slo_violation": "SLO 미달 (현재: {current}%, 기준: {threshold}%)",
-      "stuck_partitions": "Stuck Partition 감지 ({count}개)",
-      "rebalance_instability": "리밸런스 불안정 (점수: {score}/100)",
-      "unfair_distribution": "파티션 분배 불공정 (Gini: {gini})",
-      "summary_slo_violation": "{count}개 Consumer Group이 SLO 미달",
-      "summary_stuck_partitions": "{count}개 Stuck Partition 감지",
-      "summary_unconsumed_partitions": "{count}개 파티션이 소비되지 않음",
-      "summary_all_healthy": "모든 Consumer Group이 정상 작동 중",
-      "summary_partial_consumption": "총 {total}개 파티션 중 {consumed}개만 소비됨"
-    }
   }
 }

@@ -4,7 +4,7 @@ Usage:
     from app.shared.i18n.translator import t, set_language
 
     # Use translation
-    message = t("error.topic_not_found", name="prod.orders")
+    message = t("error.schema_not_found", subject="prod.orders-value")
 
     # Change language
     set_language("en")
@@ -45,8 +45,8 @@ class Translator:
             Translated string, or the key itself if not found
 
         Examples:
-            >>> t("error.topic_not_found")
-            "Topic not found"
+            >>> t("error.schema_not_found", subject="prod.orders-value")
+            "Schema 'prod.orders-value' not found"
 
             >>> t("error.invalid_value", field="partition", value=0)
             "Invalid value for partition: 0"
