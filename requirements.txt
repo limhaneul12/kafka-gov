@@ -34,9 +34,6 @@ numpy
 pyyaml
 aiohttp
 cachetools
-websocket
-websockets
-websocket-client
 setuptools
 minio
 
@@ -45,9 +42,7 @@ argon2-cffi
 orjson
 dependency-injector
 
-# Task Queue & Caching
-celery
+# Caching
 redis
-flower
 
 pre-commit

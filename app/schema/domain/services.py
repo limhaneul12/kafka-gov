@@ -8,6 +8,7 @@ from typing import Any
 from app.shared.domain.subject_utils import SubjectStrategy, extract_topics_from_subject
 
 from .models import (
+    DomainEnvironment,
     DomainPlanAction,
     DomainPolicyViolation,
     DomainSchemaBatch,
@@ -30,7 +31,7 @@ HIGH_VERSION_COUNT_THRESHOLD = 10  # 버전이 이 개수를 초과하면 경고
 
 
 class SchemaImpactAnalyzer:
-    """스키마 영향도 분석 서비스"""
+    """스키마 subject naming 기반 알려진 토픽명 분석 서비스"""
 
     def __init__(self, registry_repository: ISchemaRegistryRepository) -> None:
         self.registry_repository = registry_repository
@@ -38,20 +39,18 @@ class SchemaImpactAnalyzer:
     async def analyze_impact(
         self, subject: SubjectName, strategy: DomainSubjectStrategy
     ) -> DomainSchemaImpactRecord:
-        """스키마 변경이 미치는 영향도 분석"""
+        """스키마 subject naming에서 알려진 토픽명을 추론합니다."""
         try:
             topics = self._extract_topics_from_subject(subject, strategy)
             return DomainSchemaImpactRecord(
                 subject=subject,
                 topics=tuple(topics),
-                consumers=(),  # 컨슈머 정보는 추후 구현
                 status="success",
             )
         except Exception as e:
             return DomainSchemaImpactRecord(
                 subject=subject,
                 topics=(),
-                consumers=(),
                 status="failure",
                 error_message=str(e),
             )
@@ -71,7 +70,7 @@ class SchemaImpactAnalyzer:
 
 
 class SchemaDeleteAnalyzer:
-    """스키마 삭제 영향도 분석 서비스"""
+    """스키마 삭제 시 naming-derived known topic names를 분석합니다."""
 
     def __init__(self, registry_repository: ISchemaRegistryRepository) -> None:
         self.registry_repository = registry_repository
@@ -116,7 +115,9 @@ class SchemaDeleteAnalyzer:
         )
 
         # 4. 안전 삭제 여부 판단
-        safe_to_delete = len(warnings) == 0
+        safe_to_delete = self._is_safe_to_delete(
+            subject=subject, current_version=current_info.version
+        )
 
         return DomainSchemaDeleteImpact(
             subject=subject,
@@ -136,12 +137,12 @@ class SchemaDeleteAnalyzer:
         """삭제 경고 메시지 생성"""
         warnings = []
 
-        # 경고 1: 영향받는 토픽이 있는 경우
+        # 경고 1: subject naming으로 연결 가능한 토픽명이 있는 경우
         if affected_topics:
             topic_list = ", ".join(affected_topics)
             warnings.append(
-                f"다음 토픽이 이 스키마를 사용 중일 수 있습니다: {topic_list}. "
-                f"삭제 시 해당 토픽의 프로듀서/컨슈머에 영향을 줄 수 있습니다."
+                f"다음 토픽명은 subject naming 기준으로 이 스키마와 연결됩니다: {topic_list}. "
+                f"실사용 여부는 별도 검증이 필요합니다."
             )
 
         # 경고 2: 버전이 많은 경우
@@ -152,10 +153,27 @@ class SchemaDeleteAnalyzer:
             )
 
         # 경고 3: 프로덕션 환경 경고 (subject naming에서 추론)
-        if "prod" in subject.lower():
+        if self._is_production_subject(subject):
             warnings.append("프로덕션 환경의 스키마입니다. 삭제 전 반드시 영향도를 확인하세요.")
 
         return warnings
+
+    def _is_safe_to_delete(self, subject: SubjectName, current_version: int | None) -> bool:
+        has_high_version_warning = (
+            current_version is not None and current_version > HIGH_VERSION_COUNT_THRESHOLD
+        )
+        is_production_subject = self._is_production_subject(subject)
+        return not has_high_version_warning and not is_production_subject
+
+    def _is_production_subject(self, subject: SubjectName) -> bool:
+        return self._subject_environment(subject) is DomainEnvironment.PROD
+
+    def _subject_environment(self, subject: SubjectName) -> DomainEnvironment | None:
+        env_prefix = subject.split(".", 1)[0] if "." in subject else DomainEnvironment.DEV.value
+        try:
+            return DomainEnvironment(env_prefix)
+        except ValueError:
+            return None
 
 
 class SchemaPlannerService:

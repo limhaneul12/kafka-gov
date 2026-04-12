@@ -1,5 +1,5 @@
 import type { ElementType } from 'react';
-import { Database, History, Languages, LayoutDashboard, Link as LinkIcon, MessageSquare, ShieldCheck, Users } from 'lucide-react';
+import { Database, History, Languages, LayoutDashboard, Link as LinkIcon, ShieldCheck } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { NavLink, Outlet } from 'react-router-dom';
 
@@ -21,9 +21,7 @@ const Sidebar = () => {
 
       <nav className="flex-1 p-4 space-y-6">
           <div className="space-y-1">
-            <NavItem to="/topics" icon={MessageSquare} label="Topics" />
             <NavItem to="/schemas" icon={Database} label="Schema Registry" />
-            <NavItem to="/consumers" icon={Users} label="Consumers" />
           </div>
 
         <div className="space-y-4">
@@ -34,7 +32,6 @@ const Sidebar = () => {
             <NavItem to="/governance/dashboard" icon={LayoutDashboard} label="Dashboard" />
             <NavItem to="/history" icon={History} label="History" />
             <NavItem to="/schemas/policies" icon={ShieldCheck} label="Schema Policies" />
-            <NavItem to="/policies" icon={ShieldCheck} label="Topic Policies" />
           </div>
         </div>
 

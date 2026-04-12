@@ -9,7 +9,7 @@ from app.schema.interface.adapters import (
 )
 from app.schema.interface.schemas import (
     DashboardResponse,
-    ImpactGraphResponse,
+    KnownTopicNamesResponse,
     RollbackRequest,
     SchemaBatchDryRunResponse,
     SchemaChangeRequest,
@@ -64,22 +64,26 @@ async def get_schema_history(
 
 
 @router.get(
-    "/impact/{subject}",
-    response_model=ImpactGraphResponse,
+    "/known-topics/{subject}",
+    response_model=KnownTopicNamesResponse,
     status_code=status.HTTP_200_OK,
-    summary="영향도 그래프 (Lineage)",
-    description="스키마(Subject) -> 토픽 -> 컨슈머로 이어지는 의존 관계를 그래프 데이터로 반환합니다.",
+    summary="알려진 토픽명 조회",
+    description="현재 subject naming 패턴에서 추론한 알려진 토픽명을 반환합니다.",
 )
 @inject
-@handle_server_errors(error_message="Failed to load impact graph")
-async def get_impact_graph(
+@handle_server_errors(error_message="Failed to load known topic names")
+async def get_known_topic_names(
     subject: str,
     registry_id: str = Query(..., description="Schema Registry ID"),
-    impact_use_case=Depends(Provide[AppContainer.schema_container.impact_graph_use_case]),
-) -> ImpactGraphResponse:
-    """스키마 영향도 그래프 조회"""
-    graph = await impact_use_case.execute(registry_id=registry_id, subject=subject)
-    return ImpactGraphResponse.model_validate(asdict(graph))
+    known_topic_names_use_case=Depends(
+        Provide[AppContainer.schema_container.known_topic_names_use_case]
+    ),
+) -> KnownTopicNamesResponse:
+    topic_names = await known_topic_names_use_case.execute(
+        registry_id=registry_id,
+        subject=subject,
+    )
+    return KnownTopicNamesResponse(subject=subject, topic_names=topic_names)
 
 
 @router.post(

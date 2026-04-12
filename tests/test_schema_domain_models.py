@@ -298,9 +298,7 @@ def test_schema_plan_and_results_paths() -> None:
     assert upload_summary["json_count"] == 1
     assert upload_summary["proto_count"] == 1
 
-    impact = DomainSchemaImpactRecord(
-        subject="dev.a", topics=("t1",), consumers=("g1",), status="success"
-    )
+    impact = DomainSchemaImpactRecord(subject="dev.a", topics=("t1",), status="success")
     assert impact.status == "success"
     delete_impact = DomainSchemaDeleteImpact(subject="dev.a", current_version=3, total_versions=3)
     assert delete_impact.safe_to_delete is False

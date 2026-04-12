@@ -10,7 +10,6 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import ORJSONResponse
 
-from .celery_app import celery_app
 from .cluster.interface.router import router as cluster_router
 from .container import AppContainer
 from .schema.interface.router import router as schema_router
@@ -20,42 +19,11 @@ from .shared.interface.router import router as shared_router
 from .shared.logging_config import configure_structlog, get_logger
 from .shared.middleware import RequestLoggingMiddleware
 from .shared.settings import settings
-from .topic.interface.routers.metrics_router import router as metrics_router
-from .topic.interface.routers.policy_router import router as policy_router
-from .topic.interface.routers.topic_router import router as topic_router
 
 # structlog 초기화 (애플리케이션 최상단에서 1회만)
 configure_structlog()
 
 logger = get_logger(__name__)
-
-
-async def _trigger_initial_metrics_sync(container: AppContainer) -> None:
-    """클러스터별 초기 메트릭 스냅샷을 확보합니다."""
-    try:
-        list_clusters_use_case = container.cluster_container.list_kafka_clusters_use_case()
-        clusters = await list_clusters_use_case.execute(active_only=True)
-
-        metrics_repository = container.topic_container.metrics_repository()
-
-        for cluster in clusters:
-            snapshot = await metrics_repository.get_latest_snapshot(cluster.cluster_id)
-            if snapshot is None:
-                logger.info(
-                    "trigger_initial_metrics_sync",
-                    cluster_id=cluster.cluster_id,
-                    cluster_name=cluster.name,
-                )
-                celery_app.send_task(
-                    "app.tasks.metrics_tasks.manual_sync_metrics", args=[cluster.cluster_id]
-                )
-    except Exception as e:
-        logger.error(
-            "initial_metrics_sync_failed",
-            error_type=e.__class__.__name__,
-            error_message=str(e),
-            exc_info=True,
-        )
 
 
 @asynccontextmanager
@@ -65,7 +33,6 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
     try:
         container.init_resources()
-        await _trigger_initial_metrics_sync(container)
 
         logger.info("app_startup_completed", environment=settings.environment)
         yield
@@ -92,11 +59,14 @@ def create_app() -> FastAPI:
     app = FastAPI(
         default_response_class=ORJSONResponse,
         title="Kafka Governance API",
-        description="Kafka Topic / Schema Registry 관리용 API",
+        description="Schema Registry, connection management, and governance API",
         version="0.1.0",
         docs_url=docs_url,
         redoc_url=redoc_url,
         openapi_url=openapi_url,
+        swagger_ui_oauth2_redirect_url=None
+        if settings.is_production
+        else "/swagger/oauth2-redirect",
         lifespan=lifespan,
         swagger_ui_parameters={
             "defaultModelsExpandDepth": -1,
@@ -135,7 +105,6 @@ def create_app() -> FastAPI:
     # (선택) 하위 컨테이너 인스턴스를 접근 용도로 보관하고 싶다면 호출해서 저장
     app.state.infrastructure_container = container.infrastructure_container()
     app.state.cluster_container = container.cluster_container()
-    app.state.topic_container = container.topic_container()
     app.state.schema_container = container.schema_container()
 
     # ✅ (중요) 와이어링 - wiring_config가 있으면 생략 가능하지만,
@@ -144,7 +113,6 @@ def create_app() -> FastAPI:
         packages=[
             # 라우터/핸들러 패키지들
             "app.cluster.interface",
-            "app.topic.interface",
             "app.schema.interface",
             "app.schema.interface.routers",
             "app.shared.interface",
@@ -154,9 +122,6 @@ def create_app() -> FastAPI:
     # 라우터 등록
     app.include_router(shared_router, prefix="/api")
     app.include_router(cluster_router, prefix="/api")  # Cluster API
-    app.include_router(topic_router, prefix="/api")
-    app.include_router(metrics_router, prefix="/api")
-    app.include_router(policy_router, prefix="/api")  # Policy API
     app.include_router(schema_router, prefix="/api")
     app.include_router(schema_policy_router, prefix="/api")
 

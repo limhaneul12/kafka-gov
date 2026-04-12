@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import { type ElementType, useEffect, useState } from 'react';
 import {
     Cell,
     Legend,
@@ -12,9 +12,7 @@ import {
     FileText,
     ShieldAlert,
     Users,
-    Activity,
     Server,
-    Hash,
     Clock,
     AlertTriangle,
 } from 'lucide-react';
@@ -22,7 +20,8 @@ import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import schemaApi from '../../services/schemaApi';
 import type { DashboardResponse, SubjectStat } from '../../types/schema';
-import { clustersAPI, metricsAPI } from '../../services/api';
+import type { AuditLog, SchemaRegistry } from '../../types';
+import { auditAPI, clustersAPI } from '../../services/api';
 
 // --- Components ---
 
@@ -35,7 +34,7 @@ const StatCard = ({
 }: {
     title: string;
     value: string | number;
-    icon: React.ElementType;
+    icon: ElementType;
     trend?: string;
     color: string;
 }) => (
@@ -69,6 +68,7 @@ const ScoreCard = ({
         <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100 flex flex-col items-center text-center">
             <div className="relative w-24 h-24 mb-4">
                 <svg transform="rotate(-90)" className="w-full h-full">
+                    <title>{`${title} score indicator`}</title>
                     <circle
                         cx="48"
                         cy="48"
@@ -225,7 +225,29 @@ const TeamRanking = ({ schemas }: { schemas: SubjectStat[] }) => {
     );
 };
 
-const RecentActivity = ({ activities }: { activities: any[] }) => (
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+    typeof value === 'object' && value !== null;
+
+const getErrorMessage = (error: unknown): string => {
+    if (isRecord(error)) {
+        const response = isRecord(error.response) ? error.response : null;
+        const data = response && isRecord(response.data) ? response.data : null;
+        if (typeof data?.detail === 'string') {
+            return data.detail;
+        }
+        if (typeof error.message === 'string') {
+            return error.message;
+        }
+    }
+
+    if (error instanceof Error) {
+        return error.message;
+    }
+
+    return 'Unknown error';
+};
+
+const RecentActivity = ({ activities }: { activities: AuditLog[] }) => (
     <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100 flex flex-col h-full">
         <h3 className="font-semibold text-slate-800 mb-6 flex items-center gap-2">
             <Clock className="w-5 h-5 text-indigo-500" />
@@ -238,14 +260,14 @@ const RecentActivity = ({ activities }: { activities: any[] }) => (
                 </div>
             ) : (
                 activities.slice(0, 10).map((activity, idx) => (
-                    <div key={activity.audit_id || idx} className="flex gap-3 border-l-2 border-slate-100 pl-4 relative text-sm">
+                    <div key={`${activity.timestamp}-${activity.target}-${idx}`} className="flex gap-3 border-l-2 border-slate-100 pl-4 relative text-sm">
                         <div className="absolute -left-[5px] top-1 w-2 h-2 rounded-full bg-indigo-400" />
                         <div>
                             <p className="text-slate-800 font-medium leading-snug">
-                                {activity.action_type} - {activity.resource_name}
+                                {activity.action} - {activity.target}
                             </p>
                             <div className="flex gap-2 text-xs text-slate-400 mt-1">
-                                <span>{activity.actor_id}</span>
+                                <span>{activity.actor}</span>
                                 <span>•</span>
                                 <span>{new Date(activity.timestamp).toLocaleTimeString()}</span>
                             </div>
@@ -272,8 +294,8 @@ const emptyData: DashboardResponse = {
 
 export default function GovernanceDashboard() {
     const [data, setData] = useState<DashboardResponse | null>(null);
-    const [kafkaStats, setKafkaStats] = useState<{ topics: number, brokers: number, clusters: number } | null>(null);
-    const [recentAudit, setRecentAudit] = useState<any[]>([]);
+    const [clusterCount, setClusterCount] = useState(0);
+    const [recentAudit, setRecentAudit] = useState<AuditLog[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [retryCount, setRetryCount] = useState(0);
@@ -288,55 +310,37 @@ export default function GovernanceDashboard() {
                 const [registriesRes, clustersRes, auditRes] = await Promise.all([
                     clustersAPI.listRegistries(),
                     clustersAPI.listKafka(),
-                    // Optional audit fetch
-                    fetch('/api/v1/audit/recent').then(res => res.ok ? res.json() : [])
+                    auditAPI.recent(20),
                 ]);
 
                 const registries = registriesRes.data;
                 const clusters = clustersRes.data;
-                setRecentAudit(Array.isArray(auditRes) ? auditRes : auditRes.items || []);
+                setClusterCount(Array.isArray(clusters) ? clusters.length : 0);
+                setRecentAudit(auditRes.data ?? []);
 
                 // Handle Schema Registry Data
-                const activeRegistry = registries?.find((r: any) => r.is_active) || registries?.[0];
+                const activeRegistry: SchemaRegistry | undefined = registries.find((registry) => registry.is_active) || registries[0];
                 if (activeRegistry) {
                     try {
                         const result = await schemaApi.getDashboardStats(activeRegistry.registry_id);
                         setData(result);
                         setError(null);
-                    } catch (e: any) {
+                    } catch (e: unknown) {
                         console.error('Schema dashboard fetch failed', e);
                         if (retryCount < 1) {
                             setRetryCount(prev => prev + 1);
                             return;
                         }
                         setData(emptyData);
-                        setError(e.response?.data?.detail || e.message);
+                        setError(getErrorMessage(e));
                     }
                 } else {
                     setData(emptyData);
                 }
 
-                // Handle Kafka Metrics Data ...
-                const activeCluster = clusters?.find((c: any) => c.is_active) || clusters?.[0];
-                if (activeCluster) {
-                    try {
-                        const metricsRes = await metricsAPI.getClusterMetrics(activeCluster.cluster_id);
-                        setKafkaStats({
-                            topics: metricsRes.data.topic_count || 0,
-                            brokers: metricsRes.data.broker_count || 0,
-                            clusters: clusters.length
-                        });
-                    } catch (e) {
-                        console.error('Kafka metrics fetch failed', e);
-                        setKafkaStats({ topics: 0, brokers: 0, clusters: clusters.length });
-                    }
-                } else {
-                    setKafkaStats({ topics: 0, brokers: 0, clusters: clusters?.length || 0 });
-                }
-
-            } catch (err: any) {
+            } catch (err: unknown) {
                 console.error('Initial metadata fetch failed', err);
-                setError(err.message);
+                setError(getErrorMessage(err));
             } finally {
                 setLoading(false);
             }
@@ -384,23 +388,11 @@ export default function GovernanceDashboard() {
             </header>
 
             {/* 0. Infrastructure Overview */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 gap-6">
                 <StatCard
                     title="Active Clusters"
-                    value={kafkaStats?.clusters || 0}
+                    value={clusterCount}
                     icon={Server}
-                    color="bg-slate-700"
-                />
-                <StatCard
-                    title="Total Topics"
-                    value={kafkaStats?.topics || 0}
-                    icon={Hash}
-                    color="bg-slate-700"
-                />
-                <StatCard
-                    title="Live Brokers"
-                    value={kafkaStats?.brokers || 0}
-                    icon={Activity}
                     color="bg-slate-700"
                 />
             </div>

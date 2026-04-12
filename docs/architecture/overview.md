@@ -8,31 +8,31 @@ Kafka-Gov is built on **Clean Architecture** principles with domain-driven desig
 ┌─────────────────────────────────────────────────────────────┐
 │                    Frontend (React 19)                      │
 │  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐   │
-│  │Dashboard │  │  Topics  │  │ Schemas  │  │Consumers │   │
+│  │Dashboard │  │ Schemas  │  │History   │  │Policies  │   │
 │  └──────────┘  └──────────┘  └──────────┘  └──────────┘   │
 └─────────────────────────────────────────────────────────────┘
                               ▼
 ┌─────────────────────────────────────────────────────────────┐
 │                 REST API (FastAPI)                          │
-│  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐   │
-│  │  Topic   │  │  Schema  │  │ Connect  │  │Consumer  │   │
-│  │Interface │  │Interface │  │Interface │  │Interface │   │
-│  └──────────┘  └──────────┘  └──────────┘  └──────────┘   │
+│  ┌──────────┐  ┌──────────┐  ┌──────────┐               │
+│  │  Schema  │  │ Cluster  │  │ Shared   │               │
+│  │Interface │  │Interface │  │Interface │               │
+│  └──────────┘  └──────────┘  └──────────┘               │
 └─────────────────────────────────────────────────────────────┘
                               ▼
 ┌─────────────────────────────────────────────────────────────┐
 │              Application Layer (Use Cases)                   │
 │  ┌──────────────────────────────────────────────────────┐   │
-│  │  CreateTopic │ BatchOperation │ SyncSchema │ etc.   │   │
+│  │  SyncSchema │ PolicyEvaluation │ AuditHistory   │   │
 │  └──────────────────────────────────────────────────────┘   │
 └─────────────────────────────────────────────────────────────┘
                               ▼
 ┌─────────────────────────────────────────────────────────────┐
 │                 Domain Layer (Business Logic)                │
-│  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐   │
-│  │  Topic   │  │  Schema  │  │Connector │  │Consumer  │   │
-│  │ Entities │  │ Entities │  │ Entities │  │  Group   │   │
-│  └──────────┘  └──────────┘  └──────────┘  └──────────┘   │
+│  ┌──────────┐  ┌──────────┐  ┌──────────┐               │
+│  │  Schema  │  │ Cluster  │  │ Shared   │               │
+│  │ Entities │  │ Models   │  │ Models   │               │
+│  └──────────┘  └──────────┘  └──────────┘               │
 └─────────────────────────────────────────────────────────────┘
                               ▼
 ┌─────────────────────────────────────────────────────────────┐
@@ -63,29 +63,11 @@ app/
 │   ├── infrastructure/ # Kafka/Schema Registry 클라이언트
 │   └── interface/   # REST API 엔드포인트
 │
-├── topic/           # Topic 관리 (핵심 도메인)
-│   ├── domain/      # Topic, TopicBatch 엔티티
-│   ├── application/ # 토픽 생성/수정/삭제 유즈케이스
-│   ├── infrastructure/ # Kafka Admin API & DB 저장소
-│   └── interface/   # 배치/단일 토픽 API
-│
 ├── schema/          # Schema Registry 관리
 │   ├── domain/      # Schema, Compatibility 모델
 │   ├── application/ # 스키마 등록/동기화 유즈케이스
 │   ├── infrastructure/ # Schema Registry & MinIO
 │   └── interface/   # 스키마 API
-│
-├── connect/         # Kafka Connect 관리
-│   ├── domain/      # Connector 도메인 모델
-│   ├── application/ # Connector 생성/제어 유즈케이스
-│   ├── infrastructure/ # Connect REST API 클라이언트
-│   └── interface/   # Connect API 엔드포인트
-│
-├── consumer/        # Consumer Group 모니터링 & 분석
-│   ├── domain/      # ConsumerGroup, Partition, Metrics 모델
-│   ├── application/ # Lag 추적, Fairness, Stuck 감지 유즈케이스
-│   ├── infrastructure/ # Kafka Admin API, DB 스냅샷 저장소
-│   └── interface/   # Consumer API & WebSocket 엔드포인트
 │
 ├── container.py     # Root DI Container (Dependency Injector)
 └── main.py          # FastAPI 애플리케이션 진입점
@@ -99,30 +81,29 @@ app/
 frontend/src/
 ├── components/      # 재사용 UI 컴포넌트
 │   ├── common/      # Button, Input, Modal 등
-│   ├── topic/       # TopicList, CreateTopicModal
-│   ├── schema/      # SchemaList, UploadSchemaModal
-│   └── policy/      # PolicyDetail, VersionHistory
+│   ├── schema/      # UploadSchemaModal, schema detail helpers
+│   └── ui/          # Shared UI building blocks
 │
 ├── pages/           # 페이지 컴포넌트 (라우팅)
-│   ├── Dashboard.tsx
-│   ├── Topics.tsx
-│   ├── Schemas.tsx
-│   └── Policies.tsx
+│   ├── governance/Dashboard.tsx
+│   ├── History.tsx
+│   ├── Connections/index.tsx
+│   ├── schemas/SchemaDetail.tsx
+│   └── SchemaPolicies.tsx
 │
 ├── services/        # API 클라이언트 (axios)
-│   ├── topicService.ts
-│   ├── schemaService.ts
-│   └── policyService.ts
+│   ├── api.ts
+│   └── schemaApi.ts
 │
 ├── hooks/           # Custom React Hooks
-│   ├── useTopics.ts
-│   └── useBatchOperation.ts
+│   └── schema/useSchemaDetail.ts
 │
 ├── contexts/        # React Context (전역 상태)
-│   └── ClusterContext.tsx
+│   └── ToastContext.tsx
 │
 ├── types/           # TypeScript 타입 정의
-│   └── api.ts
+│   ├── index.ts
+│   └── schema.ts
 │
 └── utils/           # 유틸리티 함수
 ```
@@ -141,7 +122,7 @@ frontend/src/
 
 **Event-Driven:**
 - Domain events for cross-context communication
-- Topic-schema auto-correlation via events
+- Schema registration events for shared audit and approval handlers
 - Event bus for decoupling modules
 
 **Type Safety:**
@@ -214,8 +195,7 @@ frontend/src/
 ### Event-Driven Integration
 
 ```
-topic.created event → topic-schema auto-correlation
-schema.registered event → topic-schema auto-correlation
+schema.registered event → shared audit/approval handlers
 policy.changed event → validation rule update
 ```
 
@@ -226,20 +206,17 @@ shared (foundation)
   ↑
 cluster (connection manager)
   ↑
-topic, schema, connect, consumer (business domains)
+schema (business domain)
 ```
 
-### Data Flow Example (Batch Topic Creation)
+### Data Flow Example (Schema Registration)
 
-1. User uploads YAML via `/api/v1/topics/batch/upload`
-2. `topic` module parses YAML and validates against policies
-3. `topic` module queries `cluster` for active Kafka Admin client
-4. Dry-run preview generated and returned to user
-5. User clicks "Apply"
-6. `topic` module executes batch operations
-7. `topic` module emits `topic.created` events
-8. Topic-schema correlation updated automatically
-9. `shared` module persists audit logs
+1. User uploads a schema via `/api/v1/schemas/upload`
+2. `schema` module validates compatibility and governance policy
+3. `schema` module queries `cluster` for the active Schema Registry client
+4. Storage and audit metadata are persisted
+5. `schema` module emits `schema.registered` events
+6. `shared` module persists audit logs
 
 ---
 
@@ -249,20 +226,15 @@ topic, schema, connect, consumer (business domains)
 |--------|---------|--------------|---------------|
 | 🌐 **`shared/`** | Common Infrastructure | Database, Event Bus, Encryption, Exception Handling | [View Details](../../app/shared/README.md) |
 | 🔌 **`cluster/`** | Multi-Cluster Management | Register clusters, Dynamic switching, Health checks | [View Details](../../app/cluster/README.md) |
-| 🎯 **`topic/`** | Topic Governance (Core) | CRUD + Batch operations, Policy enforcement, Versioning | [View Details](../../app/topic/README.md) |
 | 📦 **`schema/`** | Schema Registry | Upload schemas, Compatibility modes, MinIO storage | [View Details](../../app/schema/README.md) |
-| 🔌 **`connect/`** | Kafka Connect | Connector CRUD, Control, Plugin management | [View Details](../../app/connect/README.md) |
-| 📊 **`consumer/`** | Real-time Monitoring | Topic & Consumer monitoring, Lag tracking, Fairness analysis | [View Details](../../app/consumer/README.md) |
 
 ---
 
 ## Detailed Architecture Guides
 
-- [Backend Architecture](./backend.md)
-- [Frontend Architecture](./frontend.md)
-- [Database Schema](./database.md)
-- [Security Architecture](./security.md)
-- [Deployment Architecture](./deployment.md)
+- [Features Overview](../features/overview.md)
+- [Platform Direction](../features/real-time-data-governance-system.md)
+- [Deployment Guide](../operations/deployment.md)
 
 ---
 
@@ -271,12 +243,12 @@ topic, schema, connect, consumer (business domains)
 | Pattern | Usage | Module |
 |---------|-------|--------|
 | **Repository** | Data access abstraction | All modules |
-| **Factory** | Object creation | cluster, topic |
-| **Strategy** | Policy validation | topic |
+| **Factory** | Object creation | cluster, schema |
+| **Strategy** | Policy validation | schema |
 | **Observer** | Event bus | shared |
 | **Adapter** | External API clients | Infrastructure layers |
 | **Dependency Injection** | Loose coupling | All modules |
-| **CQRS** | Read/Write separation | topic (batch vs single) |
+| **CQRS** | Read/Write separation | schema governance workflows |
 | **Event Sourcing** | Audit trail | shared |
 
 ---
@@ -303,13 +275,11 @@ topic, schema, connect, consumer (business domains)
 - **Apache Kafka**: Message broker
 - **Schema Registry**: Schema versioning
 - **MinIO**: S3-compatible object storage
-- **Kafka Connect**: Data integration
 
 ---
 
 ## Next Steps
 
-- [Backend Architecture Deep Dive](./backend.md)
-- [Frontend Architecture Deep Dive](./frontend.md)
-- [Database Schema Design](./database.md)
-- [API Reference](../api/)
+- [Features Overview](../features/overview.md)
+- [Platform Direction](../features/real-time-data-governance-system.md)
+- [Deployment Guide](../operations/deployment.md)

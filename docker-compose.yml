@@ -26,9 +26,8 @@ services:
       - sh
       - -c
       - |
-          echo "[startup] Checking database migration state..."
-          # 마이그레이션 정보가 꼬였을 경우(f5a8b35897bf 등)를 대비해 강제로 최신으로 스탬프를 찍거나 업그레이드 시도
-          uv run alembic upgrade head || (echo "[startup] Migration failed, trying to stamp current state..." && uv run alembic stamp head && uv run alembic upgrade head)
+          echo "[startup] Running migrations..."
+          bash script/migrate.sh
           echo "[startup] Starting FastAPI server..."
           uv run uvicorn app.main:app --host 0.0.0.0 --port 8000
     environment:
@@ -36,7 +35,7 @@ services:
       - APP_DEBUG=true
       - APP_LOG_LEVEL=INFO
       - APP_ENVIRONMENT=development  # development/staging/production
-      - APP_CORS_ORIGINS=http://localhost:3000,http://localhost:5173,http://localhost:80  # CORS 허용 오리진
+      - APP_CORS_ORIGINS=http://localhost:3000,http://localhost:80  # CORS 허용 오리진
       - KAFKA_GOV_DATABASE_URL=sqlite+aiosqlite:////app/data/kafka_gov.db
       # Kafka 설정
       - KAFKA_BOOTSTRAP_SERVERS=kafka1:19092,kafka2:29092,kafka3:39092
@@ -46,9 +45,6 @@ services:
       # Schema Registry 설정
       - SCHEMA_REGISTRY_URL=http://schema-registry:8081
       - SCHEMA_REGISTRY_TIMEOUT=30
-      # Redis/Celery 설정
-      - CELERY_BROKER_URL=redis://redis:6379/0
-      - CELERY_RESULT_BACKEND=redis://redis:6379/0
       - REDIS_HOST=redis
       - REDIS_PORT=6379
       - REDIS_DB=0
@@ -69,69 +65,6 @@ services:
       - ./logs:/app/logs
       - db_data:/app/data
       - ./migrations:/app/migrations
-
-  # Celery Worker (메트릭 수집 작업 실행)
-  celery-worker:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    user: "0:0"
-    command: ["uv", "run", "celery", "-A", "app.celery_app", "worker", "--loglevel=info"]
-    environment:
-      # App 설정
-      - APP_DEBUG=true
-      - APP_LOG_LEVEL=INFO
-      - APP_ENVIRONMENT=development
-      - KAFKA_GOV_DATABASE_URL=sqlite+aiosqlite:////app/data/kafka_gov.db
-      # Kafka 설정
-      - KAFKA_BOOTSTRAP_SERVERS=kafka1:19092,kafka2:29092,kafka3:39092
-      - KAFKA_SECURITY_PROTOCOL=PLAINTEXT
-      - KAFKA_REQUEST_TIMEOUT_MS=30000
-      - KAFKA_RETRIES=3
-      # Redis (Celery Broker/Backend)
-      - CELERY_BROKER_URL=redis://redis:6379/0
-      - CELERY_RESULT_BACKEND=redis://redis:6379/0
-    depends_on:
-      redis:
-        condition: service_healthy
-    networks:
-      - kafka-gov-internal
-      - kafka-network
-    restart: unless-stopped
-    volumes:
-      - ./logs:/app/logs
-      - db_data:/app/data
-      - ./migrations:/app/migrations
-
-  # Celery Beat (주기적 스케줄러)
-  celery-beat:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    user: "0:0"
-    command: ["uv", "run", "celery", "-A", "app.celery_app", "beat", "--loglevel=info"]
-    environment:
-      # App 설정
-      - APP_DEBUG=true
-      - APP_LOG_LEVEL=INFO
-      - APP_ENVIRONMENT=development
-      # Kafka 설정
-      - KAFKA_BOOTSTRAP_SERVERS=kafka1:19092,kafka2:29092,kafka3:39092
-      - KAFKA_SECURITY_PROTOCOL=PLAINTEXT
-      - KAFKA_REQUEST_TIMEOUT_MS=30000
-      - KAFKA_RETRIES=3
-      # Redis (Celery Broker/Backend)
-      - CELERY_BROKER_URL=redis://redis:6379/0
-      - CELERY_RESULT_BACKEND=redis://redis:6379/0
-    depends_on:
-      redis:
-        condition: service_healthy
-    networks:
-      - kafka-gov-internal
-      - kafka-network
-    restart: unless-stopped
-    volumes:
-      - ./logs:/app/logs
 
   frontend:
     build:

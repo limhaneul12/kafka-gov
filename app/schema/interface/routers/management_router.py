@@ -128,8 +128,8 @@ async def upload_schemas(
     "/delete/analyze",
     response_model=SchemaDeleteImpactResponse,
     status_code=status.HTTP_200_OK,
-    summary="스키마 삭제 영향도 분석 (멀티 레지스트리)",
-    description="스키마 삭제 전 영향도를 분석합니다. 실제 삭제는 수행하지 않습니다.",
+    summary="스키마 삭제 사전 점검 (멀티 레지스트리)",
+    description="스키마 삭제 전 버전/환경 경고와 naming-derived topic-name hints를 점검합니다. 실제 삭제는 수행하지 않습니다.",
 )
 @inject
 @handle_api_errors(validation_error_message="Validation error")
@@ -168,7 +168,7 @@ async def analyze_schema_delete_impact(
     response_model=SchemaDeleteImpactResponse,
     status_code=status.HTTP_200_OK,
     summary="스키마 삭제 (멀티 레지스트리)",
-    description="스키마를 삭제합니다. 영향도 분석 후 안전하지 않으면 실패합니다.",
+    description="스키마를 삭제합니다. 버전/환경 경고가 있으면 실패하며, naming-derived topic-name hints는 참고용으로만 반환합니다.",
 )
 @inject
 @handle_api_errors(

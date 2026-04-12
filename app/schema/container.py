@@ -1,4 +1,4 @@
-"""Schema 모듈 DI 컨테이너 - ConnectionManager 기반"""
+"""Schema 모듈 DI 컨테이너 - naming-derived associations only"""
 
 from __future__ import annotations
 
@@ -10,7 +10,7 @@ from .application.use_cases.batch.dry_run import SchemaBatchDryRunUseCase
 from .application.use_cases.batch.get_plan import SchemaPlanUseCase
 from .application.use_cases.governance.detail import GetSubjectDetailUseCase
 from .application.use_cases.governance.history import GetSchemaHistoryUseCase
-from .application.use_cases.governance.impact import GetImpactGraphUseCase
+from .application.use_cases.governance.impact import GetKnownTopicNamesUseCase
 from .application.use_cases.governance.rollback import RollbackSchemaUseCase
 from .application.use_cases.governance.stats import GetGovernanceStatsUseCase
 from .application.use_cases.management.delete import SchemaDeleteUseCase
@@ -120,9 +120,8 @@ class SchemaContainer(containers.DeclarativeContainer):
         metadata_repository=metadata_repository,
     )
 
-    impact_graph_use_case: providers.Provider[GetImpactGraphUseCase] = providers.Factory(
-        GetImpactGraphUseCase,
-        connection_manager=cluster.connection_manager,
+    known_topic_names_use_case: providers.Provider[GetKnownTopicNamesUseCase] = providers.Factory(
+        GetKnownTopicNamesUseCase,
     )
 
     subject_detail_use_case: providers.Provider[GetSubjectDetailUseCase] = providers.Factory(

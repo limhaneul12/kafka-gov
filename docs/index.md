@@ -1,6 +1,6 @@
 # 📚 Kafka-Gov Documentation
 
-Welcome to the complete documentation for Kafka Governance Platform!
+Welcome to the documentation for Kafka-Gov's current schema-centric governance surface.
 
 ## 🚀 Getting Started
 
@@ -18,16 +18,10 @@ Learn about Kafka-Gov's capabilities:
 
 ### Core Features
 - **[Features Overview](./features/overview.md)** - All features at a glance
-- **[Topic Management](./features/topic-management.md)** - Rich metadata and CRUD operations
-- **[Batch Operations](./features/batch-operations.md)** - YAML-based bulk operations
-- **[Schema Registry](./features/schema-registry.md)** - Integrated schema management
-- **[Kafka Connect](./features/kafka-connect.md)** - Connector management
+- **[Platform Direction](./features/real-time-data-governance-system.md)** - Current scope and target-state model
 
 ### Governance & Monitoring
-- **[Policy Enforcement](./features/policy-enforcement.md)** - Environment-specific rules
-- **[Naming Conventions](./features/naming-policy.md)** - Flexible naming strategies
-- **[Real-time Monitoring](./features/monitoring.md)** - Consumer lag and analytics
-- **[Team Analytics](./features/team-analytics.md)** - Resource usage tracking
+- **[Features Overview](./features/overview.md)** - Governance, schema, and monitoring capabilities
 
 ---
 
@@ -36,22 +30,12 @@ Learn about Kafka-Gov's capabilities:
 Understand how Kafka-Gov works:
 
 - **[Architecture Overview](./architecture/overview.md)** - System design and principles
-- **[Backend Architecture](./architecture/backend.md)** - Python/FastAPI structure
-- **[Frontend Architecture](./architecture/frontend.md)** - React/TypeScript structure
-- **[Database Schema](./architecture/database.md)** - Data model
-- **[Security](./architecture/security.md)** - Authentication and encryption
 
 ---
 
 ## 🔌 API Reference
 
-Complete API documentation:
-
-- **[Topics API](./api/topics.md)** - Topic management endpoints
-- **[Schemas API](./api/schemas.md)** - Schema Registry endpoints
-- **[Policies API](./api/policies.md)** - Policy management endpoints
-- **[Consumer API](./api/consumers.md)** - Monitoring endpoints
-- **[Clusters API](./api/clusters.md)** - Cluster management endpoints
+FastAPI OpenAPI is available at `/openapi.json` outside production.
 
 ---
 
@@ -60,10 +44,6 @@ Complete API documentation:
 Deploy and maintain Kafka-Gov:
 
 - **[Deployment Guide](./operations/deployment.md)** - Docker, Kubernetes, VM
-- **[Monitoring](./operations/monitoring.md)** - Health checks and metrics
-- **[Troubleshooting](./operations/troubleshooting.md)** - Common issues and solutions
-- **[Audit Trail](./operations/audit-trail.md)** - Change tracking and history
-- **[Production Checklist](./operations/production-checklist.md)** - Go-live preparation
 
 ---
 
@@ -72,17 +52,12 @@ Deploy and maintain Kafka-Gov:
 Contribute to Kafka-Gov:
 
 - **[Contributing Guide](../CONTRIBUTING.md)** - How to contribute
-- **[Development Setup](./development/local-setup.md)** - Local environment
-- **[Testing Guide](./development/testing.md)** - Unit and integration tests
-- **[Code Standards](./development/code-standards.md)** - Style and conventions
 
 ---
 
 ## 📖 Additional Resources
 
 - **[Roadmap](./ROADMAP.md)** - Feature plans and version history
-- **[FAQ](./FAQ.md)** - Frequently asked questions
-- **[Changelog](../CHANGELOG.md)** - Release notes
 - **[License](../LICENSE)** - MIT License
 
 ---
@@ -93,18 +68,15 @@ Contribute to Kafka-Gov:
 
 **👨‍💻 Developers:**
 - [Quick Start](./getting-started/quick-start.md)
-- [API Reference](./api/)
+- [API Docs](/openapi.json)
 - [Architecture Overview](./architecture/overview.md)
 
 **👨‍💼 Platform Teams:**
 - [Deployment Guide](./operations/deployment.md)
-- [Policy Enforcement](./features/policy-enforcement.md)
-- [Monitoring](./operations/monitoring.md)
+- [Platform Direction](./features/real-time-data-governance-system.md)
 
 **👨‍🔧 Kafka Admins:**
-- [Topic Management](./features/topic-management.md)
-- [Batch Operations](./features/batch-operations.md)
-- [Consumer Analytics](./features/monitoring.md)
+- [Features Overview](./features/overview.md)
 
 ---
 

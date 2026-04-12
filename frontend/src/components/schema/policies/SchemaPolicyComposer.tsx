@@ -3,12 +3,13 @@ import Button from "../../ui/Button";
 import Badge from "../../ui/Badge";
 import { X, Save, FileCode, Sparkles } from "lucide-react";
 import { GOVERNANCE_PRESETS } from "../../../constants/policyPresets";
+import type { SchemaPolicyFormInput, SchemaPolicyRecord, SchemaPolicyType } from "../../../types/schemaPolicy";
 
 interface SchemaPolicyComposerProps {
     isOpen: boolean;
     onClose: () => void;
-    onSubmit: (data: any) => Promise<void>;
-    initialData?: any;
+    onSubmit: (data: SchemaPolicyFormInput) => Promise<void>;
+    initialData?: SchemaPolicyRecord | null;
 }
 
 export default function SchemaPolicyComposer({
@@ -20,7 +21,7 @@ export default function SchemaPolicyComposer({
     const [formData, setFormData] = useState({
         name: initialData?.name || "",
         description: initialData?.description || "",
-        policy_type: initialData?.policy_type || "lint",
+        policy_type: (initialData?.policy_type || "lint") as SchemaPolicyType,
         target_environment: initialData?.target_environment || "total",
         content: initialData?.content ? JSON.stringify(initialData.content, null, 2) : JSON.stringify(GOVERNANCE_PRESETS[1].content, null, 2),
     });
@@ -51,8 +52,9 @@ export default function SchemaPolicyComposer({
             };
             await onSubmit(payload);
             onClose();
-        } catch (err: any) {
-            alert("Invalid JSON format in policy content: " + err.message);
+        } catch (err: unknown) {
+            const message = err instanceof Error ? err.message : "Unknown error";
+            alert("Invalid JSON format in policy content: " + message);
         } finally {
             setLoading(false);
         }
@@ -68,7 +70,7 @@ export default function SchemaPolicyComposer({
                             {initialData ? "Update Policy Version" : "Create New Schema Policy"}
                         </h2>
                     </div>
-                    <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-lg">
+                    <button type="button" onClick={onClose} className="p-2 hover:bg-gray-100 rounded-lg">
                         <X className="h-5 w-5 text-gray-400" />
                     </button>
                 </div>
@@ -98,8 +100,9 @@ export default function SchemaPolicyComposer({
 
                         <div className="grid grid-cols-2 gap-4">
                             <div className="col-span-1">
-                                <label className="block text-xs font-bold text-gray-400 uppercase mb-1">Policy Name</label>
+                                <label htmlFor="schema-policy-name" className="block text-xs font-bold text-gray-400 uppercase mb-1">Policy Name</label>
                                 <input
+                                    id="schema-policy-name"
                                     type="text"
                                     required
                                     value={formData.name}
@@ -109,10 +112,11 @@ export default function SchemaPolicyComposer({
                                 />
                             </div>
                             <div className="col-span-1">
-                                <label className="block text-xs font-bold text-gray-400 uppercase mb-1">Policy Type</label>
+                                <label htmlFor="schema-policy-type" className="block text-xs font-bold text-gray-400 uppercase mb-1">Policy Type</label>
                                 <select
+                                    id="schema-policy-type"
                                     value={formData.policy_type}
-                                    onChange={(e) => setFormData({ ...formData, policy_type: e.target.value })}
+                                    onChange={(e) => setFormData({ ...formData, policy_type: e.target.value as SchemaPolicyType })}
                                     className="w-full rounded-lg border-gray-200 text-sm py-2.5"
                                 >
                                     <option value="lint">Content Linting</option>
@@ -122,7 +126,7 @@ export default function SchemaPolicyComposer({
                         </div>
 
                         <div>
-                            <label className="block text-xs font-bold text-gray-400 uppercase mb-1">Target Environment</label>
+                            <div className="block text-xs font-bold text-gray-400 uppercase mb-1">Target Environment</div>
                             <div className="flex gap-2">
                                 {["total", "dev", "stg", "prod"].map((env) => (
                                     <button
@@ -141,8 +145,9 @@ export default function SchemaPolicyComposer({
                         </div>
 
                         <div>
-                            <label className="block text-xs font-bold text-gray-400 uppercase mb-1">Description</label>
+                            <label htmlFor="schema-policy-description" className="block text-xs font-bold text-gray-400 uppercase mb-1">Description</label>
                             <textarea
+                                id="schema-policy-description"
                                 value={formData.description}
                                 onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                                 placeholder="Explain the purpose of this policy..."
@@ -152,9 +157,10 @@ export default function SchemaPolicyComposer({
                         </div>
 
                         <div>
-                            <label className="block text-xs font-bold text-gray-400 uppercase mb-1">Policy Content (JSON)</label>
+                            <label htmlFor="schema-policy-content" className="block text-xs font-bold text-gray-400 uppercase mb-1">Policy Content (JSON)</label>
                             <div className="relative group">
                                 <textarea
+                                    id="schema-policy-content"
                                     value={formData.content}
                                     onChange={(e) => setFormData({ ...formData, content: e.target.value })}
                                     className="w-full rounded-lg bg-gray-950 border-gray-800 text-blue-300 font-mono text-xs p-4 focus:ring-1 focus:ring-blue-500 outline-none"

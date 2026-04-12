@@ -38,23 +38,9 @@ export interface SchemaHistoryResponse {
     history: SchemaHistoryItem[];
 }
 
-export interface GraphNode {
-    id: string;
-    type: 'SCHEMA' | 'TOPIC' | 'CONSUMER';
-    label: string;
-    metadata?: Record<string, string | number>;
-}
-
-export interface GraphLink {
-    source: string;
-    target: string;
-    relation: string;
-}
-
-export interface ImpactGraphResponse {
+export interface KnownTopicNamesResponse {
     subject: string;
-    nodes: GraphNode[];
-    links: GraphLink[];
+    topic_names: string[];
 }
 
 export interface SchemaArtifactResponse {

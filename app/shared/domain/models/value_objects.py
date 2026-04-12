@@ -22,29 +22,6 @@ class AuditActivity:
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
-class BrokerInfo:
-    """Kafka 브로커 정보 도메인 모델 - Value Object"""
-
-    broker_id: int  # 브로커 ID
-    host: str  # 호스트
-    port: int  # 포트
-    is_controller: bool  # 컨트롤러 여부
-    leader_partition_count: int  # 리더 파티션 수
-    disk_usage_bytes: int | None = None  # 디스크 사용량 (bytes)
-
-
-@dataclass(frozen=True, slots=True, kw_only=True)
-class ClusterStatus:
-    """Kafka 클러스터 상태 도메인 모델 - Value Object"""
-
-    cluster_id: str  # 클러스터 ID
-    controller_id: int  # 컨트롤러 브로커 ID
-    brokers: tuple[BrokerInfo, ...]  # 브로커 목록
-    total_topics: int  # 전체 토픽 수
-    total_partitions: int  # 전체 파티션 수
-
-
-@dataclass(frozen=True, slots=True, kw_only=True)
 class ApprovalRequest:
     request_id: str
     resource_type: str

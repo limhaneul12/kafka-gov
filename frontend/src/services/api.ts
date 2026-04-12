@@ -1,6 +1,5 @@
 import axios from "axios";
-
-import type { ApprovalOverridePayload } from "../utils/approvalOverride";
+import type { AuditLog, KafkaCluster, SchemaRegistry } from "../types";
 
 const api = axios.create({
   baseURL: "/api/",
@@ -70,76 +69,6 @@ export const testAPIConnection = async () => {
 
 export default api;
 
-// API 엔드포인트 함수들
-export const topicsAPI = {
-  list: (clusterId: string, page: number = 1, size: number = 20) =>
-    api.get(`/v1/topics?cluster_id=${clusterId}&page=${page}&size=${size}`),
-  listAll: (clusterId: string) =>
-    api.get(`/v1/topics/all?cluster_id=${clusterId}`),
-  uploadAndDryRun: (clusterId: string, file: File) => {
-    const formData = new FormData();
-    formData.append("file", file);
-    return api.post(`/v1/topics/batch/upload?cluster_id=${clusterId}`, formData, {
-      headers: { "Content-Type": "multipart/form-data" },
-    });
-  },
-  dryRun: (clusterId: string, batchRequest: Record<string, unknown>) =>
-    api.post(`/v1/topics/batch/dry-run?cluster_id=${clusterId}`, batchRequest),
-  create: (
-    clusterId: string,
-    batchRequest: Record<string, unknown>,
-    approvalOverride?: ApprovalOverridePayload,
-  ) =>
-    api.post(`/v1/topics/batch/apply?cluster_id=${clusterId}`, {
-      ...batchRequest,
-      approvalOverride,
-    }),
-  createFromYAML: (clusterId: string, yamlContent: string, approvalOverride?: ApprovalOverridePayload) =>
-    api.post(`/v1/topics/batch/apply-yaml?cluster_id=${clusterId}`, {
-      yaml_content: yamlContent,
-      approvalOverride,
-    }),
-  updateMetadata: (
-    clusterId: string,
-    topicName: string,
-    metadata: {
-      owners: string[];
-      doc: string | null;
-      tags: string[];
-      environment: string;
-      slo: string | null;
-      sla: string | null;
-    }
-  ) =>
-    api.patch(`/v1/topics/${topicName}/metadata?cluster_id=${clusterId}`, metadata),
-  delete: (clusterId: string, name: string, approvalOverride?: ApprovalOverridePayload) =>
-    api.delete(`/v1/topics/${name}?cluster_id=${clusterId}`, {
-      data: approvalOverride ? { approvalOverride } : undefined,
-    }),
-  bulkDelete: (clusterId: string, names: string[], approvalOverride?: ApprovalOverridePayload) =>
-    api.post(`/v1/topics/bulk-delete?cluster_id=${clusterId}`, {
-      names,
-      approvalOverride,
-    }),
-  getDetail: (clusterId: string, topicName: string) =>
-    api.get(`/v1/topics/${topicName}/detail?cluster_id=${clusterId}`),
-};
-
-export const metricsAPI = {
-  getTopicMetrics: (clusterId: string, topicName: string) =>
-    api.get(`/v1/metrics/topics/${topicName}?cluster_id=${clusterId}`),
-  getTopicMetricsLive: (clusterId: string, topicName: string) =>
-    api.get(`/v1/metrics/topics/${topicName}/live?cluster_id=${clusterId}`),
-  getAllTopicsMetrics: (clusterId: string) =>
-    api.get(`/v1/metrics/topics?cluster_id=${clusterId}`),
-  getClusterMetrics: (clusterId: string) =>
-    api.get(`/v1/metrics/cluster?cluster_id=${clusterId}`),
-  refreshMetrics: (clusterId: string) =>
-    api.post(`/v1/metrics/refresh?cluster_id=${clusterId}`),
-  syncMetrics: (clusterId: string) =>
-    api.post(`/v1/metrics/sync?cluster_id=${clusterId}`),
-};
-
 export const schemasAPI = {
   list: () => api.get("/v1/schemas/artifacts"),
   sync: (registryId: string) =>
@@ -166,8 +95,8 @@ export const schemasAPI = {
 
 export const clustersAPI = {
   // Kafka Clusters (Brokers)
-  listKafka: () => api.get("/v1/clusters/brokers"),
-  getKafka: (clusterId: string) => api.get(`/v1/clusters/brokers/${clusterId}`),
+  listKafka: () => api.get<KafkaCluster[]>("/v1/clusters/brokers"),
+  getKafka: (clusterId: string) => api.get<KafkaCluster>(`/v1/clusters/brokers/${clusterId}`),
   createKafka: (data: Record<string, string>) => api.post("/v1/clusters/brokers", data),
   updateKafka: (clusterId: string, data: Record<string, unknown>) =>
     api.put(`/v1/clusters/brokers/${clusterId}`, data),
@@ -177,8 +106,8 @@ export const clustersAPI = {
     api.post(`/v1/clusters/brokers/${clusterId}/test`),
 
   // Schema Registries
-  listRegistries: () => api.get("/v1/clusters/schema-registries"),
-  getRegistry: (registryId: string) => api.get(`/v1/clusters/schema-registries/${registryId}`),
+  listRegistries: () => api.get<SchemaRegistry[]>("/v1/clusters/schema-registries"),
+  getRegistry: (registryId: string) => api.get<SchemaRegistry>(`/v1/clusters/schema-registries/${registryId}`),
   createRegistry: (data: Record<string, string>) =>
     api.post("/v1/clusters/schema-registries", data),
   updateRegistry: (registryId: string, data: Record<string, unknown>) =>
@@ -190,67 +119,7 @@ export const clustersAPI = {
     api.post(`/v1/clusters/schema-registries/${registryId}/test`),
 };
 
-export const policiesAPI = {
-  list: (policyType?: string, status?: string) => {
-    const params = new URLSearchParams();
-    if (policyType) params.append("policy_type", policyType);
-    if (status) params.append("status", status);
-    return api.get(`/v1/policies?${params.toString()}`);
-  },
-  get: (policyId: string) => api.get(`/v1/policies/${policyId}`),
-  getActive: (policyId: string) => api.get(`/v1/policies/${policyId}/active`),
-  getVersions: (policyId: string) => api.get(`/v1/policies/${policyId}/versions`),
-  create: (data: Record<string, unknown>) => api.post("/v1/policies", data),
-  update: (policyId: string, data: Record<string, unknown>) =>
-    api.put(`/v1/policies/${policyId}`, data),
-  delete: (policyId: string, version?: number) => {
-    const params = version !== undefined ? `?version=${version}` : '';
-    return api.delete(`/v1/policies/${policyId}${params}`);
-  },
-  deleteAll: (policyId: string) => api.delete(`/v1/policies/${policyId}/all`),
-  activate: (policyId: string, version?: number) =>
-    api.post(`/v1/policies/${policyId}/activate`, version !== undefined ? { version } : {}),
-  archive: (policyId: string) =>
-    api.post(`/v1/policies/${policyId}/archive`),
-  rollback: (policyId: string, targetVersion: number, createdBy: string = "system") =>
-    api.post(`/v1/policies/${policyId}/rollback`, { target_version: targetVersion, created_by: createdBy }),
-};
-
 export const auditAPI = {
-  recent: (limit = 20) => api.get(`/v1/audit/recent?limit=${limit}`),
+  recent: (limit = 20) => api.get<AuditLog[]>(`/v1/audit/recent?limit=${limit}`),
   history: (params: Record<string, unknown>) => api.get("/v1/audit/history", { params }),
-};
-
-export const consumerAPI = {
-  // Consumer Groups 목록
-  listGroups: (clusterId: string) =>
-    api.get(`/v1/consumers/groups?cluster_id=${clusterId}`),
-
-  // Consumer Group 메트릭
-  getMetrics: (clusterId: string, groupId: string) =>
-    api.get(`/v1/consumers/groups/${groupId}/metrics?cluster_id=${clusterId}`),
-
-  // Consumer Group 상세 요약
-  getSummary: (clusterId: string, groupId: string) =>
-    api.get(`/v1/consumers/groups/${groupId}/summary?cluster_id=${clusterId}`),
-
-  // 멤버 목록
-  getMembers: (clusterId: string, groupId: string) =>
-    api.get(`/v1/consumers/groups/${groupId}/members?cluster_id=${clusterId}`),
-
-  // 파티션 목록
-  getPartitions: (clusterId: string, groupId: string) =>
-    api.get(`/v1/consumers/groups/${groupId}/partitions?cluster_id=${clusterId}`),
-
-  // 리밸런스 이벤트
-  getRebalanceEvents: (clusterId: string, groupId: string, limit = 10) =>
-    api.get(`/v1/consumers/groups/${groupId}/rebalance?cluster_id=${clusterId}&limit=${limit}`),
-
-  // 정책 어드바이저
-  getAdvice: (clusterId: string, groupId: string) =>
-    api.get(`/v1/consumers/groups/${groupId}/advice?cluster_id=${clusterId}`),
-
-  // 토픽별 컨슈머 매핑
-  getTopicConsumers: (clusterId: string, topic: string) =>
-    api.get(`/v1/topics/${topic}/consumers?cluster_id=${clusterId}`),
 };

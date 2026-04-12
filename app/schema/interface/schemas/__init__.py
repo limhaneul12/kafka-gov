@@ -14,9 +14,7 @@ from .common import (
 from .governance import (
     DashboardResponse,
     GovernanceScore,
-    GraphLink,
-    GraphNode,
-    ImpactGraphResponse,
+    KnownTopicNamesResponse,
     SchemaHistoryItem,
     SchemaHistoryResponse,
     SubjectStat,
@@ -35,9 +33,7 @@ from .search import SchemaSearchResponse
 __all__ = [
     "DashboardResponse",
     "GovernanceScore",
-    "GraphLink",
-    "GraphNode",
-    "ImpactGraphResponse",
+    "KnownTopicNamesResponse",
     "PolicyViolation",
     "RollbackRequest",
     "SchemaArtifact",

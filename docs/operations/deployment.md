@@ -13,6 +13,10 @@ docker-compose up -d
 ### Production
 
 ```bash
+# Run migrations first (the bare Dockerfile image does not auto-run Alembic)
+bash script/migrate.sh
+
+# Then start the API container
 docker build -t kafka-gov:latest .
 docker run -d \
   --name kafka-gov \
@@ -46,7 +50,7 @@ See [`.env.example`](../../.env.example) for all options.
 curl https://kafka-gov.company.com/health
 
 # Expected response
-{"status": "healthy", "database": "connected", "version": "1.0.0"}
+{"status": "healthy"}
 ```
 
 ---
@@ -58,9 +62,9 @@ curl https://kafka-gov.company.com/health
 docker logs -f kafka-gov
 ```
 
-**Metrics:**
-- Available at `/metrics` (Prometheus format)
-- API docs: http://your-domain/docs
+**API Docs:**
+- Available at `http://your-domain/swagger` in non-production environments only.
+- Production disables `/swagger`, `/redoc`, and `/openapi.json`.
 
 ---
 
@@ -78,6 +82,5 @@ mysql -u kafka_gov -p kafka_gov < backup_20250115.sql
 
 ## Next Steps
 
-- [Kubernetes Deployment](./kubernetes.md)
-- [Production Checklist](./production-checklist.md)
-- [Monitoring Guide](./monitoring.md)
+- [Architecture Overview](../architecture/overview.md)
+- [Platform Direction](../features/real-time-data-governance-system.md)

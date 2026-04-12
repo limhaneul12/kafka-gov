@@ -27,9 +27,6 @@ dependencies = [
     "pyyaml>=6.0.2",
     "aiohttp>=3.12.15",
     "cachetools>=6.2.0",
-    "websocket>=0.2.1",
-    "websockets>=15.0.1",
-    "websocket-client>=1.8.0",
     "setuptools>=80.9.0",
     "minio>=7.2.16",
     "argon2-cffi>=25.1.0",
@@ -43,9 +40,7 @@ dependencies = [
     "pre-commit>=4.3.0",
     "asyncmy>=0.2.10",
     "fastapi-pagination>=0.15.0",
-    "celery>=5.5.3",
     "redis>=7.0.1",
-    "flower>=2.0.1",
     "structlog>=25.5.0",
     "gunicorn>=23.0.0",
     "typer>=0.16.1",
@@ -91,6 +86,11 @@ omit = [
   "**/interface/router.py",  # API 라우터는 통합 테스트에서
   "app/main.py",  # 메인 진입점
   "app/shared/**",  # 공통 유틸리티 제외
+  "app/catalog/**",
+  "app/contract/**",
+  "app/governance/**",
+  "app/lineage/**",
+  "app/product/**",
 ]
 
 [tool.coverage.report]

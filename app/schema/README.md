@@ -1,6 +1,6 @@
 # 📦 Schema Module
 
-Schema Registry 관리 및 MinIO 아카이빙
+Schema Registry 관리, MinIO 아카이빙, 그리고 naming-derived known topic-name hints 제공.
 
 ## Structure
 
@@ -12,7 +12,7 @@ schema/
 │   ├── schema_registry_adapter.py
 │   └── storage/           # MinIO artifact storage
 └── interface/
-    ├── router.py
+    ├── routers/
     └── schemas/
 ```
 
@@ -34,4 +34,4 @@ schema/
 
 ## Domain Events
 
-- `schema.registered` - 스키마 등록 시 발행 → analysis 모듈이 topic과 연결
+- `schema.registered` - 스키마 등록 시 발행 → shared audit/approval handlers가 후속 처리를 수행

@@ -5,7 +5,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from datetime import datetime
 
-from .models import ApprovalRequest, AuditActivity, ClusterStatus
+from .models import ApprovalRequest, AuditActivity
 
 
 class IAuditActivityRepository(ABC):
@@ -47,20 +47,6 @@ class IAuditActivityRepository(ABC):
 
         Returns:
             필터링된 활동 목록 (시간 역순)
-        """
-        ...
-
-
-class IClusterRepository(ABC):
-    """Kafka 클러스터 정보 조회 리포지토리 인터페이스"""
-
-    @abstractmethod
-    async def get_cluster_status(self) -> ClusterStatus:
-        """
-        Kafka 클러스터 상태 조회
-
-        Returns:
-            클러스터 상태 정보 (브로커, 토픽, 파티션 수)
         """
         ...
 

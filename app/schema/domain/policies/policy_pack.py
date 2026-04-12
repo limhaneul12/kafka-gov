@@ -6,7 +6,7 @@ from typing import Any
 
 from app.schema.domain.models import DomainSchemaBatch, DomainSchemaPlan
 from app.schema.domain.models.policy import DomainPolicyViolation
-from app.schema.domain.models.types_enum import DomainEnvironment, DomainSubjectStrategy
+from app.schema.domain.models.types_enum import DomainEnvironment
 from app.shared.domain.policy_types import DomainResourceType
 from app.shared.domain.preflight_policy import (
     DomainPolicyDecision,
@@ -14,7 +14,6 @@ from app.shared.domain.preflight_policy import (
     DomainPolicyRuleResult,
     DomainRiskLevel,
 )
-from app.shared.domain.subject_utils import extract_topics_from_subject
 
 DEFAULT_SCHEMA_POLICY_PACK_V1 = "policy-pack.v1.schema.default"
 
@@ -121,45 +120,6 @@ class DefaultSchemaPolicyPackV1:
                         field="metadata.doc",
                     )
                 )
-
-            if batch.subject_strategy in (
-                DomainSubjectStrategy.TOPIC_NAME,
-                DomainSubjectStrategy.TOPIC_RECORD_NAME,
-            ):
-                topics = extract_topics_from_subject(spec.subject, batch.subject_strategy.value)
-                if not topics:
-                    rules.append(
-                        self._rule(
-                            code="schema.subject.topic_link.invalid",
-                            severity="error",
-                            risk_level=DomainRiskLevel.HIGH,
-                            decision=DomainPolicyDecision.REJECT,
-                            reason=(
-                                f"schema '{spec.subject}' does not match the configured "
-                                f"subject strategy '{batch.subject_strategy.value}'"
-                            ),
-                            resource_name=spec.subject,
-                            field="subject",
-                        )
-                    )
-                else:
-                    for topic_name in topics:
-                        prefix = topic_name.split(".", 1)[0] if "." in topic_name else topic_name
-                        if prefix != batch.env.value:
-                            rules.append(
-                                self._rule(
-                                    code="schema.subject.topic_env.mismatch",
-                                    severity="error",
-                                    risk_level=DomainRiskLevel.HIGH,
-                                    decision=DomainPolicyDecision.REJECT,
-                                    reason=(
-                                        f"schema '{spec.subject}' links to topic '{topic_name}' "
-                                        f"outside batch env '{batch.env.value}'"
-                                    ),
-                                    resource_name=spec.subject,
-                                    field="subject",
-                                )
-                            )
 
             if item.action.value != "UPDATE" or item.current_schema is None or item.schema is None:
                 continue

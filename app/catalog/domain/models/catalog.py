@@ -4,7 +4,7 @@
 비즈니스 사용자가 "주문 관련 데이터가 뭐가 있지?"라고 물었을 때
 답할 수 있게 하는 것이 목적이다.
 
-기존 schema metadata / topic metadata의 tags, doc, owner 필드를
+기존 schema metadata 중심의 tags, doc, owner 필드를
 카탈로그 도메인으로 끌어올린 것이다.
 """
 

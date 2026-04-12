@@ -2,13 +2,11 @@ from __future__ import annotations
 
 from collections.abc import AsyncGenerator
 from pathlib import Path
-from types import SimpleNamespace
 from typing import cast
 
 import pytest
 
 import app.schema.application.use_cases.batch.apply as schema_apply_module
-import app.topic.application.batch_use_cases.batch_apply as topic_apply_module
 from app.infra.kafka.connection_manager import IConnectionManager
 from app.schema.application.use_cases.batch.apply import SchemaBatchApplyUseCase
 from app.schema.domain.models import (
@@ -36,31 +34,6 @@ from app.shared.application.use_cases import CreateApprovalRequestUseCase
 from app.shared.approval import ApprovalRequiredError
 from app.shared.database import DatabaseManager
 from app.shared.infrastructure.repository import SQLApprovalRequestRepository
-from app.topic.application.batch_use_cases.batch_apply import TopicBatchApplyUseCase
-from app.topic.domain.models import (
-    DomainCleanupPolicy,
-    DomainEnvironment as TopicEnvironment,
-    DomainPlanAction as TopicPlanAction,
-    DomainTopicAction,
-    DomainTopicBatch,
-    DomainTopicConfig,
-    DomainTopicMetadata,
-    DomainTopicPlan,
-    DomainTopicPlanItem,
-    DomainTopicSpec,
-)
-from app.topic.domain.policies.management import IPolicyRepository
-from app.topic.domain.policies.policy_pack import DefaultTopicPolicyPackV1
-from app.topic.domain.repositories.interfaces import IAuditRepository, ITopicMetadataRepository
-from app.topic.domain.services import TopicPlannerService
-
-
-class _TopicAuditRepository:
-    def __init__(self) -> None:
-        self.entries: list[dict[str, object]] = []
-
-    async def log_topic_operation(self, **kwargs: object) -> None:
-        self.entries.append(kwargs)
 
 
 class _SchemaAuditRepository:
@@ -69,11 +42,6 @@ class _SchemaAuditRepository:
 
     async def log_operation(self, **kwargs: object) -> None:
         self.entries.append(kwargs)
-
-
-class _TopicMetadataRepository:
-    async def save_apply_result(self, result: object, actor: str) -> None:
-        _ = (result, actor)
 
 
 class _SchemaMetadataRepository:
@@ -85,12 +53,6 @@ class _SchemaMetadataRepository:
 
     async def record_artifact(self, artifact: object, change_id: str) -> None:
         _ = (artifact, change_id)
-
-
-class _TopicConnectionManager:
-    async def get_kafka_admin_client(self, cluster_id: str) -> object:
-        _ = cluster_id
-        return object()
 
 
 class _SchemaConnectionManager:
@@ -109,69 +71,6 @@ async def approval_repository(tmp_path: Path) -> AsyncGenerator[SQLApprovalReque
         yield SQLApprovalRequestRepository(session_factory=manager.get_db_session)
     finally:
         await manager.close()
-
-
-def _topic_batch() -> DomainTopicBatch:
-    update_spec = DomainTopicSpec(
-        name="stg.orders.created",
-        action=DomainTopicAction.UPDATE,
-        config=DomainTopicConfig(
-            partitions=6,
-            replication_factor=3,
-            cleanup_policy=DomainCleanupPolicy.DELETE,
-            retention_ms=3600000,
-            min_insync_replicas=2,
-        ),
-        metadata=DomainTopicMetadata(
-            owners=("team-platform",),
-            doc="https://wiki.local/orders",
-            tags=("critical",),
-        ),
-    )
-    delete_spec = DomainTopicSpec(name="stg.orders.legacy", action=DomainTopicAction.DELETE)
-    return DomainTopicBatch(
-        change_id="chg-topic-approval-auto-001",
-        env=TopicEnvironment.STG,
-        specs=(update_spec, delete_spec),
-    )
-
-
-def _topic_plan(batch: DomainTopicBatch) -> DomainTopicPlan:
-    update_spec, delete_spec = batch.specs
-    return DomainTopicPlan(
-        change_id=batch.change_id,
-        env=batch.env,
-        items=(
-            DomainTopicPlanItem(
-                name=update_spec.name,
-                action=TopicPlanAction.ALTER,
-                diff={"retention.ms": "3600000"},
-                current_config={
-                    "partitions": "6",
-                    "replication_factor": "3",
-                    "cleanup.policy": "delete",
-                    "retention.ms": "7200000",
-                    "min.insync.replicas": "2",
-                },
-                target_config={
-                    "partitions": "6",
-                    "replication_factor": "3",
-                    "cleanup.policy": "delete",
-                    "retention.ms": "3600000",
-                    "min.insync.replicas": "2",
-                },
-            ),
-            DomainTopicPlanItem(
-                name=delete_spec.name,
-                action=TopicPlanAction.DELETE,
-                diff={"op": "delete"},
-                current_config={"partitions": "3", "replication_factor": "2"},
-                target_config=None,
-            ),
-        ),
-        violations=(),
-        requested_total=len(batch.specs),
-    )
 
 
 def _schema_batch() -> DomainSchemaBatch:
@@ -230,60 +129,6 @@ def _schema_plan(batch: DomainSchemaBatch) -> DomainSchemaPlan:
         violations=(),
         requested_total=len(batch.specs),
     )
-
-
-@pytest.mark.asyncio
-async def test_topic_apply_creates_approval_request_when_approval_is_required(
-    approval_repository: SQLApprovalRequestRepository,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    batch = _topic_batch()
-    plan = _topic_plan(batch)
-    evaluation = DefaultTopicPolicyPackV1().evaluate(batch, plan).evaluation
-
-    async def fake_validate_policies(
-        self: TopicBatchApplyUseCase, specs: object, env: object
-    ) -> list[object]:
-        _ = (self, specs, env)
-        return []
-
-    async def fake_create_plan(
-        self: object, batch_arg: DomainTopicBatch, actor: str
-    ) -> DomainTopicPlan:
-        _ = (self, actor)
-        assert batch_arg.change_id == batch.change_id
-        return plan
-
-    def fake_ensure_approval(*args: object, **kwargs: object) -> dict[str, object]:
-        _ = (args, kwargs)
-        raise ApprovalRequiredError(evaluation)
-
-    monkeypatch.setattr(TopicBatchApplyUseCase, "_validate_policies", fake_validate_policies)
-    monkeypatch.setattr(TopicPlannerService, "create_plan", fake_create_plan)
-    monkeypatch.setattr(topic_apply_module, "ensure_approval", fake_ensure_approval)
-
-    audit_repository = _TopicAuditRepository()
-    use_case = TopicBatchApplyUseCase(
-        connection_manager=cast(IConnectionManager, cast(object, _TopicConnectionManager())),
-        metadata_repository=cast(
-            ITopicMetadataRepository, cast(object, _TopicMetadataRepository())
-        ),
-        audit_repository=cast(IAuditRepository, cast(object, audit_repository)),
-        policy_repository=cast(IPolicyRepository, cast(object, SimpleNamespace())),
-        approval_request_use_case=CreateApprovalRequestUseCase(approval_repository),
-    )
-
-    with pytest.raises(ApprovalRequiredError):
-        _ = await use_case.execute(cluster_id="cluster-1", batch=batch, actor="alice")
-
-    requests = await approval_repository.list(status="pending", resource_type="topic")
-
-    assert len(requests) == 1
-    assert requests[0].change_ref == batch.change_id
-    assert requests[0].metadata is not None
-    assert requests[0].metadata["cluster_id"] == "cluster-1"
-    assert requests[0].metadata["requested_items"] == [spec.name for spec in batch.specs]
-    assert audit_repository.entries[-1]["snapshot"] is not None
 
 
 @pytest.mark.asyncio

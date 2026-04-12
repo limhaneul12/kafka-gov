@@ -6,55 +6,32 @@ Kafka-Gov feature roadmap and development plans.
 
 ### Backend Core
 - ✅ Multi-cluster connection management with encryption
-- ✅ Topic CRUD with rich metadata (owner, tags, docs)
-- ✅ YAML-based batch operations with dry-run
 - ✅ Environment-specific policy enforcement
 - ✅ Policy version management (draft/active/archived)
 - ✅ Schema Registry integration with MinIO storage
-- ✅ Kafka Connect connector management (backend API)
+- ✅ Multi-cluster connection management backend API
 - ✅ Complete audit trail with event sourcing
-- ✅ 64%+ test coverage with pytest
+- ✅ Backend test coverage maintained above the enforced threshold
 
-### Real-time Monitoring (🔥 New in v1.0)
-- ✅ Topic detail view with consumer health insights
-- ✅ Real-time consumer group list with lag statistics
-- ✅ Lag metrics calculation (p50, p95, max, total)
-- ✅ Group state tracking (Stable, Rebalancing, Empty, Dead)
-- ✅ Governance alerts and recommendations per topic
-- ✅ Member-level partition assignments
-- ✅ Fairness index (Gini coefficient) calculation
-- ✅ Rebalance stability scoring with time windows
-- ✅ Stuck partition detection with configurable thresholds
-- ✅ Historical lag tracking via DB snapshots
-- ✅ WebSocket-based live lag streaming
-- ✅ Policy advisor for assignor & scaling recommendations
+### Governance Visibility (🔥 New in v1.0)
+- ✅ Governance dashboard for schema and cluster health
+- ✅ Approval-aware audit history
+- ✅ Naming-derived known topic hints
+- ✅ Connection visibility for active broker and registry endpoints
 
 ### Frontend Core
 - ✅ React 19 frontend with TailwindCSS
 - ✅ Dashboard with cluster health monitoring
-- ✅ Topic list with search functionality
-- ✅ Create Topic modal (single vs batch toggle)
-- ✅ YAML batch upload interface
 - ✅ Policy version management UI
-- ✅ Team Analytics page
-- ✅ Consumer Group list page with metrics
-- ✅ Consumer Group detail page with live lag charts
+- ✅ Schema inventory and detail flows
+- ✅ Connections management surface
 
 ---
 
 ## 🚧 In Progress (v1.1)
 
 ### Frontend Enhancements
-- 🔄 Topics page: Owner/Team filtering UI
-- 🔄 Topics page: Tags filtering UI  
-- 🔄 Topics page: Doc field display
-- 🔄 Topics page: Environment filter implementation
-- 🔄 Create Topic modal: Dry-run button
-- 🔄 Create Topic modal: Preset selection (dev/stg/prod/custom)
-- 🔄 Dashboard: Topic/Schema sync functionality
-- 🔄 Dashboard: Manual sync button
-- 🔄 Policy page: Frontend integration with preset_spec.py
-- 🔄 Connections page: Kafka Connect tab UI
+- 🔄 Connections page: richer broker and registry diagnostics
 - 🔄 Policy Versions: Enhanced version management features
 
 ---
@@ -62,12 +39,11 @@ Kafka-Gov feature roadmap and development plans.
 ## 🔮 Planned (v2.0)
 
 ### Monitoring & Observability
-- 📅 Topic retention policy recommendations
 - 📅 Prometheus metrics export
 - 📅 Grafana dashboard templates
 - 📅 Real-time cluster metrics (throughput, latency)
-- 📅 Consumer group SLO compliance monitoring
-- 📅 Predictive lag alerting with ML models
+- 📅 Schema governance health trend reporting
+- 📅 Predictive policy-risk alerting with ML models
 
 ### Governance & Security
 - 📅 Role-based access control (RBAC)
@@ -78,18 +54,14 @@ Kafka-Gov feature roadmap and development plans.
 ### Advanced Features
 - 📅 Schema migration wizard
 - 📅 GitOps integration (sync with Git repository)
-- 📅 Cross-cluster topic migration tool
-- 📅 Topic usage analytics (hot partitions, consumer lag)
 
 ---
 
 ## 💡 Ideas (Future)
 
-- 🤖 AI-powered topic naming suggestions
-- 💰 Cost estimation for topic configurations
 - 📈 Advanced analytics dashboard (usage patterns, trends)
 - 🔄 Automated schema evolution recommendations
-- 🔍 Full-text search across topics/schemas/docs
+- 🔍 Full-text search across schemas/docs
 - 📱 Mobile app for alerts and quick actions
 - 🌐 Multi-language support (i18n)
 
@@ -99,7 +71,7 @@ Kafka-Gov feature roadmap and development plans.
 
 ### v1.0 (2025-01)
 - Initial release with core governance features
-- Real-time monitoring and consumer analytics
+- Schema governance dashboard and audit visibility
 - Policy enforcement and audit trail
 
 ### v0.9 (2024-12)

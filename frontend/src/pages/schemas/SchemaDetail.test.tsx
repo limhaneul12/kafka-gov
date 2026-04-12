@@ -23,10 +23,6 @@ vi.mock('sonner', () => ({
   },
 }));
 
-vi.mock('../../components/schema/ImpactGraph', () => ({
-  default: () => null,
-}));
-
 vi.mock('../../hooks/schema/useSchemaDetail', () => ({
   useSchemaDetail: mocks.useSchemaDetail,
 }));
@@ -87,7 +83,6 @@ const planResult = {
     {
       status: 'ok',
       topics: ['prod.orders.created'],
-      consumers: ['orders-consumer'],
     },
   ],
 };
@@ -113,7 +108,7 @@ describe('SchemaDetail approval flow', () => {
     mocks.useSchemaDetail.mockReturnValue({
       detailData,
       historyData: null,
-      graphData: null,
+      topicHintsData: null,
       loading: false,
       reload: mocks.reload,
     });
@@ -127,6 +122,7 @@ describe('SchemaDetail approval flow', () => {
 
     await user.click(screen.getByRole('button', { name: 'Edit' }));
     await user.click(screen.getByRole('button', { name: 'Analyze Changes' }));
+    expect(await screen.findByText(/not authoritative topic associations/i)).toBeInTheDocument();
     await screen.findByRole('button', { name: 'Apply v2' });
     await user.click(screen.getByRole('button', { name: 'Apply v2' }));
 
@@ -147,6 +143,7 @@ describe('SchemaDetail approval flow', () => {
 
     await user.click(screen.getByRole('button', { name: 'Edit' }));
     await user.click(screen.getByRole('button', { name: 'Analyze Changes' }));
+    expect(await screen.findByText(/not authoritative topic associations/i)).toBeInTheDocument();
     await screen.findByRole('button', { name: 'Apply v2' });
     await user.click(screen.getByRole('button', { name: 'Apply v2' }));
 

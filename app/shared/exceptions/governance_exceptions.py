@@ -50,7 +50,7 @@ class ClassificationViolationError(GovernanceError):
 
     def __init__(self, resource: str, required: str, actual: str) -> None:
         super().__init__(
-            f"classification violation on {resource}: " f"required {required}, got {actual}"
+            f"classification violation on {resource}: required {required}, got {actual}"
         )
         self.resource = resource
         self.required = required

@@ -1,17 +1,16 @@
 <div align="center">
   <img src="./image/kafka_gov_logo.png" alt="Kafka Gov Logo" width="300"/>
   
-  # 🛡️ Kafka Governance Platform
+  # 🛡️ Kafka-Gov
   
-  **Enterprise-grade Kafka management with rich metadata, policy enforcement, and batch operations**
+  **Schema-centric governance workflows with policy controls, audit history, and operational visibility**
   
   [![Python](https://img.shields.io/badge/Python-3.12+-blue.svg)](https://python.org)
   [![FastAPI](https://img.shields.io/badge/FastAPI-0.117.1+-green.svg)](https://fastapi.tiangolo.com)
   [![React](https://img.shields.io/badge/React-19.1-61dafb.svg)](https://react.dev)
-  [![Coverage](https://img.shields.io/badge/Coverage-97.62%25-brightgreen.svg)](https://github.com/limhaneul12/kafka-gov)
   [![License](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
   
-  **"Without knowing who owns a topic and what it's used for, Kafka is just a message queue."**
+  **"Without clear schema ownership, compatibility rules, and audit history, real-time data is just traffic."**
   
   [🚀 Quick Start](#-quick-start) • [✨ Features](#-features) • [📖 Documentation](#-documentation) • [🗺️ Roadmap](./docs/ROADMAP.md)
 </div>
@@ -57,10 +56,12 @@ If you're new to Kafka-Gov, we recommend the following onboarding path.
      ```bash
      uv run alembic upgrade head
      ```
-   - In Docker environments, the `migration` service included in `docker-compose.yml` is responsible for running migrations.
+   - In Docker Compose, the `app` service runs `bash script/migrate.sh` before starting FastAPI.
 
 5. **Open the UI and register your first connections**
-   - Open `http://localhost:8000` in your browser
+   - Lite Mode: run the frontend dev server and open `http://localhost:3000`
+   - Full Stack Mode (Docker Compose): open `http://localhost:90`
+   - Backend API docs are available at `http://localhost:8000/swagger` in non-production local runs
    - Register Kafka Cluster / Schema Registry connections directly through the UI
    - From then on, all governance metadata is stored in the selected DB (SQLite/MySQL/Postgres)
 
@@ -71,13 +72,12 @@ After onboarding, see [Quick Start](./docs/getting-started/quick-start.md) and
 
 ## 🌟 What is Kafka-Gov?
 
-Kafka-Gov transforms Kafka from a simple message broker into a **governed enterprise platform** with:
+Kafka-Gov transforms schema operations from ad hoc registry usage into a **governed enterprise platform** with:
 
-- **🏷️ Rich Metadata**: Owner, team, tags, documentation links for every topic
-- **🛡️ Policy Enforcement**: Environment-specific rules (naming, replication, ISR)
-- **🚀 Batch Operations**: YAML-based bulk create/update/delete with dry-run
-- **📦 Schema Management**: Integrated Schema Registry with auto-correlation
-- **📊 Real-time Monitoring**: Consumer lag, fairness index, stuck partition detection
+- **🛡️ Policy Enforcement**: Environment-specific schema governance rules and approvals
+- **📦 Schema Management**: Integrated Schema Registry with versioning and compatibility workflows
+- **🧭 Naming-Derived Traceability**: Read-only schema hints for related topic names
+- **📊 Operational Visibility**: Governance dashboards, audit history, and connection health
 - **📝 Complete Audit Trail**: Track every change (who, when, what, why)
 
 <div align="center">
@@ -90,22 +90,21 @@ Kafka-Gov transforms Kafka from a simple message broker into a **governed enterp
 
 | Traditional Tools | Kafka-Gov |
 |-------------------|-----------|
-| ❌ No ownership tracking | ✅ Mandatory owner, team, tags |
-| ❌ No policy enforcement | ✅ Environment-specific validation |
-| ❌ Manual one-by-one operations | ✅ YAML-based batch operations |
+| ❌ No ownership tracking | ✅ Mandatory schema metadata and audit context |
+| ❌ No policy enforcement | ✅ Environment-specific schema validation |
+| ❌ Poor schema visibility | ✅ Versioned schema governance |
 | ❌ No audit trail | ✅ Complete change history |
 | ❌ Separate schema tool | ✅ Integrated schema management |
 
  **Problems we solve:**
- - 🤔 **Who owns this topic?** → Track ownership across hundreds of topics
- - 📝 **What is it for?** → Required documentation links
- - ⚠️ **Policy violations?** → Auto-detect risky configs before deployment
- - 🚀 **Bulk operations?** → Create 50+ topics in one YAML file
+ - 📦 **Which schema is live?** → Track version history and compatibility state
+ - ⚠️ **Policy violations?** → Auto-detect risky changes before deployment
+ - 🧭 **Where might this schema belong?** → Derive likely topic names from naming strategy
  - 🔄 **Change history?** → Complete audit trail with before/after snapshots
 
 ### 프로젝트 방향성
 
-Although we initially approached this project from a governance perspective, over time it started to drift toward operational concerns. To realign with its original direction — governance — we are refocusing on **topics** and **scenario-based policy alerts** as the core of the project.
+Although we initially approached this project from a governance perspective, over time it started to drift toward operational concerns. To realign with its original direction — governance — we are refocusing on **schema governance**, **approval-aware change control**, and **scenario-based policy alerts** as the core of the project.
 
 ---
 
@@ -135,16 +134,18 @@ bash script/migrate.sh
 # 5. Start backend API
 uv run uvicorn app.main:app --reload
 
-# 6. (optional) Start frontend (from ./frontend)
-# pnpm install
-# pnpm dev
+# 6. (optional) Start frontend UI (from ./frontend)
+# npm install
+# npm run dev
 ```
 
 In this mode, the **local file `./kafka_gov.db`** is used as the metadata database.
+Open the backend API docs at `http://localhost:8000/swagger`.
+If you also start the frontend dev server, the web UI is available at `http://localhost:3000`.
 
-### 2) Full Stack Mode (Docker Compose + MySQL)
+### 2) Full Stack Mode (Docker Compose)
 
-For production-like setups, use Docker Compose to start MySQL/Kafka/Schema Registry/Redis together.
+For production-like setups, use Docker Compose to start the app, frontend, nginx, and Redis together. The compose stack expects Kafka and Schema Registry to be available on the external `kafka-network`, and the metadata DB defaults to SQLite inside the app container unless you override `KAFKA_GOV_DATABASE_URL`.
 
 ```bash
 # 1. Clone and setup
@@ -152,11 +153,11 @@ git clone https://github.com/limhaneul12/kafka-gov.git
 cd kafka-gov
 cp .env.example .env
 
-# 2. Start all services (includes MySQL-backed metadata DB)
+# 2. Start the shipped compose services
 docker-compose up -d
 
 # 3. Access web UI (proxied by nginx)
-open http://localhost:8000
+open http://localhost:90
 ```
 
 **That's it!** 🎉
@@ -167,38 +168,19 @@ See [Quick Start Guide](./docs/getting-started/quick-start.md) for more details.
 
 ## ✨ Features
 
-### 🏷️ Rich Topic Metadata
+### 📦 Schema Governance
 
-Every topic includes owner, team, documentation URL, and custom tags:
+Track schema versions, compatibility, and policy quality through a single workflow:
 
-```yaml
-name: prod.orders.created
-metadata:
-  owner: team-commerce
-  doc: "https://wiki.company.com/orders"
-  tags: ["orders", "critical", "pii"]
+```json
+{
+  "subject": "prod.orders-value",
+  "compatibility": "BACKWARD",
+  "version": 7
+}
 ```
 
-### 🚀 YAML-Based Batch Operations
-
-Create dozens of topics at once:
-
-```yaml
-kind: TopicBatch
-env: prod
-items:
-  - name: prod.orders.created
-    action: create
-    config:
-      partitions: 12
-      replication_factor: 3
-```
-
-Upload → Review dry-run → Apply changes
-
-<div align="center">
-  <img src="./image/create_topic.png" alt="Batch Operations" width="700"/>
-</div>
+Upload → Review governance checks → Apply the next schema version
 
 ### 🛡️ Policy Enforcement
 
@@ -206,45 +188,39 @@ Environment-specific rules prevent production incidents:
 
 | Policy | DEV | PROD |
 |--------|-----|------|
-| Min Replication | ≥ 1 | ≥ 3 ⚠️ |
-| Min ISR | ≥ 1 | ≥ 2 ⚠️ |
-| 'tmp' prefix | ✅ | 🚫 |
+| Missing `metadata.doc` | Warn | Approval Required |
+| `compatibility: NONE` | Approval Required | Rejected |
+| Breaking field type change | Rejected | Rejected |
 
-### 🛡️ Schema Governance (New)
+### 🛡️ Schema Governance
 
 Advanced schema quality control and life-cycle management to ensure data consistency across the enterprise:
 
 - **📊 Governance Dashboard**: Real-time health scoring for every schema. Scores are calculated based on compatibility levels, documentation coverage, and compliance with organizational linting rules.
 - **🛡️ Custom Guardrails (Policies)**: Define and enforce your own linting rules (e.g., mandatory 'doc' fields, naming conventions) and environment-specific compliance policies to prevent breaking changes.
 - **🕒 Schema Time Machine**: Access the complete history of every schema version. Track who changed what and when, with automated rollback plans to quickly revert to a stable state.
-- **📈 Impact Analysis**: A visual dependency graph that identifies exactly which topics and consumers will be affected by a schema change, reducing the risk of downstream failures.
+- **🧭 Known Topic Names**: Read-only naming-derived hints that help operators understand where a schema may belong without claiming verified runtime usage.
 
 <div align="center">
   <img src="./image/schema_linting.png" alt="Schema Linting & Violations" width="750"/>
   <p><i>Real-time Schema Linting and Policy Violation Detection</i></p>
-  <br/>
-  <img src="./image/impact_analysis.png" alt="Schema Impact Analysis" width="750"/>
-  <p><i>Visualizing Schema-Topic Dependencies and Impact</i></p>
 </div>
 
-### 📊 Real-time Monitoring
+### 📊 Operational Visibility
 
-- **Consumer lag tracking** with p50/p95/max metrics
-- **Fairness index** (Gini coefficient) for partition distribution
-- **Stuck partition detection** with configurable thresholds
-- **Rebalance stability** scoring with time windows
-- **WebSocket streaming** for live updates
+- **Governance dashboard** for schema and cluster health
+- **Approval-aware audit history** for changes and overrides
+- **Connection health visibility** for active broker and registry endpoints
+- **Naming-derived traceability** surfaced where schema context matters
 
 <div align="center">
-  <img src="./image/consumer_list.png" alt="Monitoring" width="700"/>
+  <img src="./image/dashboard.png" alt="Monitoring" width="700"/>
 </div>
 
 ### 📦 More Features
 
-- [Schema Registry Management](./docs/features/schema-registry.md)
-- [Multi-Cluster Support](./docs/features/multi-cluster.md)
-- [Team Analytics](./docs/features/team-analytics.md)
-- [Complete Audit Trail](./docs/operations/audit-trail.md)
+- [Features Overview](./docs/features/overview.md)
+- [Product Direction](./docs/features/real-time-data-governance-system.md)
 
 ---
 
@@ -256,22 +232,15 @@ Advanced schema quality control and life-cycle management to ensure data consist
 - [⚙️ Configuration](./docs/getting-started/configuration.md)
 
 ### Features
-- [📊 Topic Management](./docs/features/topic-management.md)
-- [🚀 Batch Operations](./docs/features/batch-operations.md)
-- [🛡️ Policy Enforcement](./docs/features/policy-enforcement.md)
-- [📦 Schema Registry](./docs/features/schema-registry.md)
-- [📈 Real-time Monitoring](./docs/features/monitoring.md)
+- [🧭 Product Direction](./docs/features/real-time-data-governance-system.md)
 - [📚 All Features](./docs/features/overview.md)
 
 ### Architecture & API
 - [🏗️ Architecture Overview](./docs/architecture/overview.md)
-- [🔌 API Reference](./docs/api/)
-- [🔐 Security](./docs/architecture/security.md)
+- [🔌 API Docs](/openapi.json)
 
 ### Operations
 - [🚀 Deployment Guide](./docs/operations/deployment.md)
-- [📊 Monitoring](./docs/operations/monitoring.md)
-- [🔧 Troubleshooting](./docs/operations/troubleshooting.md)
 
 ---
 
@@ -287,7 +256,7 @@ Advanced schema quality control and life-cycle management to ensure data consist
 
 **v1.0 (Current):**
 - ✅ Core governance features
-- ✅ Real-time monitoring
+- ✅ Operational visibility
 - ✅ Policy enforcement
 
 **v1.1 (Completed):**
@@ -322,11 +291,10 @@ uv run ruff check app/
 uv run ruff format app/
 ```
 
-### Test Status (Current Branch)
+### Test Status
 
-- Backend tests: `37 passed`
-- Coverage (`uv run pytest --cov=app`): `97.62%`
-- Core domain mock matrix: `cluster`, `topic`, `schema`, `consumer`, `shared`
+- Run `uv run pytest` for the current backend suite and coverage.
+- Run `npm run test --prefix frontend` for the current frontend unit tests.
 
 ---
 

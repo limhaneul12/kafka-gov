@@ -1,70 +1,42 @@
-"""영향도 그래프 조회 유스케이스"""
+"""Schema subject에서 알려진 토픽명을 추론하는 유스케이스"""
 
 from __future__ import annotations
 
 import logging
 
-from app.infra.kafka.connection_manager import IConnectionManager
-from app.infra.kafka.kafka_adapter import KafkaTopicAdapter
-from app.schema.domain.models import (
-    GraphLink,
-    GraphNode,
-    ImpactGraph,
-    SubjectName,
-)
+from app.schema.domain.models import SubjectName
 from app.shared.domain.subject_utils import SubjectStrategy, extract_topics_from_subject
 
 
-class GetImpactGraphUseCase:
-    """영향도 그래프 조회 유스케이스"""
+class GetKnownTopicNamesUseCase:
+    """Subject naming 규칙으로 알려진 토픽명을 구성합니다."""
 
-    def __init__(
-        self,
-        connection_manager: IConnectionManager,
-    ) -> None:
-        self.connection_manager = connection_manager
+    def __init__(self) -> None:
         self.logger = logging.getLogger(__name__)
 
-    async def execute(self, registry_id: str, subject: SubjectName) -> ImpactGraph:
-        """영향도 그래프 조회"""
-        nodes: list[GraphNode] = []
-        links: list[GraphLink] = []
+    async def execute(self, registry_id: str, subject: SubjectName) -> list[str]:
+        _ = registry_id
 
-        # 1. 중심 노드 (Schema)
-        schema_node_id = f"schema:{subject}"
-        nodes.append(
-            GraphNode(id=schema_node_id, type="SCHEMA", label=subject, metadata={"layer": "schema"})
+        found_topics = self._derive_known_topic_names(subject)
+        self.logger.debug(
+            "derived_known_topic_names registry_id=%s subject=%s topics=%s",
+            registry_id,
+            subject,
+            found_topics,
         )
 
-        # 2. 토픽 추출 및 검색
-        all_clusters = await self.connection_manager.kafka_cluster_repo.list_all()
-        cluster_id = next((c.cluster_id for c in all_clusters if c.is_active), "default")
+        return found_topics
 
-        repo_topics: list[str] = []
-        try:
-            admin_client = await self.connection_manager.get_kafka_admin_client(cluster_id)
-            adapter = KafkaTopicAdapter(admin_client)
-            repo_topics = await adapter.list_topics()
-            if not repo_topics:
-                self.logger.warning(
-                    f"Cluster '{cluster_id}' returned 0 topics. Impact graph will use guesses."
-                )
-        except (TimeoutError, RuntimeError, ConnectionError, AttributeError, ValueError) as e:
-            self.logger.error(f"Failed to list topics for cluster {cluster_id}: {e!s}")
+    def _derive_known_topic_names(self, subject: SubjectName) -> list[str]:
+        if subject.endswith(("-key", "-value")):
+            return extract_topics_from_subject(subject, SubjectStrategy.TOPIC_NAME)
 
-        # 실제 매치되는 토픽 검색 (Fuzzy Match - Case Insensitive)
-        sub_str = str(subject).lower()
-        real_matches = [t for t in repo_topics if sub_str in t.lower()]
+        if "-" in subject:
+            topic_name, suffix = subject.split("-", 1)
+            if "." in suffix and suffix.rsplit(".", 1)[-1][:1].isupper():
+                return [topic_name]
 
-        if real_matches:
-            found_topics = real_matches
-        else:
-            found_topics = extract_topics_from_subject(subject, SubjectStrategy.TOPIC_NAME)
-            self.logger.debug(f"No real topics matched. Using guessed topic: {found_topics}")
+        if "." in subject and subject.rsplit(".", 1)[-1][:1].isupper():
+            return []
 
-        for topic in found_topics:
-            t_id = f"topic:{topic}"
-            nodes.append(GraphNode(id=t_id, type="TOPIC", label=topic, metadata={"layer": "topic"}))
-            links.append(GraphLink(source=schema_node_id, target=t_id, relation="WRITES_TO"))
-
-        return ImpactGraph(subject=subject, nodes=nodes, links=links)
+        return extract_topics_from_subject(subject, SubjectStrategy.TOPIC_NAME)

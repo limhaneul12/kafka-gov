@@ -100,8 +100,8 @@ uv run uvicorn app.main:app --reload
 ```
 
 **Application Access:**
-- Web UI: http://localhost:8000
-- API Docs: http://localhost:8000/swagger
+- Web UI (frontend dev server): http://localhost:3000
+- Backend API Docs: http://localhost:8000/swagger
 - Health Check: http://localhost:8000/health
 
 ---
@@ -145,25 +145,22 @@ def process_data(items: List[str], config: Dict[str, int]) -> Optional[str]:
 ```python
 from pydantic import BaseModel, Field
 
-class CreateTopicRequest(BaseModel):
+class SchemaBatchItemRequest(BaseModel):
     """API request model - requires runtime validation"""
-    name: str = Field(..., pattern=r'^[a-z0-9\-\.]+$')
-    partitions: int = Field(..., ge=1)
-    replication_factor: int = Field(..., ge=1)
+    subject: str = Field(..., pattern=r'^(dev|stg|prod)\.[a-z0-9_.\-]+$')
+    schema_type: str = Field(..., pattern=r'^(AVRO|JSON|PROTOBUF)$')
+    compatibility: str = Field(..., pattern=r'^(BACKWARD|FULL|NONE)$')
 ```
 
 **Internal Domain (Business Logic)**
 ```python
 from dataclasses import dataclass
-from datetime import datetime
 
 @dataclass(frozen=True)
-class Topic:
+class SchemaRule:
     """Domain model - immutable structure"""
-    name: str
-    partitions: int
-    replication_factor: int
-    created_at: datetime
+    subject: str
+    compatibility: str
 ```
 
 ### No Lazy Loading
@@ -225,22 +222,22 @@ uv run ruff check .
 - `perf`: Performance improvements
 
 **Scope (Optional):**
-- `topic`, `schema`, `connect`, `cluster`, `shared`
+- `schema`, `cluster`, `shared`, `docs`, `frontend`
 
 ### Examples
 
 ```bash
 # Add feature
-git commit -m "feat(connect): Add connector pause/resume endpoints"
+git commit -m "feat(schema): Add known-topic hint endpoint"
 
 # Bug fix
 git commit -m "fix(schema): Fix compatibility check validation"
 
 # Documentation update
-git commit -m "docs: Update API reference for Connect endpoints"
+git commit -m "docs: Update schema governance API reference"
 
 # Refactoring
-git commit -m "refactor(topic): Extract validation logic to domain service"
+git commit -m "refactor(schema): Extract validation logic to domain service"
 ```
 
 ---
@@ -250,7 +247,7 @@ git commit -m "refactor(topic): Extract validation logic to domain service"
 ### Testing Principles
 
 1. **Unit Test First**: Domain logic must have unit tests
-2. **80%+ Coverage**: New code must maintain minimum 80% test coverage
+2. **Coverage Discipline**: New code must keep the enforced coverage threshold green and include focused regressions for behavior changes
 3. **Fixture Usage**: Use pytest fixtures for test data reuse
 4. **Async Testing**: Use `pytest-asyncio`
 
@@ -263,11 +260,8 @@ uv run pytest
 # With coverage
 uv run pytest --cov=app --cov-report=html
 
-# Test specific module
-uv run pytest tests/connect/
-
 # Test specific file
-uv run pytest tests/connect/test_connector_service.py
+uv run pytest tests/test_schema_domain_models.py
 
 # Re-run failed tests only
 uv run pytest --lf
@@ -279,37 +273,25 @@ uv run pytest -n auto
 ### Test Writing Example
 
 ```python
-# tests/connect/test_connector_service.py
+# tests/test_schema_domain_models.py
 import pytest
-from app.connect.application.services import ConnectorService
-from app.connect.domain.models import ConnectorInfo, ConnectorType, ConnectorState
+from app.schema.domain.models.spec_batch import DomainSchemaSpec
+from app.schema.domain.models.types_enum import DomainCompatibilityMode, DomainSchemaType
+from app.schema.domain.models.value_objects import DomainSchemaMetadata, DomainSchemaSource
 
 @pytest.fixture
-def mock_connector_info():
-    """Test connector info fixture"""
-    return ConnectorInfo(
-        name="test-connector",
-        type=ConnectorType.SOURCE,
-        state=ConnectorState.RUNNING,
-        worker_id="worker-1",
-        config={"connector.class": "io.debezium.connector.mysql.MySqlConnector"},
-        tasks=[],
-        topics=["test.topic"],
+def schema_spec():
+    return DomainSchemaSpec(
+        subject="dev.orders-value",
+        schema_type=DomainSchemaType.AVRO,
+        compatibility=DomainCompatibilityMode.BACKWARD,
+        source=DomainSchemaSource(type="INLINE", inline='{"type":"record","name":"Order","fields":[]}'),
+        metadata=DomainSchemaMetadata(owner="team-data", doc="https://wiki/orders"),
     )
 
-@pytest.mark.asyncio
-async def test_get_connector_info(connector_service: ConnectorService, mock_connector_info):
-    """Test connector info retrieval"""
-    # Given
-    connector_name = "test-connector"
-    
-    # When
-    result = await connector_service.get_connector(connector_name)
-    
-    # Then
-    assert result.name == connector_name
-    assert result.type == ConnectorType.SOURCE
-    assert result.state == ConnectorState.RUNNING
+def test_schema_spec_has_owner(schema_spec):
+    assert schema_spec.metadata.owner == "team-data"
+    assert schema_spec.subject == "dev.orders-value"
 ```
 
 ---
@@ -319,7 +301,7 @@ async def test_get_connector_info(connector_service: ConnectorService, mock_conn
 ### 1. Pre-PR Checklist
 
 - [ ] All tests pass (`uv run pytest`)
-- [ ] Code coverage 80%+ maintained
+- [ ] Coverage gate remains green for the affected test suite
 - [ ] Ruff formatting and linting pass
 - [ ] No missing type hints
 - [ ] Documentation updated (if API changed)
@@ -418,68 +400,57 @@ Interface → Application → Domain ← Infrastructure
 
 **1. Define Domain Model**
 ```python
-# app/connect/domain/models.py
+# app/schema/domain/models/spec_batch.py
 from dataclasses import dataclass
-from enum import Enum
 
 @dataclass(frozen=True)
-class Connector:
-    """Connector domain model"""
-    name: str
-    type: ConnectorType
-    state: ConnectorState
-    config: dict[str, str]
+class SchemaRule:
+    subject: str
+    compatibility: str
 ```
 
 **2. Repository Interface**
 ```python
-# app/connect/domain/repositories.py
+# app/schema/domain/repositories/interfaces.py
 from abc import ABC, abstractmethod
 
-class ConnectorRepository(ABC):
-    """Connector repository interface"""
+class SchemaRepository(ABC):
     
     @abstractmethod
-    async def find_by_name(self, name: str) -> Connector | None:
+    async def get_latest(self, subject: str):
         ...
 ```
 
 **3. Repository Implementation**
 ```python
-# app/connect/infrastructure/repositories.py
-class ConnectorRepositoryImpl(ConnectorRepository):
-    """Connector repository implementation"""
+# app/schema/infrastructure/repository/mysql_repository.py
+class SchemaRepositoryImpl(SchemaRepository):
     
-    async def find_by_name(self, name: str) -> Connector | None:
-        # Query DB with SQLAlchemy
+    async def get_latest(self, subject: str):
         ...
 ```
 
 **4. Write UseCase**
 ```python
-# app/connect/application/use_cases.py
-class GetConnectorUseCase:
-    """Connector retrieval use case"""
+# app/schema/application/use_cases/management/search.py
+class SearchSchemasUseCase:
     
-    def __init__(self, repository: ConnectorRepository):
+    def __init__(self, repository: SchemaRepository):
         self.repository = repository
     
-    async def execute(self, name: str) -> ConnectorDTO:
-        connector = await self.repository.find_by_name(name)
-        if not connector:
-            raise ConnectorNotFoundError(name)
-        return ConnectorMapper.to_dto(connector)
+    async def execute(self, subject: str):
+        return await self.repository.get_latest(subject)
 ```
 
 **5. Add API Router**
 ```python
-# app/connect/interface/router.py
-@router.get("/connectors/{name}")
-async def get_connector(
-    name: str,
-    use_case: GetConnectorUseCase = Depends(Provide[...])
+# app/schema/interface/routers/management_router.py
+@router.get("/search")
+async def search_schemas(
+    subject: str,
+    use_case: SearchSchemasUseCase = Depends(Provide[...])
 ):
-    return await use_case.execute(name)
+    return await use_case.execute(subject)
 ```
 
 ---
@@ -490,16 +461,16 @@ async def get_connector(
 
 ```python
 # Define domain event
-class ConnectorCreatedEvent(DomainEvent):
-    connector_name: str
-    connector_type: ConnectorType
+class SchemaRegisteredEvent(DomainEvent):
+    subject: str
+    schema_type: str
 
 # Publish event
 from app.shared.domain.event_bus import EventBus
 
-await event_bus.publish(ConnectorCreatedEvent(
-    connector_name="my-connector",
-    connector_type=ConnectorType.SOURCE
+await event_bus.publish(SchemaRegisteredEvent(
+    subject="dev.orders-value",
+    schema_type="AVRO",
 ))
 ```
 
@@ -507,10 +478,10 @@ await event_bus.publish(ConnectorCreatedEvent(
 
 ```python
 # Register event handler
-@event_bus.subscribe(ConnectorCreatedEvent)
-async def on_connector_created(event: ConnectorCreatedEvent):
-    logger.info(f"Connector created: {event.connector_name}")
-    # Follow-up actions (e.g., auto-create topics)
+@event_bus.subscribe(SchemaRegisteredEvent)
+async def on_schema_registered(event: SchemaRegisteredEvent):
+    logger.info(f"Schema registered: {event.subject}")
+    # Follow-up actions (e.g., write audit metadata)
 ```
 
 ---

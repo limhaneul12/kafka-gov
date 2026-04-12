@@ -167,7 +167,6 @@ class ConnectionManager(IConnectionManager):
                 latency_ms=latency_ms,
                 metadata={
                     "broker_count": len(metadata.brokers),
-                    "topic_count": len(metadata.topics),
                     "cluster_id": metadata.cluster_id or "unknown",
                 },
             )

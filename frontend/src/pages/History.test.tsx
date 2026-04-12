@@ -16,10 +16,10 @@ vi.mock('../services/api', () => ({
 
 const auditLogs = [
   {
-    activity_type: 'topic',
+    activity_type: 'schema',
     action: 'APPLY',
-    target: 'prod.orders.created',
-    message: 'Topic apply completed',
+    target: 'prod.orders-value',
+    message: 'Schema apply completed',
     actor: 'alice',
     team: 'platform',
     timestamp: '2026-03-10T10:00:00Z',
@@ -35,7 +35,7 @@ const auditLogs = [
       },
       risk: {
         risk_level: 'high',
-        reasons: ['production topic change'],
+        reasons: ['production schema change'],
       },
     },
   },
@@ -82,15 +82,15 @@ const auditLogs = [
   {
     activity_type: 'approval',
     action: 'REQUESTED',
-    target: 'prod.orders.created',
-    message: 'approval required for topic apply',
+    target: 'prod.orders-value',
+    message: 'approval required for schema apply',
     actor: 'alice',
     team: null,
     timestamp: '2026-03-10T12:30:00Z',
     metadata: {
       approval_request: {
         request_id: 'req-123',
-        resource_type: 'topic',
+        resource_type: 'schema',
         change_type: 'apply',
         change_ref: 'chg-approval-001',
         status: 'pending',
@@ -103,7 +103,7 @@ const auditLogs = [
       },
       risk: {
         risk_level: 'high',
-        reasons: ['production topic change'],
+        reasons: ['production schema change'],
       },
     },
   },
@@ -117,10 +117,10 @@ describe('History', () => {
   it('loads and renders audit activity rows with approval state', async () => {
     render(<History />);
 
-    expect(await screen.findByText('Topic apply completed')).toBeInTheDocument();
+    expect(await screen.findByText('Schema apply completed')).toBeInTheDocument();
     expect(screen.getByText('Schema apply pending approval')).toBeInTheDocument();
     expect(screen.getByText('Policy updated')).toBeInTheDocument();
-    expect(screen.getByText('approval required for topic apply')).toBeInTheDocument();
+    expect(screen.getByText('approval required for schema apply')).toBeInTheDocument();
     expect(screen.getByText('OVERRIDDEN')).toBeInTheDocument();
     expect(screen.getAllByText('REQUIRED')).toHaveLength(2);
     expect(screen.getByText('CHECKED')).toBeInTheDocument();
@@ -132,7 +132,7 @@ describe('History', () => {
 
     render(<History />);
 
-    await screen.findByText('Topic apply completed');
+    await screen.findByText('Schema apply completed');
 
     const selects = screen.getAllByRole('combobox');
     await user.selectOptions(selects[1], 'schema');
@@ -140,9 +140,9 @@ describe('History', () => {
     await user.selectOptions(selects[3], 'critical');
 
     expect(screen.getByText('Schema apply pending approval')).toBeInTheDocument();
-    expect(screen.queryByText('Topic apply completed')).not.toBeInTheDocument();
+    expect(screen.queryByText('Schema apply completed')).not.toBeInTheDocument();
     expect(screen.queryByText('Policy updated')).not.toBeInTheDocument();
-    expect(screen.queryByText('approval required for topic apply')).not.toBeInTheDocument();
+    expect(screen.queryByText('approval required for schema apply')).not.toBeInTheDocument();
   });
 
   it('filters approval activities explicitly', async () => {
@@ -150,13 +150,13 @@ describe('History', () => {
 
     render(<History />);
 
-    await screen.findByText('approval required for topic apply');
+    await screen.findByText('approval required for schema apply');
 
     const selects = screen.getAllByRole('combobox');
     await user.selectOptions(selects[1], 'approval');
 
-    expect(screen.getByText('approval required for topic apply')).toBeInTheDocument();
-    expect(screen.queryByText('Topic apply completed')).not.toBeInTheDocument();
+    expect(screen.getByText('approval required for schema apply')).toBeInTheDocument();
+    expect(screen.queryByText('Schema apply completed')).not.toBeInTheDocument();
     expect(screen.queryByText('Schema apply pending approval')).not.toBeInTheDocument();
   });
 
@@ -165,7 +165,7 @@ describe('History', () => {
 
     render(<History />);
 
-    await screen.findByText('Topic apply completed');
+    await screen.findByText('Schema apply completed');
 
     const buttons = screen.getAllByRole('button');
     await user.click(buttons[1]);
@@ -174,7 +174,7 @@ describe('History', () => {
     expect(screen.getByText('Approver: approver-1')).toBeInTheDocument();
     expect(screen.getAllByText('Reason: urgent production fix')).toHaveLength(2);
     expect(screen.getByText('Level: high')).toBeInTheDocument();
-    expect(screen.getAllByText(/production topic change/)).toHaveLength(4);
+    expect(screen.getAllByText(/production schema change/)).toHaveLength(4);
   });
 
   it('reloads activity data when the limit changes', async () => {
@@ -182,7 +182,7 @@ describe('History', () => {
 
     render(<History />);
 
-    await screen.findByText('Topic apply completed');
+    await screen.findByText('Schema apply completed');
 
     const selects = screen.getAllByRole('combobox');
     await user.selectOptions(selects[0], '100');

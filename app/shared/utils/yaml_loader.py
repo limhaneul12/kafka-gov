@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Any, TypeVar
 
 import yaml
-from pydantic import BaseModel, ValidationError
+from pydantic import BaseModel
 
 T = TypeVar("T", bound=BaseModel)
 
@@ -61,20 +61,13 @@ def load_pydantic_from_yaml[T: BaseModel](file_path: str | Path, model_class: ty
         ValidationError: If data doesn't match model schema
 
     Example:
-        >>> from app.topic.domain.policies.naming.rule_schema import CustomNamingRules
-        >>> rules = load_pydantic_from_yaml("config/naming/custom.yaml", CustomNamingRules)
+        >>> from pydantic import BaseModel
+        >>> class SettingsModel(BaseModel):
+        ...     enabled: bool
+        >>> settings = load_pydantic_from_yaml("config/example.yaml", SettingsModel)
     """
     data = load_yaml_file(file_path)
-
-    try:
-        return model_class(**data)
-    except ValidationError as e:
-        # Pydantic ValidationError - pyrefly 타입 체커가 시그니처를 인식하지 못함
-        model_name: str = model_class.__name__  # pyrefly: ignore
-        raise ValidationError(  # pyrefly: ignore
-            f"Failed to validate YAML data against {model_name}: {e}",
-            model=model_class,  # pyrefly: ignore
-        ) from e
+    return model_class(**data)
 
 
 def save_pydantic_to_yaml(model: BaseModel, file_path: str | Path) -> None:
@@ -88,9 +81,10 @@ def save_pydantic_to_yaml(model: BaseModel, file_path: str | Path) -> None:
         OSError: If file cannot be written
 
     Example:
-        >>> from app.topic.domain.policies.guardrail.preset_schema import CustomGuardrailPreset
-        >>> preset = CustomGuardrailPreset(...)
-        >>> save_pydantic_to_yaml(preset, "config/guardrails/my_preset.yaml")
+        >>> from pydantic import BaseModel
+        >>> class SettingsModel(BaseModel):
+        ...     enabled: bool
+        >>> save_pydantic_to_yaml(SettingsModel(enabled=True), "config/example.yaml")
     """
     path = Path(file_path)
     path.parent.mkdir(parents=True, exist_ok=True)

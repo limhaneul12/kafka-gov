@@ -39,11 +39,11 @@ async def test_create_and_get_approval_request(
     get_use_case = GetApprovalRequestUseCase(approval_repository)
 
     created = await create_use_case.execute(
-        resource_type="topic",
-        resource_name="prod.orders.created",
+        resource_type="schema",
+        resource_name="prod.orders-value",
         change_type="delete",
         change_ref="chg-001",
-        summary="Delete production topic",
+        summary="Delete production schema",
         justification="Cleanup after migration",
         requested_by="alice",
         metadata={"risk_level": "high"},
@@ -65,10 +65,10 @@ async def test_list_approval_requests_filters_by_status_and_resource(
     approve_use_case = ApproveApprovalRequestUseCase(approval_repository)
 
     pending = await create_use_case.execute(
-        resource_type="topic",
-        resource_name="prod.orders.created",
+        resource_type="schema",
+        resource_name="prod.orders-value",
         change_type="delete",
-        summary="Delete production topic",
+        summary="Delete production schema",
         justification="Cleanup",
         requested_by="alice",
     )
@@ -86,7 +86,7 @@ async def test_list_approval_requests_filters_by_status_and_resource(
         decision_reason="reviewed",
     )
 
-    pending_topics = await list_use_case.execute(status="pending", resource_type="topic")
+    pending_topics = await list_use_case.execute(status="pending", resource_type="schema")
 
     assert [item.request_id for item in pending_topics] == [pending.request_id]
 
@@ -100,10 +100,10 @@ async def test_approve_and_reject_approval_requests(
     reject_use_case = RejectApprovalRequestUseCase(approval_repository)
 
     approvable = await create_use_case.execute(
-        resource_type="topic",
-        resource_name="prod.orders.created",
+        resource_type="schema",
+        resource_name="prod.orders-value",
         change_type="delete",
-        summary="Delete topic",
+        summary="Delete schema",
         justification="Cleanup",
         requested_by="alice",
     )
@@ -148,14 +148,14 @@ async def test_approval_requests_appear_in_activity_history(
     )
 
     created = await create_use_case.execute(
-        resource_type="topic",
-        resource_name="prod.orders.created",
+        resource_type="schema",
+        resource_name="prod.orders-value",
         change_type="apply",
         change_ref="chg-approval-001",
-        summary="approval required for topic apply",
-        justification="high-risk topic change",
+        summary="approval required for schema apply",
+        justification="high-risk schema change",
         requested_by="alice",
-        metadata={"cluster_id": "cluster-1"},
+        metadata={"registry_id": "registry-1"},
     )
 
     recent = await audit_repository.get_recent_activities(limit=10)
@@ -163,12 +163,12 @@ async def test_approval_requests_appear_in_activity_history(
 
     assert recent[0].activity_type == "approval"
     assert recent[0].action == "REQUESTED"
-    assert recent[0].target == "prod.orders.created"
+    assert recent[0].target == "prod.orders-value"
     assert recent[0].metadata == {
-        "cluster_id": "cluster-1",
+        "registry_id": "registry-1",
         "approval_request": {
             "request_id": created.request_id,
-            "resource_type": "topic",
+            "resource_type": "schema",
             "change_type": "apply",
             "change_ref": "chg-approval-001",
             "status": "pending",

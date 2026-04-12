@@ -4,7 +4,7 @@ import logging
 from collections.abc import Callable
 from contextlib import AbstractAsyncContextManager
 from datetime import UTC, datetime
-from typing import Any, TypeVar
+from typing import Any
 
 from sqlalchemy import desc, literal, select, union_all
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -15,28 +15,21 @@ from app.shared.constants import ACTION_MESSAGES, ActivityType, AuditAction, Aud
 from app.shared.domain.models import ApprovalRequest, AuditActivity
 from app.shared.domain.repositories import IApprovalRequestRepository, IAuditActivityRepository
 from app.shared.infrastructure.models import ApprovalRequestModel
-from app.topic.infrastructure.models import AuditLogModel
 
 logger = logging.getLogger(__name__)
 
-# TypeVar for audit log models
-AuditLogT = TypeVar("AuditLogT", AuditLogModel, SchemaAuditLogModel)
-ModelsToQuery = list[
-    tuple[type[AuditLogModel] | type[SchemaAuditLogModel] | type[ApprovalRequestModel], str]
-]
+ModelsToQuery = list[tuple[type[SchemaAuditLogModel] | type[ApprovalRequestModel], str]]
 
 
 VISIBLE_AUDIT_STATUSES = (AuditStatus.COMPLETED, AuditStatus.PARTIALLY_COMPLETED)
 
 
-def _subquery_log_model[AuditLogT: (AuditLogModel, SchemaAuditLogModel)](
-    model: type[AuditLogT], activity_type: str
-) -> Select[Any]:
+def _subquery_log_model(model: type[SchemaAuditLogModel], activity_type: str) -> Select[Any]:
     """활동 로그 서브쿼리 생성 (모델별)
 
     Args:
         model: Audit 로그 모델 클래스
-        activity_type: 활동 타입 ("topic" or "schema")
+        activity_type: 활동 타입 ("schema")
 
     Returns:
         SQLAlchemy Select 쿼리 객체
@@ -94,8 +87,6 @@ def _get_models_to_query(activity_type: str | None) -> ModelsToQuery:
         (모델 클래스, 활동 타입) 튜플 리스트
     """
     models: ModelsToQuery = []
-    if not activity_type or activity_type == ActivityType.TOPIC:
-        models.append((AuditLogModel, ActivityType.TOPIC))
     if not activity_type or activity_type == ActivityType.SCHEMA:
         models.append((SchemaAuditLogModel, ActivityType.SCHEMA))
     if not activity_type or activity_type == ActivityType.APPROVAL:
@@ -112,15 +103,12 @@ class MySQLAuditActivityRepository(IAuditActivityRepository):
         self.session_factory = session_factory
 
     async def get_recent_activities(self, limit: int) -> list[AuditActivity]:
-        """최근 활동 조회 (Topic + Schema 통합) - UNION 쿼리 최적화"""
+        """최근 활동 조회 (Schema + Approval 통합) - UNION 쿼리 최적화"""
         async with self.session_factory() as session:
-            topic_query = _subquery_log_model(AuditLogModel, ActivityType.TOPIC)
             schema_query = _subquery_log_model(SchemaAuditLogModel, ActivityType.SCHEMA)
             approval_query = _approval_request_query()
             combined_query = (
-                union_all(topic_query, schema_query, approval_query)
-                .order_by(desc("timestamp"))
-                .limit(limit)
+                union_all(schema_query, approval_query).order_by(desc("timestamp")).limit(limit)
             )
 
             result = await session.execute(combined_query)
