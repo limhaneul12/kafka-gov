@@ -32,7 +32,7 @@ Infrastructure
   ├─ Schema Registry client
   ├─ database repositories
   ├─ MinIO artifact storage
-  └─ Redis / shared runtime services
+  └─ shared runtime services
 ```
 
 ## Active backend modules

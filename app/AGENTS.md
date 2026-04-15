@@ -21,7 +21,7 @@ app/
 |------|----------|-------|
 | FastAPI startup | `app/main.py` | routers, lifespan, exception handlers |
 | DI wiring | `app/container.py` | only composition root should wire broadly |
-| Shared runtime config | `app/shared/settings.py` | DB/env precedence and Redis/cache config |
+| Shared runtime config | `app/shared/settings.py` | DB/env precedence and runtime config |
 | Shared infra | `app/shared/` | middleware, logging, database, common utilities |
 | Schema details | `app/schema/README.md` | schema governance and registry flows |
 

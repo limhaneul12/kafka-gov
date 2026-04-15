@@ -6,7 +6,6 @@ This guide explains how to configure and deploy the current **schema-governance 
 
 The active runtime assumes:
 - a metadata database
-- Redis
 - a reachable Schema Registry
 - optional object storage for schema artifacts
 
@@ -35,8 +34,6 @@ STORAGE_ENDPOINT_URL=http://minio:9000
 STORAGE_ACCESS_KEY=CHANGE_ME
 STORAGE_SECRET_KEY=CHANGE_ME_STRONG_SECRET
 
-# Redis
-REDIS_URL=redis://redis:6379/0
 ```
 
 ---

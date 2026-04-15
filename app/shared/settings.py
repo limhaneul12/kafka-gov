@@ -120,17 +120,6 @@ class AppSettings(BaseSettings):
     database: DatabaseSettings = Field(default_factory=DatabaseSettings)
 
     @property
-    def redis_url(self) -> str:
-        explicit_url = os.getenv("REDIS_URL")
-        if explicit_url:
-            return explicit_url
-
-        host = os.getenv("REDIS_HOST", "redis")
-        port = os.getenv("REDIS_PORT", "6379")
-        db = os.getenv("REDIS_DB", "0")
-        return f"redis://{host}:{port}/{db}"
-
-    @property
     def is_production(self) -> bool:
         """프로덕션 환경 여부"""
         return self.environment.lower() in ("prod", "production")

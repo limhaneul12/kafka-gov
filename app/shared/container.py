@@ -18,7 +18,6 @@ from app.shared.infrastructure.repository import (
     SQLApprovalRequestRepository,
 )
 
-from .cache import init_redis
 from .database import DatabaseManager
 from .settings import settings
 
@@ -39,9 +38,6 @@ class InfrastructureContainer(containers.DeclarativeContainer):
         database_url=infra_container.provided.database.url,
         echo=infra_container.provided.database.echo,
     )
-
-    # Redis Client - Resource (자동 생명주기 관리)
-    redis_client = providers.Resource(init_redis)
 
     # Repositories
     audit_activity_repository = providers.Factory(
