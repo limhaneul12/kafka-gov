@@ -1,4 +1,4 @@
-"""사용자 역할 정의 - Kafka 거버넌스용"""
+"""사용자 역할 정의 - 현재 schema-governance slice용."""
 
 from __future__ import annotations
 
@@ -8,14 +8,14 @@ from enum import Enum
 class UserRole(str, Enum):
     """사용자 역할 정의
 
-    Kafka 거버넌스 시스템의 사용자 역할을 정의합니다.
+    현재 schema-governance 시스템의 사용자 역할을 정의합니다.
     현재는 단순화를 위해 3가지 역할만 제공합니다.
     """
 
     # 시스템 관리자 - 모든 권한
     ADMIN = "admin"
 
-    # 개발자 - Topic/Schema 생성/수정 권한
+    # 개발자 - schema 관련 생성/수정 권한
     DEVELOPER = "developer"
 
     # 뷰어 - 읽기 전용 권한
@@ -26,7 +26,7 @@ class UserRole(str, Enum):
         """역할 설명"""
         descriptions = {
             UserRole.ADMIN: "시스템 관리자 - 모든 리소스에 대한 전체 권한",
-            UserRole.DEVELOPER: "개발자 - Topic/Schema 생성, 수정, 삭제 권한",
+            UserRole.DEVELOPER: "개발자 - schema 생성, 수정, 삭제 권한",
             UserRole.VIEWER: "뷰어 - 읽기 전용 권한",
         }
         return descriptions[self]

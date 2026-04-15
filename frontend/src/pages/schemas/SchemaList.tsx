@@ -63,7 +63,7 @@ const SchemaItem = ({ schema, onClick }: { schema: SchemaArtifactResponse; onCli
 import { Plus, RefreshCw, BookOpen, GitCommit, ChevronRight, Database } from 'lucide-react';
 import { Button } from '../../components/common/Button';
 import UploadSchemaModal from '../../components/schema/UploadSchemaModal';
-import { clustersAPI, schemasAPI } from '../../services/api';
+import { registryAPI, schemasAPI } from '../../services/api';
 import { toast } from 'sonner';
 
 // ... inside SchemaList ...
@@ -77,7 +77,7 @@ export default function SchemaList() {
     useEffect(() => {
         fetchSchemas();
         // Get active registry for upload/sync
-        clustersAPI.listRegistries().then(res => {
+        registryAPI.list().then(res => {
             const active = res.data.find((registry: SchemaRegistry) => registry.is_active) || res.data[0];
             if (active) setActiveRegistryId(active.registry_id);
         });
@@ -115,11 +115,11 @@ export default function SchemaList() {
                     <div>
                         <div className="flex items-center gap-2 mb-2 text-[#57606a]">
                             <Database className="w-5 h-5" />
-                            <span className="text-sm font-semibold uppercase tracking-wide">Registry Explorer</span>
+                            <span className="text-sm font-semibold uppercase tracking-wide">Schema Registry</span>
                         </div>
                         <h1 className="text-2xl font-bold text-[#24292f]">Schema Subjects</h1>
                         <p className="text-sm text-[#57606a] mt-1">
-                            Manage and version your Kafka message schemas across all clusters.
+                            Manage and version your registered schemas from the active Schema Registry.
                         </p>
                     </div>
                     <div className="flex gap-2">

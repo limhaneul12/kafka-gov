@@ -4,12 +4,9 @@ from dependency_injector.wiring import Provide, inject
 from fastapi import APIRouter, Depends, Query, Request, status
 
 from app.container import AppContainer
-from app.schema.interface.adapters import (
-    safe_convert_plan_to_response,
-)
+from app.schema.interface.adapters import safe_convert_plan_to_response
 from app.schema.interface.schemas import (
     DashboardResponse,
-    KnownTopicNamesResponse,
     RollbackRequest,
     SchemaBatchDryRunResponse,
     SchemaChangeRequest,
@@ -39,7 +36,6 @@ async def get_governance_dashboard(
     registry_id: str = Query(..., description="Schema Registry ID"),
     stats_use_case=Depends(Provide[AppContainer.schema_container.governance_stats_use_case]),
 ) -> DashboardResponse:
-    """거버넌스 대시보드 조회"""
     stats = await stats_use_case.execute(registry_id=registry_id)
     return DashboardResponse.model_validate(asdict(stats))
 
@@ -58,32 +54,8 @@ async def get_schema_history(
     registry_id: str = Query(..., description="Schema Registry ID"),
     history_use_case=Depends(Provide[AppContainer.schema_container.schema_history_use_case]),
 ) -> SchemaHistoryResponse:
-    """스키마 이력 조회"""
     history = await history_use_case.execute(registry_id=registry_id, subject=subject)
     return SchemaHistoryResponse.model_validate(asdict(history))
-
-
-@router.get(
-    "/known-topics/{subject}",
-    response_model=KnownTopicNamesResponse,
-    status_code=status.HTTP_200_OK,
-    summary="알려진 토픽명 조회",
-    description="현재 subject naming 패턴에서 추론한 알려진 토픽명을 반환합니다.",
-)
-@inject
-@handle_server_errors(error_message="Failed to load known topic names")
-async def get_known_topic_names(
-    subject: str,
-    registry_id: str = Query(..., description="Schema Registry ID"),
-    known_topic_names_use_case=Depends(
-        Provide[AppContainer.schema_container.known_topic_names_use_case]
-    ),
-) -> KnownTopicNamesResponse:
-    topic_names = await known_topic_names_use_case.execute(
-        registry_id=registry_id,
-        subject=subject,
-    )
-    return KnownTopicNamesResponse(subject=subject, topic_names=topic_names)
 
 
 @router.post(
@@ -101,7 +73,6 @@ async def plan_schema_change(
     registry_id: str = Query(..., description="Schema Registry ID"),
     plan_change_use_case=Depends(Provide[AppContainer.schema_container.plan_change_use_case]),
 ) -> SchemaBatchDryRunResponse:
-    """단건 스키마 변경 계획 수립"""
     actor, actor_context = _resolve_actor(http_request)
     plan = await plan_change_use_case.execute(
         registry_id=registry_id,
@@ -132,7 +103,6 @@ async def plan_schema_rollback(
     registry_id: str = Query(..., description="Schema Registry ID"),
     rollback_use_case=Depends(Provide[AppContainer.schema_container.rollback_use_case]),
 ) -> SchemaBatchDryRunResponse:
-    """스키마 롤백 계획 수립"""
     actor, actor_context = _resolve_actor(http_request)
     plan = await rollback_use_case.execute(
         registry_id=registry_id,

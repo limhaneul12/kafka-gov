@@ -29,7 +29,7 @@ class EventBus:
         """이벤트 발행 - 모든 핸들러 실행
 
         Note:
-            event를 Any로 선언한 이유: TopicCreated, SchemaRegistered 등
+            event를 Any로 선언한 이유: SchemaRegistered 등 다양한 이벤트 타입을 처리하기 위함
             다양한 DomainEvent 서브타입을 받아야 하며, Protocol로 정의하면
             event_type, aggregate_id 속성만 보장하면 되므로 Any 사용
         """

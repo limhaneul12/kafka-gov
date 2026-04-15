@@ -58,7 +58,7 @@ class GetActivityHistoryUseCase:
         Args:
             from_date: 시작 날짜/시간
             to_date: 종료 날짜/시간
-            activity_type: 활동 타입 ("topic" or "schema")
+            activity_type: 활동 타입 (예: schema, approval)
             action: 액션 타입
             actor: 수행자
             limit: 최대 조회 개수 (기본 100개, 최대 500개)

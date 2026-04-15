@@ -127,7 +127,7 @@ class SchemaBatchRequest(BaseModel):
                 "kind": "SchemaBatch",
                 "env": "prod",
                 "change_id": "2025-09-25_001",
-                "subjectStrategy": "TopicNameStrategy",
+                "subjectStrategy": "SubjectNameStrategy",
                 "items": [
                     {
                         "subject": "prod.orders.created-value",
@@ -148,7 +148,7 @@ class SchemaBatchRequest(BaseModel):
     env: Environment
     change_id: ChangeId
     subject_strategy: SubjectStrategy = Field(
-        default=SubjectStrategy.TOPIC_NAME,
+        default=SubjectStrategy.SUBJECT_NAME,
         validation_alias=AliasChoices("subjectStrategy", "subject_strategy"),
         serialization_alias="subjectStrategy",
     )

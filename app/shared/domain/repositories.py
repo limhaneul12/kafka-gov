@@ -14,7 +14,7 @@ class IAuditActivityRepository(ABC):
     @abstractmethod
     async def get_recent_activities(self, limit: int) -> list[AuditActivity]:
         """
-        최근 활동 조회 (Topic + Schema 통합)
+        최근 활동 조회 (schema/approval 중심)
 
         Args:
             limit: 조회할 최대 개수
@@ -40,7 +40,7 @@ class IAuditActivityRepository(ABC):
         Args:
             from_date: 시작 날짜/시간
             to_date: 종료 날짜/시간
-            activity_type: 활동 타입 ("topic" or "schema")
+            activity_type: 활동 타입 (예: schema, approval)
             action: 액션 타입
             actor: 수행자
             limit: 최대 조회 개수

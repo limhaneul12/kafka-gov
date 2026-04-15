@@ -29,7 +29,7 @@
   },
   "dashboard": {
     "title": "Dashboard",
-    "subtitle": "Monitor your Kafka cluster status at a glance",
+    "subtitle": "Monitor your schema governance status at a glance",
     "registeredSchemas": "Registered Schemas",
     "healthStatus": "Health Status",
     "healthy": "Healthy",
@@ -200,7 +200,7 @@
   },
   "connection": {
     "list": "Connections",
-    "description": "Manage Kafka cluster and related resource connections",
+    "description": "Manage Schema Registry connections used by schema governance",
     "add": "Add Connection",
     "edit": "Edit Connection",
     "delete": "Delete Connection",
@@ -208,7 +208,7 @@
     "activate": "Activate",
     "name": "Connection Name",
     "type": "Type",
-    "broker": "Broker",
+    "broker": "Legacy Broker",
     "registry": "Registry",
     "storage": "Storage",
     "bootstrapServers": "Bootstrap Servers",

@@ -38,11 +38,6 @@ export interface SchemaHistoryResponse {
     history: SchemaHistoryItem[];
 }
 
-export interface KnownTopicNamesResponse {
-    subject: string;
-    topic_names: string[];
-}
-
 export interface SchemaArtifactResponse {
     subject: string;
     version: number | null;

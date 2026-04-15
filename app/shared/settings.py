@@ -87,7 +87,7 @@ class AppSettings(BaseSettings):
     model_config = model_config_module("APP_")
 
     # 애플리케이션 기본 설정
-    app_name: str = Field(default="Kafka Governance", description="애플리케이션 이름")
+    app_name: str = Field(default="Data Governance", description="애플리케이션 이름")
     app_version: str = Field(default="1.0.0", description="애플리케이션 버전")
     debug: bool = Field(default=False, description="디버그 모드")
     environment: str = Field(

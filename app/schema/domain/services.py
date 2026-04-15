@@ -5,8 +5,6 @@ from __future__ import annotations
 import json
 from typing import Any
 
-from app.shared.domain.subject_utils import SubjectStrategy, extract_topics_from_subject
-
 from .models import (
     DomainEnvironment,
     DomainPlanAction,
@@ -31,7 +29,7 @@ HIGH_VERSION_COUNT_THRESHOLD = 10  # 버전이 이 개수를 초과하면 경고
 
 
 class SchemaImpactAnalyzer:
-    """스키마 subject naming 기반 알려진 토픽명 분석 서비스"""
+    """스키마 변경 영향도 기본 분석 서비스"""
 
     def __init__(self, registry_repository: ISchemaRegistryRepository) -> None:
         self.registry_repository = registry_repository
@@ -39,52 +37,23 @@ class SchemaImpactAnalyzer:
     async def analyze_impact(
         self, subject: SubjectName, strategy: DomainSubjectStrategy
     ) -> DomainSchemaImpactRecord:
-        """스키마 subject naming에서 알려진 토픽명을 추론합니다."""
-        try:
-            topics = self._extract_topics_from_subject(subject, strategy)
-            return DomainSchemaImpactRecord(
-                subject=subject,
-                topics=tuple(topics),
-                status="success",
-            )
-        except Exception as e:
-            return DomainSchemaImpactRecord(
-                subject=subject,
-                topics=(),
-                status="failure",
-                error_message=str(e),
-            )
-
-    def _extract_topics_from_subject(
-        self, subject: SubjectName, strategy: DomainSubjectStrategy
-    ) -> list[str]:
-        """Subject naming strategy에 따라 토픽명 추출"""
-        # DomainSubjectStrategy를 SubjectStrategy로 매핑
-        strategy_map = {
-            DomainSubjectStrategy.TOPIC_NAME: SubjectStrategy.TOPIC_NAME,
-            DomainSubjectStrategy.RECORD_NAME: SubjectStrategy.RECORD_NAME,
-            DomainSubjectStrategy.TOPIC_RECORD_NAME: SubjectStrategy.TOPIC_RECORD_NAME,
-        }
-        mapped_strategy = strategy_map.get(strategy, SubjectStrategy.TOPIC_NAME)
-        return extract_topics_from_subject(subject, mapped_strategy)
+        """현재 범위에서는 토픽 추론 없이 영향도 기록만 유지합니다."""
+        _ = strategy
+        return DomainSchemaImpactRecord(subject=subject, status="success")
 
 
 class SchemaDeleteAnalyzer:
-    """스키마 삭제 시 naming-derived known topic names를 분석합니다."""
+    """스키마 삭제 전 버전/환경 기준 영향도를 분석합니다."""
 
     def __init__(self, registry_repository: ISchemaRegistryRepository) -> None:
         self.registry_repository = registry_repository
         self.impact_analyzer = SchemaImpactAnalyzer(registry_repository)
 
-    async def analyze_delete_impact(
-        self, subject: SubjectName, strategy: DomainSubjectStrategy
-    ) -> DomainSchemaDeleteImpact:
+    async def analyze_delete_impact(self, subject: SubjectName) -> DomainSchemaDeleteImpact:
         """스키마 삭제 전 영향도 분석
 
         Args:
             subject: 삭제할 Subject 이름
-            strategy: Subject 전략
-
         Returns:
             삭제 영향도 분석 결과
         """
@@ -98,20 +67,14 @@ class SchemaDeleteAnalyzer:
                 subject=subject,
                 current_version=None,
                 total_versions=0,
-                affected_topics=(),
                 warnings=("스키마가 존재하지 않습니다.",),
                 safe_to_delete=True,
             )
-
-        # 2. 영향받는 토픽 추출
-        impact = await self.impact_analyzer.analyze_impact(subject, strategy)
-        affected_topics = impact.topics
 
         # 3. 경고 메시지 생성
         warnings = self._generate_delete_warnings(
             subject=subject,
             current_version=current_info.version,
-            affected_topics=affected_topics,
         )
 
         # 4. 안전 삭제 여부 판단
@@ -123,7 +86,6 @@ class SchemaDeleteAnalyzer:
             subject=subject,
             current_version=current_info.version,
             total_versions=current_info.version if current_info.version else 0,
-            affected_topics=affected_topics,
             warnings=tuple(warnings),
             safe_to_delete=safe_to_delete,
         )
@@ -132,27 +94,18 @@ class SchemaDeleteAnalyzer:
         self,
         subject: SubjectName,
         current_version: int | None,
-        affected_topics: tuple[str, ...],
     ) -> list[str]:
         """삭제 경고 메시지 생성"""
         warnings = []
 
-        # 경고 1: subject naming으로 연결 가능한 토픽명이 있는 경우
-        if affected_topics:
-            topic_list = ", ".join(affected_topics)
-            warnings.append(
-                f"다음 토픽명은 subject naming 기준으로 이 스키마와 연결됩니다: {topic_list}. "
-                f"실사용 여부는 별도 검증이 필요합니다."
-            )
-
-        # 경고 2: 버전이 많은 경우
+        # 경고 1: 버전이 많은 경우
         if current_version and current_version > HIGH_VERSION_COUNT_THRESHOLD:
             warnings.append(
                 f"이 스키마는 {current_version}개의 버전이 있습니다. "
                 f"삭제 시 모든 버전이 제거됩니다."
             )
 
-        # 경고 3: 프로덕션 환경 경고 (subject naming에서 추론)
+        # 경고 2: 프로덕션 환경 경고
         if self._is_production_subject(subject):
             warnings.append("프로덕션 환경의 스키마입니다. 삭제 전 반드시 영향도를 확인하세요.")
 

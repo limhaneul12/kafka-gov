@@ -28,8 +28,8 @@ vi.mock('../../hooks/schema/useSchemaDetail', () => ({
 }));
 
 vi.mock('../../services/api', () => ({
-  clustersAPI: {
-    listRegistries: mocks.listRegistries,
+  registryAPI: {
+    list: mocks.listRegistries,
   },
   schemasAPI: {
     planChange: mocks.planChange,
@@ -82,7 +82,6 @@ const planResult = {
   impacts: [
     {
       status: 'ok',
-      topics: ['prod.orders.created'],
     },
   ],
 };
@@ -108,7 +107,6 @@ describe('SchemaDetail approval flow', () => {
     mocks.useSchemaDetail.mockReturnValue({
       detailData,
       historyData: null,
-      topicHintsData: null,
       loading: false,
       reload: mocks.reload,
     });
@@ -122,7 +120,6 @@ describe('SchemaDetail approval flow', () => {
 
     await user.click(screen.getByRole('button', { name: 'Edit' }));
     await user.click(screen.getByRole('button', { name: 'Analyze Changes' }));
-    expect(await screen.findByText(/not authoritative topic associations/i)).toBeInTheDocument();
     await screen.findByRole('button', { name: 'Apply v2' });
     await user.click(screen.getByRole('button', { name: 'Apply v2' }));
 
@@ -143,7 +140,6 @@ describe('SchemaDetail approval flow', () => {
 
     await user.click(screen.getByRole('button', { name: 'Edit' }));
     await user.click(screen.getByRole('button', { name: 'Analyze Changes' }));
-    expect(await screen.findByText(/not authoritative topic associations/i)).toBeInTheDocument();
     await screen.findByRole('button', { name: 'Apply v2' });
     await user.click(screen.getByRole('button', { name: 'Apply v2' }));
 

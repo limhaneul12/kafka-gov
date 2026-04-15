@@ -1,4 +1,4 @@
-"""Schema Interface Schemas - Export Module"""
+"""Schema interface schemas."""
 
 from .common import (
     PolicyViolation,
@@ -14,7 +14,6 @@ from .common import (
 from .governance import (
     DashboardResponse,
     GovernanceScore,
-    KnownTopicNamesResponse,
     SchemaHistoryItem,
     SchemaHistoryResponse,
     SubjectStat,
@@ -33,11 +32,9 @@ from .search import SchemaSearchResponse
 __all__ = [
     "DashboardResponse",
     "GovernanceScore",
-    "KnownTopicNamesResponse",
     "PolicyViolation",
     "RollbackRequest",
     "SchemaArtifact",
-    "SchemaArtifactResponse",
     "SchemaBatchApplyResponse",
     "SchemaBatchDryRunResponse",
     "SchemaBatchItem",

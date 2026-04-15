@@ -1,16 +1,13 @@
-"""Schema Governance DTOs"""
+"""Schema Governance DTOs."""
 
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.schema.interface.types.enums import CompatibilityMode
 
-# 🚀 Python 3.12 Type Alias
-type Score = float  # 0.0 ~ 1.0
+type Score = float
 
 
 class GovernanceScore(BaseModel):
-    """거버넌스 점수"""
-
     model_config = ConfigDict(frozen=True)
 
     compatibility_pass_rate: Score = Field(..., description="호환성 검사 통과율 (0.0~1.0)")
@@ -20,8 +17,6 @@ class GovernanceScore(BaseModel):
 
 
 class SubjectStat(BaseModel):
-    """Subject 별 거버넌스 상태"""
-
     model_config = ConfigDict(frozen=True)
 
     subject: str = Field(..., description="Subject 이름")
@@ -34,8 +29,6 @@ class SubjectStat(BaseModel):
 
 
 class DashboardResponse(BaseModel):
-    """거버넌스 대시보드 응답"""
-
     model_config = ConfigDict(
         frozen=True,
         json_schema_extra={
@@ -68,14 +61,10 @@ class DashboardResponse(BaseModel):
     total_versions: int = Field(..., description="전체 스키마 버전 수 합계")
     orphan_subjects: int = Field(..., description="Owner가 없는 고아 Subject 수")
     scores: GovernanceScore = Field(..., description="거버넌스 종합 점수")
-    top_subjects: list[SubjectStat] = Field(
-        ..., description="주요 Subject 목록 (샘플링 또는 상위 랭크)"
-    )
+    top_subjects: list[SubjectStat] = Field(..., description="주요 Subject 목록")
 
 
 class SchemaHistoryItem(BaseModel):
-    """스키마 변경 이력 항목"""
-
     model_config = ConfigDict(frozen=True)
 
     version: int = Field(..., description="스키마 버전")
@@ -87,8 +76,6 @@ class SchemaHistoryItem(BaseModel):
 
 
 class SchemaHistoryResponse(BaseModel):
-    """스키마 타임머신 응답"""
-
     model_config = ConfigDict(
         frozen=True,
         json_schema_extra={
@@ -116,18 +103,3 @@ class SchemaHistoryResponse(BaseModel):
 
     subject: str = Field(..., description="Subject 이름")
     history: list[SchemaHistoryItem] = Field(..., description="변경 이력 목록 (최신순)")
-
-
-class KnownTopicNamesResponse(BaseModel):
-    model_config = ConfigDict(
-        frozen=True,
-        json_schema_extra={
-            "example": {
-                "subject": "order.payment",
-                "topic_names": ["order.payment"],
-            }
-        },
-    )
-
-    subject: str = Field(..., description="중심 노드 (Subject)")
-    topic_names: list[str] = Field(..., description="읽기 전용 토픽명 힌트 목록")

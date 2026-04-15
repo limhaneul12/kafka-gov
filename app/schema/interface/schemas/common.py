@@ -199,13 +199,12 @@ class SchemaImpactRecord(BaseModel):
         json_schema_extra={
             "example": {
                 "subject": "prod.orders.created-value",
-                "topics": ["prod.orders.created"],
+                "status": "success",
             }
         },
     )
 
     subject: SubjectName
-    topics: list[StrictStr] = Field(default_factory=list, max_length=50)
     status: StrictStr = Field(default="success")
     error_message: StrictStr | None = Field(default=None)
 

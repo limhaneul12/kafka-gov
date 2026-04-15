@@ -15,18 +15,6 @@ export interface SchemaArtifact {
   owner: string | null;
 }
 
-// Cluster Types
-export interface KafkaCluster {
-  cluster_id: string;
-  name: string;
-  bootstrap_servers: string;
-  description: string | null;
-  security_protocol: string;
-  is_active: boolean;
-  created_at: string;
-  updated_at: string;
-}
-
 export interface SchemaRegistry {
   registry_id: string;
   name: string;
@@ -50,16 +38,4 @@ export interface Policy {
   created_at: string;
   target_environment: string;
   updated_at: string | null;
-}
-
-// Audit Types
-export interface AuditLog {
-  activity_type: string;
-  action: string;
-  target: string;
-  message: string;
-  actor: string;
-  team: string | null;
-  timestamp: string;
-  metadata: Record<string, unknown> | null;
 }

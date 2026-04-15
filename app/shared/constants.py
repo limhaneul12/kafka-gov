@@ -15,7 +15,6 @@ class AuditStatus:
 class ActivityType:
     """활동 타입"""
 
-    TOPIC = "topic"
     SCHEMA = "schema"
     APPROVAL = "approval"
 
@@ -23,7 +22,7 @@ class ActivityType:
 class AuditAction:
     """감사 액션"""
 
-    # Topic 액션
+    # 공통/레거시 액션
     CREATE = "CREATE"
     UPDATE = "UPDATE"
     DELETE = "DELETE"
@@ -60,13 +59,6 @@ class MethodType:
 
 # 활동 메시지 매핑
 ACTION_MESSAGES = {
-    ActivityType.TOPIC: {
-        AuditAction.CREATE: "생성됨",
-        AuditAction.UPDATE: "수정됨",
-        AuditAction.DELETE: "삭제됨",
-        AuditAction.DRY_RUN: "검증됨",
-        AuditAction.APPLY: "적용됨",
-    },
     ActivityType.SCHEMA: {
         AuditAction.REGISTER: "등록됨",
         AuditAction.UPLOAD: "업로드됨",
@@ -87,7 +79,7 @@ def format_activity_message(activity_type: str, action: str) -> str:
     """활동 메시지 포맷팅
 
     Args:
-        activity_type: 활동 타입 (topic/schema)
+        activity_type: 활동 타입 (schema/approval)
         action: 액션
 
     Returns:

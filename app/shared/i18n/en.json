@@ -1,7 +1,6 @@
 {
   "error": {
     "schema_not_found": "Schema '{subject}' not found",
-    "cluster_not_found": "Cluster '{id}' not found",
     "connection_failed": "Connection failed: {reason}",
     "invalid_value": "Invalid value for {field}: {value}",
     "validation_failed": "Validation failed: {reason}",
@@ -43,6 +42,5 @@
     "loading": "Loading...",
     "processing": "Processing...",
     "no_data": "No data available",
-    "cluster_selected": "Cluster '{name}' selected"
   }
 }

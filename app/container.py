@@ -1,6 +1,6 @@
 from dependency_injector import containers, providers
 
-from app.cluster.container import ClusterContainer
+from app.registry_connections.container import RegistryConnectionContainer
 from app.schema.container import SchemaContainer
 from app.shared.container import InfrastructureContainer
 
@@ -13,19 +13,19 @@ class AppContainer(containers.DeclarativeContainer):
             "app.schema.interface",
             "app.schema.interface.routers",
             "app.shared.interface",
-            "app.cluster.interface.routers",
+            "app.registry_connections.interface.routers",
         ]
     )
 
-    # ClusterContainer (ConnectionManager 제공) - 최우선 생성
-    cluster_container = providers.Container(ClusterContainer)
+    # Registry connection container (ConnectionManager 제공)
+    registry_container = providers.Container(RegistryConnectionContainer)
 
     infrastructure_container = providers.Container(InfrastructureContainer)
 
-    # ClusterContainer에 infrastructure 주입 (순환 참조 해결)
-    cluster_container.override(
+    # Registry connection container에 infrastructure 주입
+    registry_container.override(
         providers.Container(
-            ClusterContainer,
+            RegistryConnectionContainer,
             infrastructure=infrastructure_container,
         )
     )
@@ -34,5 +34,5 @@ class AppContainer(containers.DeclarativeContainer):
     schema_container = providers.Container(
         SchemaContainer,
         infrastructure=infrastructure_container,
-        cluster=cluster_container,  # ConnectionManager 전달
+        registry_connections=registry_container,
     )

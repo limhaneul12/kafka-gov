@@ -1,156 +1,108 @@
-import { useState, useEffect } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
-import { clustersAPI } from "../../../services/api";
-import type { KafkaCluster, SchemaRegistry } from "../Connections.types";
+
+import { registryAPI } from "../../../services/api";
+import type { SchemaRegistry } from "../Connections.types";
 
 export function useConnections() {
   const { t } = useTranslation();
-  const [clusters, setClusters] = useState<KafkaCluster[]>([]);
   const [registries, setRegistries] = useState<SchemaRegistry[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    loadConnections();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  const loadConnections = async () => {
+  const loadConnections = useCallback(async () => {
     try {
       setLoading(true);
-      const [clustersRes, registriesRes] = await Promise.all([
-        clustersAPI.listKafka(),
-        clustersAPI.listRegistries(),
-      ]);
-      setClusters(clustersRes.data);
+      const registriesRes = await registryAPI.list();
       setRegistries(registriesRes.data);
     } catch (error) {
-      console.error("Failed to load connections:", error);
+      console.error("Failed to load registry connections:", error);
       toast.error(t("error.general"));
     } finally {
       setLoading(false);
     }
-  };
+  }, [t]);
 
-  const addConnection = async (type: string, data: Record<string, string>) => {
+  useEffect(() => {
+    void loadConnections();
+  }, [loadConnections]);
+
+  const addConnection = async (data: Record<string, string>) => {
     try {
-      switch (type) {
-        case "kafka":
-          await clustersAPI.createKafka(data);
-          break;
-        case "registry":
-          await clustersAPI.createRegistry(data);
-          break;
-      }
+      await registryAPI.create(data);
       await loadConnections();
       toast.success(t("common.success"));
     } catch (error) {
-      console.error("Failed to add connection:", error);
+      console.error("Failed to add registry connection:", error);
       throw error;
     }
   };
 
-  const updateConnection = async (type: string, id: string, data: Record<string, unknown>) => {
+  const updateConnection = async (id: string, data: Record<string, unknown>) => {
     try {
-      switch (type) {
-        case "kafka":
-          await clustersAPI.updateKafka(id, data);
-          break;
-        case "registry":
-          await clustersAPI.updateRegistry(id, data);
-          break;
-      }
+      await registryAPI.update(id, data);
       await loadConnections();
       toast.success(t("common.success"), {
-        description: "Connection updated successfully",
+        description: "Schema Registry connection updated successfully",
       });
     } catch (error) {
-      console.error("Failed to update connection:", error);
+      console.error("Failed to update registry connection:", error);
       toast.error(t("error.general"), {
-        description: "Failed to update connection",
+        description: "Failed to update Schema Registry connection",
       });
       throw error;
     }
   };
 
-  const deleteConnection = async (type: string, id: string, name: string) => {
+  const deleteConnection = async (id: string, name: string) => {
     if (!confirm(`Delete "${name}"?`)) return;
 
     try {
-      switch (type) {
-        case "kafka":
-          await clustersAPI.deleteKafka(id);
-          break;
-        case "registry":
-          await clustersAPI.deleteRegistry(id);
-          break;
-      }
+      await registryAPI.delete(id);
       await loadConnections();
       toast.success(t("common.success"));
     } catch (error) {
-      console.error("Failed to delete connection:", error);
+      console.error("Failed to delete registry connection:", error);
       toast.error(t("error.general"));
     }
   };
 
-  const testConnection = async (type: string, id: string, name: string) => {
+  const testConnection = async (id: string, name: string) => {
     try {
-      let response;
-      switch (type) {
-        case "kafka":
-          response = await clustersAPI.testKafka(id);
-          break;
-        case "registry":
-          response = await clustersAPI.testRegistry(id);
-          break;
-      }
-
-      // Backend는 HTTP 200을 반환하지만 success 필드로 실제 연결 성공/실패 판단
-      if (response?.data?.success) {
+      const response = await registryAPI.test(id);
+      if (response.data?.success) {
         toast.success(t("connection.test"), {
           description: `"${name}" ${t("dashboard.healthy")} (${response.data.latency_ms?.toFixed(0)}ms)`,
         });
       } else {
         toast.error(t("connection.test"), {
-          description: `"${name}" connection failed: ${response?.data?.message || "Unknown error"}`,
+          description: `"${name}" connection failed: ${response.data?.message || "Unknown error"}`,
         });
       }
     } catch (error) {
-      console.error("Failed to test connection:", error);
+      console.error("Failed to test registry connection:", error);
       toast.error(t("error.network"), {
         description: `"${name}" ${t("connection.test")} failed`,
       });
     }
   };
 
-  const activateConnection = async (type: string, id: string) => {
+  const activateConnection = async (id: string) => {
     try {
-      // Backend에 PATCH /{id}/activate 엔드포인트 사용
-      // is_active만 true로 변경하고 나머지는 기존 값 유지
-      
-      switch (type) {
-        case "kafka":
-          await clustersAPI.activateKafka(id);
-          break;
-        case "registry":
-          await clustersAPI.activateRegistry(id);
-          break;
-      }
-      
+      await registryAPI.activate(id);
       await loadConnections();
       toast.success(t("common.success"), {
-        description: "Connection activated successfully",
+        description: "Schema Registry connection activated successfully",
       });
     } catch (error) {
-      console.error("Failed to activate connection:", error);
+      console.error("Failed to activate registry connection:", error);
       toast.error(t("error.general"), {
-        description: "Failed to activate connection",
+        description: "Failed to activate Schema Registry connection",
       });
     }
   };
 
   return {
-    clusters,
     registries,
     loading,
     loadConnections,

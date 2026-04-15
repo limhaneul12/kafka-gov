@@ -39,8 +39,8 @@ class SchemaRegisteredEvent:
     schema_id: int
     compatibility_mode: str
 
-    # Subject Strategy (토픽 추론용)
-    subject_strategy: str  # "TopicNameStrategy", etc.
+    # Subject Strategy (legacy naming metadata)
+    subject_strategy: str  # naming strategy metadata
 
     # 메타데이터
     environment: str  # "dev", "stg", "prod"

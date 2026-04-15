@@ -17,7 +17,6 @@ class DomainPolicySeverity(str, Enum):
 class DomainResourceType(str, Enum):
     """리소스 타입"""
 
-    TOPIC = "topic"
     SCHEMA = "schema"
 
 

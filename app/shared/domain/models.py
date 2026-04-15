@@ -11,11 +11,11 @@ from typing import Any
 class AuditActivity:
     """감사 활동 도메인 모델 - Value Object"""
 
-    activity_type: str  # "topic" | "schema"
+    activity_type: str  # schema | approval
     action: str  # CREATE, UPDATE, DELETE,ADD, etc.
     target: str  # 대상 이름
     message: str  # 포맷된 메시지
     actor: str  # 작업자
-    team: str | None = None  # 팀 (토픽 소유자)
+    team: str | None = None  # 팀/담당 조직
     timestamp: datetime
     metadata: dict[str, Any] | None = None  # 추가 메타데이터

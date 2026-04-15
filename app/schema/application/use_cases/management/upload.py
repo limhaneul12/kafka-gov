@@ -423,7 +423,7 @@ class SchemaUploadUseCase:
         if context.strategy_id == "gov:EnvPrefixed":
             return f"{context.env.value}.{base_name}"
 
-        # 기본값: 파일명 그대로 사용 (TopicNameStrategy 등)
+        # 기본값: 파일명 그대로 사용 (SubjectNameStrategy 등)
         return base_name
 
     async def _publish_schema_registered_event(
@@ -444,7 +444,7 @@ class SchemaUploadUseCase:
             schema_type=spec.schema_type.value,
             schema_id=0,  # Registry에서 조회 필요 시 추가
             compatibility_mode=spec.compatibility.value,
-            subject_strategy=DomainSubjectStrategy.TOPIC_NAME.value,
+            subject_strategy=DomainSubjectStrategy.SUBJECT_NAME.value,
             environment=env.value,
             actor=actor,
         )

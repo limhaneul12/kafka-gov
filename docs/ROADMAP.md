@@ -1,86 +1,30 @@
 # 🗺️ Roadmap
 
-Kafka-Gov feature roadmap and development plans.
+## Current focus
 
-## ✅ Completed (v1.0)
+The repository is intentionally narrowed to a **schema-governance slice**.
+The roadmap therefore prioritizes depth and reliability in that slice over breadth.
 
-### Backend Core
-- ✅ Multi-cluster connection management with encryption
-- ✅ Environment-specific policy enforcement
-- ✅ Policy version management (draft/active/archived)
-- ✅ Schema Registry integration with MinIO storage
-- ✅ Multi-cluster connection management backend API
-- ✅ Complete audit trail with event sourcing
-- ✅ Backend test coverage maintained above the enforced threshold
+## ✅ Completed
 
-### Governance Visibility (🔥 New in v1.0)
-- ✅ Governance dashboard for schema and cluster health
-- ✅ Approval-aware audit history
-- ✅ Naming-derived known topic hints
-- ✅ Connection visibility for active broker and registry endpoints
+- Schema Registry connection management
+- Schema upload / sync / detail / search
+- Schema governance dashboard
+- Schema policies
+- Batch dry-run / apply
+- Rollback planning
+- Approval-aware schema apply flow
+- Audit/history persistence for schema changes
+- Frontend shell narrowed to schema-focused routes
 
-### Frontend Core
-- ✅ React 19 frontend with TailwindCSS
-- ✅ Dashboard with cluster health monitoring
-- ✅ Policy version management UI
-- ✅ Schema inventory and detail flows
-- ✅ Connections management surface
+## 🚧 Next
 
----
+- Rename legacy internal module names that still imply broader Kafka scope
+- Simplify remaining schema request/strategy vocabulary
+- Tighten schema approval/audit boundaries inside the backend
+- Improve schema policy UX and diagnostics
 
-## 🚧 In Progress (v1.1)
+## 🔮 Later
 
-### Frontend Enhancements
-- 🔄 Connections page: richer broker and registry diagnostics
-- 🔄 Policy Versions: Enhanced version management features
-
----
-
-## 🔮 Planned (v2.0)
-
-### Monitoring & Observability
-- 📅 Prometheus metrics export
-- 📅 Grafana dashboard templates
-- 📅 Real-time cluster metrics (throughput, latency)
-- 📅 Schema governance health trend reporting
-- 📅 Predictive policy-risk alerting with ML models
-
-### Governance & Security
-- 📅 Role-based access control (RBAC)
-- 📅 Multi-tenancy support
-- 📅 Approval workflows for production changes
-- 📅 Slack/Discord notifications for policy violations
-
-### Advanced Features
-- 📅 Schema migration wizard
-- 📅 GitOps integration (sync with Git repository)
-
----
-
-## 💡 Ideas (Future)
-
-- 📈 Advanced analytics dashboard (usage patterns, trends)
-- 🔄 Automated schema evolution recommendations
-- 🔍 Full-text search across schemas/docs
-- 📱 Mobile app for alerts and quick actions
-- 🌐 Multi-language support (i18n)
-
----
-
-## Version History
-
-### v1.0 (2025-01)
-- Initial release with core governance features
-- Schema governance dashboard and audit visibility
-- Policy enforcement and audit trail
-
-### v0.9 (2024-12)
-- Beta release for internal testing
-- Core CRUD operations
-- Batch processing foundation
-
----
-
-## Contributing
-
-Have ideas for new features? [Create an issue](https://github.com/limhaneul12/kafka-gov/issues) or check our [Contributing Guide](../CONTRIBUTING.md).
+- Reintroduce broader data-governance capabilities only when they have a clear product boundary
+- Re-evaluate higher-order governance objects after the schema slice is stable

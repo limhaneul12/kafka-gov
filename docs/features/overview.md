@@ -1,156 +1,45 @@
 # ✨ Features Overview
 
-Comprehensive guide to Kafka-Gov's capabilities.
+The active product surface is now focused on **schema governance backed by Schema Registry**.
 
-## 🌟 What Makes Kafka-Gov Special?
+## Core capabilities
 
-### 🎯 Built for Governance, Not Just Inspection
+### Schema Registry connections
+- register Schema Registry endpoints
+- activate the currently used registry
+- test registry connectivity
 
-Unlike traditional Kafka UI tools that focus on *viewing* data, Kafka-Gov is designed for **enterprise governance** with metadata-first approach, policy enforcement, and operational excellence.
+### Schema lifecycle
+- upload schema files
+- sync from Schema Registry
+- search/list/detail views
+- version history
+- guarded delete analysis
 
-| Traditional Tools (Kafka-UI, AKHQ, Conduktor) | Kafka-Gov |
-|-----------------------------------------------|-----------|
-| ❌ No ownership tracking | ✅ Mandatory owner, team, tags |
-| ❌ No policy enforcement | ✅ Environment-specific validation |
-| ❌ Poor schema visibility | ✅ Versioned schema governance |
-| ❌ No audit trail | ✅ Complete change history |
-| ❌ Schema Registry as separate tool | ✅ Integrated schema management |
-| ❌ Static configuration | ✅ Dynamic cluster switching |
-| ❌ Single cluster focus | ✅ Multi-cluster management |
+### Schema governance
+- governance dashboard
+- compatibility validation
+- schema policies
+- change planning / rollback planning
+- approval-aware apply flow
+- audit/history support
 
----
+## What is intentionally excluded
 
-## 💡 Why Kafka-Gov?
+- Kafka broker management
+- topic management
+- topic-hint UI/API
+- consumer/websocket runtime features
+- dormant higher-level governance domains
 
-### The Problem
+## Why the scope is narrow
 
-Existing Kafka UI tools (Kafka-UI, Conduktor, AKHQ) lack critical metadata capabilities:
+The repository is being rebuilt around one dependable slice.
+Instead of spreading across many half-finished governance concepts, the current system keeps one thing clear:
 
-- **📦 Which schema is active?** Version drift is hard to track without governance metadata
-- **📝 Where's the documentation?** Schema ownership and docs are often scattered
-- **🔄 Change history?** No audit trail for compatibility changes and approvals
-- **⚠️ Policy violations?** Breaking schema changes are easy to miss before deployment
-- **🧭 Where might this schema belong?** Naming-derived topic hints are usually tribal knowledge
+> **Schemas are the primary managed object, and Schema Registry is the primary external dependency.**
 
-### The Solution
-
-Kafka-Gov transforms schema operations into a **governed enterprise platform**:
-
-| Problem | Solution |
-|---------|----------|
-| 📖 Missing documentation | Direct metadata owner/doc capture |
-| 🚫 No policies | Environment-specific schema validation and approvals |
-| ⏱️ No audit trail | Automatic logging (who, when, what, why) |
-| 🔗 Schema context gap | Naming-derived known topic-name hints |
-
----
-
-## 🎯 Features at a Glance
-
-<table>
-<tr>
-<td width="33%">
-
-### 🏷️ Rich Metadata
-- Owner & Team tracking
-- Documentation links
-- Custom tags
-- Environment labels
-
-</td>
-<td width="33%">
-
-### 📦 Schema Governance
-- Versioned schema workflows
-- Compatibility validation
-- Storage-backed artifacts
-- Naming-derived topic hints
-
-</td>
-<td width="33%">
-
-### 🛡️ Policy Enforcement
-- Environment-specific rules
-- Version management
-- Naming conventions
-- Config validation
-
-</td>
-</tr>
-<tr>
-<td width="33%">
-
-### 🔌 Multi-Cluster
-- Dynamic cluster switching
-- SASL/SSL support
-- Connection pooling
-- Health monitoring
-
-</td>
-<td width="33%">
-
-### 📦 Schema Registry
-- Auto schema sync
-- Compatibility modes
-- MinIO artifact storage
-- Naming-derived traceability hints
-
-</td>
-<td width="33%">
-
-### 📊 Audit Trail
-- Complete change history
-- Before/after snapshots
-- User attribution
-- Deployment linking
-
-</td>
-</tr>
-</table>
-
----
-
-## 📊 Dashboard Overview
-
-Monitor your Kafka ecosystem at a glance with real-time metrics and health status.
-
-<div align="center">
-  <img src="../../image/dashboard.png" alt="Kafka Gov Dashboard" width="800"/>
-  <p><em>Unified dashboard showing cluster availability, schema governance, and overall platform health</em></p>
-</div>
-
-**Dashboard Metrics:**
-- 🖧 **Active Clusters**: Available Kafka infrastructure connections
-- 📦 **Registered Schemas**: Schema Registry integration status
-- ✅ **Governance Score**: Policy and compatibility health summary
-- 💚 **Health Status**: Real-time platform connectivity monitoring
-
----
-
-## 📚 Feature Categories
-
-### Core Management
-- [Platform Direction](./real-time-data-governance-system.md)
-
-### Governance & Policy
+## Where to look next
 - [Architecture Overview](../architecture/overview.md)
-
-### Infrastructure
-- [Deployment Guide](../operations/deployment.md)
-
----
-
-## 🔄 Latest Updates (2025-11)
-
-- **Connection Bootstrap Improvements**: Faster connection setup and validation feedback
-- **Schema Policy UX Refresh**: Improved navigation and schema governance preview
-- **Schema-Centric Governance UX**: dashboard, approvals, and audit visibility aligned to the current runtime
-
----
-
-## Next Steps
-
-1. **Get Started**: [Quick Start Guide](../getting-started/quick-start.md)
-2. **Learn Features**: Browse feature-specific guides above
-3. **Understand Architecture**: [Architecture Overview](../architecture/overview.md)
-4. **API Reference**: [OpenAPI Docs](/openapi.json)
+- [Current System Analysis](../architecture/current-system-analysis.md)
+- [Quick Start](../getting-started/quick-start.md)

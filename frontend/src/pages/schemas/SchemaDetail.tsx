@@ -17,9 +17,9 @@ import { Button } from '../../components/common/Button';
 import { Badge } from '../../components/common/Badge';
 import { useSchemaDetail } from '../../hooks/schema/useSchemaDetail';
 import { toast } from 'sonner';
-import { schemasAPI, clustersAPI } from '../../services/api';
+import { registryAPI, schemasAPI } from '../../services/api';
 import type { SchemaRegistry } from '../../types';
-import type { KnownTopicNamesResponse, SchemaHistoryResponse } from '../../types/schema';
+import type { SchemaHistoryResponse } from '../../types/schema';
 import { promptApprovalOverride } from '../../utils/approvalOverride';
 import { formatDistanceToNow } from 'date-fns';
 
@@ -72,7 +72,6 @@ interface SchemaCompatibilityReport {
 interface SchemaImpactRecord {
     status: string;
     error_message?: string | null;
-    topics: string[];
 }
 
 interface SchemaPlanResult {
@@ -128,7 +127,7 @@ const readErrorStatus = (error: unknown): number | undefined => {
 };
 
 const resolveActiveRegistry = async (): Promise<SchemaRegistry | null> => {
-    const registriesRes = await clustersAPI.listRegistries();
+    const registriesRes = await registryAPI.list();
     const registries = registriesRes.data as SchemaRegistry[];
     return registries.find((registry) => registry.is_active) ?? registries[0] ?? null;
 };
@@ -145,7 +144,6 @@ const Tabs = ({
     const tabs = [
         { id: 'overview', label: 'Overview' },
         { id: 'history', label: 'History' },
-        { id: 'knownTopics', label: 'Known Topic Names' },
     ];
 
     return (
@@ -309,13 +307,11 @@ const JsonDiffHelper = ({ oldStr, newStr }: { oldStr: string | null, newStr: str
 const PlanResultView = ({
     item,
     report,
-    impact,
     onApply,
     onCancel,
 }: {
     item: SchemaPlanItem;
     report: SchemaCompatibilityReport;
-    impact: SchemaImpactRecord;
     onApply: () => Promise<void>;
     onCancel: () => void;
 }) => {
@@ -404,43 +400,6 @@ const PlanResultView = ({
                     </div>
                 )}
 
-                <div className="border border-[#d0d7de] rounded-lg overflow-hidden bg-white shadow-sm">
-                    <div className="px-4 py-2 bg-[#f6f8fa] border-b border-[#d0d7de] flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                            <GitPullRequest className="w-4 h-4 text-[#57606a]" />
-                            <span className="font-semibold text-[#24292f] text-xs">Known Topic Names</span>
-                        </div>
-                        {impact.status !== 'failure' && (
-                            <span className="text-[9px] text-[#1a7f37] font-bold uppercase tracking-widest flex items-center gap-1">
-                                <CheckCircle2 className="w-3 h-3" /> Read Only
-                            </span>
-                        )}
-                    </div>
-
-                    {impact.status === 'failure' ? (
-                        <div className="p-4 bg-[#fff5f5] flex items-center gap-3">
-                            <AlertCircle className="w-4 h-4 text-[#cf222e]" />
-                            <div className="text-xs text-[#cf222e]">
-                                <p className="font-bold">Topic-name hint lookup failed</p>
-                                <p className="opacity-80">{impact.error_message || 'An unexpected error occurred while loading naming-derived hints.'}</p>
-                            </div>
-                        </div>
-                    ) : (
-                        <div className="p-4 space-y-4">
-                            <div className="rounded-lg border border-[#d0d7de] bg-[#f6f8fa] p-3 text-[11px] text-[#57606a]">
-                                Derived from schema-to-topic naming patterns and shown for context only. These names are not authoritative topic associations.
-                            </div>
-                            <div>
-                                <h5 className="text-[10px] font-bold text-[#57606a] uppercase tracking-wider mb-2">Known topic names</h5>
-                                <div className="flex flex-wrap gap-1.5">
-                                    {impact.topics.length > 0 ? impact.topics.map((t: string) => (
-                                        <Badge key={t} variant="outline" className="bg-[#fff8eb] border-[#d4a72c]/30 text-[#9a6700] text-[10px] font-mono px-1.5 py-0">{t}</Badge>
-                                    )) : <span className="text-[11px] text-[#57606a] italic">No topic names were derived from the current naming pattern.</span>}
-                                </div>
-                            </div>
-                        </div>
-                    )}
-                </div>
             </div>
 
             <div className="flex justify-end gap-2 pt-4 border-t border-[#d0d7de]">
@@ -477,11 +436,9 @@ export default function SchemaDetail() {
     const [planResult, setPlanResult] = useState<SchemaPlanResult | null>(null);
     const [isPlanning, setIsPlanning] = useState(false);
 
-    const { detailData, historyData, topicHintsData, loading, reload } = useSchemaDetail(subject, activeTab);
+    const { detailData, historyData, loading, reload } = useSchemaDetail(subject, activeTab);
     const typedDetailData = detailData as SubjectDetailData | null;
     const typedHistoryData = historyData as SchemaHistoryResponse | null;
-    const typedTopicHintsData = topicHintsData as KnownTopicNamesResponse | null;
-    const knownTopicNames = [...(typedTopicHintsData?.topic_names ?? [])].sort((left, right) => left.localeCompare(right));
 
     // Initial value setup for edit
     const startEditing = () => {
@@ -850,7 +807,6 @@ export default function SchemaDetail() {
                                                     <PlanResultView
                                                         item={planResult.plan[0]}
                                                         report={planResult.compatibility[0]}
-                                                        impact={planResult.impacts[0]}
                                                         onApply={handleApply}
                                                         onCancel={() => setPlanResult(null)}
                                                     />
@@ -923,35 +879,6 @@ export default function SchemaDetail() {
                                     </div>
                                 )}
 
-                                {activeTab === 'knownTopics' && (
-                                    <div className="space-y-4">
-                                        <div className="space-y-2">
-                                            <h3 className="text-sm font-semibold text-[#24292f]">Known Topic Names</h3>
-                                            <p className="text-xs text-[#57606a]">
-                                                Derived from schema-to-topic naming patterns and shown as read-only hints. These names are not authoritative topic associations.
-                                            </p>
-                                        </div>
-                                        <div className="rounded-lg border border-[#d0d7de] bg-[#f6f8fa] p-4">
-                                            {knownTopicNames.length > 0 ? (
-                                                <div className="flex flex-wrap gap-2">
-                                                    {knownTopicNames.map((topicName) => (
-                                                        <Badge
-                                                            key={topicName}
-                                                            variant="outline"
-                                                            className="bg-[#fff8eb] border-[#d4a72c]/30 text-[#9a6700] text-[11px] font-mono px-2 py-1"
-                                                        >
-                                                            {topicName}
-                                                        </Badge>
-                                                    ))}
-                                                </div>
-                                            ) : (
-                                                <p className="text-sm text-[#57606a] italic">
-                                                    No topic names were derived from the current schema naming pattern.
-                                                </p>
-                                            )}
-                                        </div>
-                                    </div>
-                                )}
                             </>
                         )}
                     </div>

@@ -190,7 +190,6 @@ class SchemaConverter:
         impacts: list[SchemaImpactRecord] = [
             SchemaImpactRecord(
                 subject=impact.subject,
-                topics=list(impact.topics),
                 status=getattr(impact, "status", "success"),
                 error_message=getattr(impact, "error_message", None),
             )

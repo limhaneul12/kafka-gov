@@ -248,7 +248,6 @@ export default function UploadSchemaModal({
                 </h4>
                 <ul className="space-y-1 text-xs text-blue-800">
                   <li>• <strong>Env Prefixed:</strong> 환경과 파일명을 결합해 subject를 만듭니다 (예: dev.orders).</li>
-                  <li>• Known topic names in the detail screen are derived from this env-prefixed pattern.</li>
                 </ul>
               </div>
             </div>

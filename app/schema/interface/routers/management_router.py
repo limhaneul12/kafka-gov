@@ -18,7 +18,6 @@ from app.container import AppContainer
 from app.schema.domain.models import (
     DomainCompatibilityMode,
     DomainEnvironment,
-    DomainSubjectStrategy,
 )
 from app.schema.interface.schemas import (
     SchemaArtifact,
@@ -129,7 +128,7 @@ async def upload_schemas(
     response_model=SchemaDeleteImpactResponse,
     status_code=status.HTTP_200_OK,
     summary="스키마 삭제 사전 점검 (멀티 레지스트리)",
-    description="스키마 삭제 전 버전/환경 경고와 naming-derived topic-name hints를 점검합니다. 실제 삭제는 수행하지 않습니다.",
+    description="스키마 삭제 전 버전/환경 경고를 점검합니다. 실제 삭제는 수행하지 않습니다.",
 )
 @inject
 @handle_api_errors(validation_error_message="Validation error")
@@ -137,17 +136,14 @@ async def analyze_schema_delete_impact(
     subject: str,
     request: Request,
     registry_id: str = Query(..., description="Schema Registry ID"),
-    strategy: str = "TopicNameStrategy",
     delete_use_case=Depends(Provide[AppContainer.schema_container.delete_use_case]),
 ) -> SchemaDeleteImpactResponse:
     """스키마 삭제 영향도 분석"""
     # 영향도 분석 수행
-    strategy_enum = DomainSubjectStrategy(strategy)
     actor, actor_context = _resolve_actor(request)
     impact = await delete_use_case.analyze(
         registry_id=registry_id,
         subject=subject,
-        strategy=strategy_enum,
         actor=actor,
         actor_context=actor_context,
     )
@@ -157,7 +153,6 @@ async def analyze_schema_delete_impact(
         subject=impact.subject,
         current_version=impact.current_version,
         total_versions=impact.total_versions,
-        affected_topics=list(impact.affected_topics),
         warnings=list(impact.warnings),
         safe_to_delete=impact.safe_to_delete,
     )
@@ -168,7 +163,7 @@ async def analyze_schema_delete_impact(
     response_model=SchemaDeleteImpactResponse,
     status_code=status.HTTP_200_OK,
     summary="스키마 삭제 (멀티 레지스트리)",
-    description="스키마를 삭제합니다. 버전/환경 경고가 있으면 실패하며, naming-derived topic-name hints는 참고용으로만 반환합니다.",
+    description="스키마를 삭제합니다. 버전/환경 경고가 있으면 실패합니다.",
 )
 @inject
 @handle_api_errors(
@@ -179,18 +174,15 @@ async def delete_schema(
     subject: str,
     request: Request,
     registry_id: str = Query(..., description="Schema Registry ID"),
-    strategy: str = "TopicNameStrategy",
     force: bool = False,
     delete_use_case=Depends(Provide[AppContainer.schema_container.delete_use_case]),
 ) -> SchemaDeleteImpactResponse:
     """스키마 삭제"""
     # 삭제 실행
-    strategy_enum = DomainSubjectStrategy(strategy)
     actor, actor_context = _resolve_actor(request)
     impact = await delete_use_case.delete(
         registry_id=registry_id,
         subject=subject,
-        strategy=strategy_enum,
         actor=actor,
         force=force,
         actor_context=actor_context,
@@ -201,7 +193,6 @@ async def delete_schema(
         subject=impact.subject,
         current_version=impact.current_version,
         total_versions=impact.total_versions,
-        affected_topics=list(impact.affected_topics),
         warnings=list(impact.warnings),
         safe_to_delete=impact.safe_to_delete,
     )

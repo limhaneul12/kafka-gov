@@ -46,7 +46,7 @@ class SchemaBatchDryRunResponse(BaseModel):
                 "impacts": [
                     {
                         "subject": "prod.orders.created-value",
-                        "topics": ["prod.orders.created"],
+                        "status": "success",
                     }
                 ],
                 "summary": {
@@ -78,9 +78,7 @@ class SchemaDeleteImpactResponse(BaseModel):
                 "subject": "prod.orders.created-value",
                 "current_version": 15,
                 "total_versions": 15,
-                "affected_topics": ["prod.orders.created"],
                 "warnings": [
-                    "다음 토픽명은 subject naming 기준으로 이 스키마와 연결됩니다: prod.orders.created. 실사용 여부는 별도 검증이 필요합니다.",
                     "이 스키마는 15개의 버전이 있습니다. 삭제 시 모든 버전이 제거됩니다.",
                     "프로덕션 환경의 스키마입니다. 삭제 전 반드시 영향도를 확인하세요.",
                 ],
@@ -92,10 +90,6 @@ class SchemaDeleteImpactResponse(BaseModel):
     subject: SubjectName
     current_version: int | None = Field(description="현재 버전 번호")
     total_versions: int = Field(description="총 버전 개수")
-    affected_topics: list[str] = Field(
-        default_factory=list,
-        description="Subject naming 기준으로 유추된 토픽명 힌트 목록",
-    )
     warnings: list[str] = Field(default_factory=list, description="경고 메시지 목록")
     safe_to_delete: bool = Field(description="버전/환경 기준 안전 삭제 가능 여부")
 

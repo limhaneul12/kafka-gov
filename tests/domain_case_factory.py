@@ -4,8 +4,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
-from app.cluster.domain.models.entities import KafkaCluster, SchemaRegistry
-from app.cluster.domain.models.types_enum import SaslMechanism, SecurityProtocol
+from app.registry_connections.domain.models.entities import SchemaRegistry
 from app.schema.domain.models.plan_result import (
     DomainSchemaDiff,
     DomainSchemaPlan,
@@ -31,25 +30,6 @@ def _fixture_test_value(label: str) -> str:
 
 
 class DomainMockFactory:
-    @staticmethod
-    def kafka_cluster(*, with_sasl: bool = False, with_ssl: bool = False) -> KafkaCluster:
-        return KafkaCluster(
-            cluster_id="cluster-a",
-            name="cluster-a",
-            bootstrap_servers="broker-1:9092,broker-2:9092",
-            security_protocol=SecurityProtocol.SASL_SSL
-            if with_sasl
-            else SecurityProtocol.PLAINTEXT,
-            sasl_mechanism=SaslMechanism.SCRAM_SHA_256 if with_sasl else None,
-            sasl_username="svc-user" if with_sasl else None,
-            sasl_password=_fixture_test_value("sasl") if with_sasl else None,
-            ssl_ca_location="/tmp/ca.crt" if with_ssl else None,
-            ssl_cert_location="/tmp/client.crt" if with_ssl else None,
-            ssl_key_location="/tmp/client.key" if with_ssl else None,
-            created_at=datetime(2026, 1, 1, tzinfo=UTC),
-            updated_at=datetime(2026, 1, 1, tzinfo=UTC),
-        )
-
     @staticmethod
     def schema_registry(*, with_auth: bool = False) -> SchemaRegistry:
         return SchemaRegistry(
@@ -90,7 +70,7 @@ class DomainMockFactory:
         return DomainSchemaBatch(
             change_id="chg-schema-001",
             env=env,
-            subject_strategy=DomainSubjectStrategy.TOPIC_NAME,
+            subject_strategy=DomainSubjectStrategy.SUBJECT_NAME,
             specs=specs,
         )
 
@@ -152,21 +132,18 @@ class DomainCaseBuilder:
 def build_domain_case_matrix() -> dict[str, list[dict[str, Any]]]:
     factory = DomainMockFactory()
 
-    cluster_cases = [
+    registry_connection_cases = [
         DomainCaseBuilder(
-            domain="cluster",
-            name="kafka_admin_config_plaintext",
+            domain="registry_connections",
+            name="schema_registry_client_config_without_auth",
             payload={
-                "run": lambda: factory.kafka_cluster().to_admin_config(),
-                "assert": lambda cfg: (
-                    cfg["security.protocol"] == "PLAINTEXT"
-                    and "sasl.mechanism" not in cfg
-                    and cfg["bootstrap.servers"].startswith("broker-1")
-                ),
+                "run": lambda: factory.schema_registry(with_auth=False).to_client_config(),
+                "assert": lambda cfg: cfg["url"] == "http://localhost:8081"
+                and "basic.auth.user.info" not in cfg,
             },
         ).build(),
         DomainCaseBuilder(
-            domain="cluster",
+            domain="registry_connections",
             name="schema_registry_client_config_with_auth",
             payload={
                 "run": lambda: factory.schema_registry(with_auth=True).to_client_config(),
@@ -258,7 +235,7 @@ def build_domain_case_matrix() -> dict[str, list[dict[str, Any]]]:
     ]
 
     return {
-        "cluster": cluster_cases,
+        "registry_connections": registry_connection_cases,
         "schema": schema_cases,
         "shared": shared_cases,
     }

@@ -81,7 +81,6 @@ class Environment(StrEnum):
 class InfraType(StrEnum):
     """데이터 제품의 물리적 구현 유형"""
 
-    KAFKA_TOPIC = "kafka_topic"
     DATABASE_TABLE = "database_table"
     S3_BUCKET = "s3_bucket"
     API_ENDPOINT = "api_endpoint"

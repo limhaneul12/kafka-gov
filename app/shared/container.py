@@ -27,8 +27,8 @@ class InfrastructureContainer(containers.DeclarativeContainer):
     """인프라스트럭처 컨테이너 (DB만 관리)
 
     Note:
-        Kafka/Schema Registry/MinIO는 DB 기반 동적 관리로 전환됨
-        ConnectionManager가 cluster_id 기반으로 클라이언트를 생성/관리
+        Schema Registry/MinIO는 DB 기반 동적 관리로 전환됨
+        ConnectionManager가 registry_id 기반으로 클라이언트를 생성/관리
     """
 
     infra_container = providers.Object(settings)

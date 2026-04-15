@@ -88,7 +88,7 @@ def _schema_batch() -> DomainSchemaBatch:
     return DomainSchemaBatch(
         change_id="chg-schema-approval-auto-001",
         env=SchemaEnvironment.STG,
-        subject_strategy=DomainSubjectStrategy.TOPIC_NAME,
+        subject_strategy=DomainSubjectStrategy.SUBJECT_NAME,
         specs=(spec,),
     )
 

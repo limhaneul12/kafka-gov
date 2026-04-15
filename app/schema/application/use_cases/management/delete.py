@@ -9,7 +9,7 @@ from app.infra.kafka.connection_manager import IConnectionManager
 from app.infra.kafka.schema_registry_adapter import ConfluentSchemaRegistryAdapter
 from app.shared.actor import merge_actor_metadata
 
-from ....domain.models import DomainSchemaDeleteImpact, DomainSubjectStrategy, SubjectName
+from ....domain.models import DomainSchemaDeleteImpact, SubjectName
 from ....domain.repositories.interfaces import (
     ISchemaAuditRepository,
     ISchemaMetadataRepository,
@@ -34,7 +34,6 @@ class SchemaDeleteUseCase:
         self,
         registry_id: str,
         subject: SubjectName,
-        strategy: DomainSubjectStrategy,
         actor: str,
         actor_context: dict[str, str] | None = None,
     ) -> DomainSchemaDeleteImpact:
@@ -55,7 +54,7 @@ class SchemaDeleteUseCase:
 
         # 2. 영향도 분석 수행
         delete_analyzer = SchemaDeleteAnalyzer(registry_repository)  # type: ignore[arg-type]
-        impact = await delete_analyzer.analyze_delete_impact(subject, strategy)
+        impact = await delete_analyzer.analyze_delete_impact(subject)
 
         # 감사 로그 기록
         await self.audit_repository.log_operation(
@@ -69,7 +68,6 @@ class SchemaDeleteUseCase:
                 {
                     "subject": subject,
                     "current_version": impact.current_version,
-                    "affected_topics": list(impact.affected_topics),
                     "warnings": list(impact.warnings),
                     "safe_to_delete": impact.safe_to_delete,
                 },
@@ -83,7 +81,6 @@ class SchemaDeleteUseCase:
         self,
         registry_id: str,
         subject: SubjectName,
-        strategy: DomainSubjectStrategy,
         actor: str,
         force: bool = False,
         actor_context: dict[str, str] | None = None,
@@ -109,7 +106,7 @@ class SchemaDeleteUseCase:
 
         # 2. 영향도 분석
         delete_analyzer = SchemaDeleteAnalyzer(registry_repository)  # type: ignore[arg-type]
-        impact = await delete_analyzer.analyze_delete_impact(subject, strategy)
+        impact = await delete_analyzer.analyze_delete_impact(subject)
 
         # 2. 안전성 검증
         if not force and not impact.safe_to_delete:
@@ -143,7 +140,6 @@ class SchemaDeleteUseCase:
                     {
                         "subject": subject,
                         "deleted_version": impact.current_version,
-                        "affected_topics": list(impact.affected_topics),
                         "force": force,
                     },
                     actor_context,

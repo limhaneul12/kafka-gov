@@ -98,7 +98,8 @@ class MySQLSchemaMetadataRepository(ISchemaMetadataRepository):
                     "impacts": [
                         {
                             "subject": impact.subject,
-                            "topics": list(impact.topics),
+                            "status": impact.status,
+                            "error_message": impact.error_message,
                         }
                         for impact in plan.impacts
                     ],
@@ -205,7 +206,8 @@ class MySQLSchemaMetadataRepository(ISchemaMetadataRepository):
                 impacts: list[DomainSchemaImpactRecord] = [
                     DomainSchemaImpactRecord(
                         subject=impact["subject"],
-                        topics=tuple(impact["topics"]),
+                        status=impact.get("status", "success"),
+                        error_message=impact.get("error_message"),
                     )
                     for impact in plan_data.get("impacts", [])
                 ]
