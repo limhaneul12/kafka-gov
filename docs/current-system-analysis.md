@@ -146,7 +146,7 @@ Why it matters:
 - The backend still ships `/api/v1/clusters/brokers`.
 - The connection manager still maintains Kafka admin clients.
 
-If Kafka broker registration/testing is still a required supporting feature, document it clearly as part of the supported boundary.  
+If Kafka broker registration/testing is still a required supporting feature, document it clearly as part of the supported boundary.
 If not, this is the highest-value remaining runtime simplification target.
 
 ### Priority 2 — Quarantine or explicitly mark dormant future-state modules

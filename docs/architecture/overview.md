@@ -2,6 +2,9 @@
 
 Kafka-Gov is built on **Clean Architecture** principles with domain-driven design.
 
+> For the **current shipped/runtime boundary** and concrete cleanup priorities, see [Current System Analysis](./current-system-analysis.md).
+> For the **future target state**, see [Platform Direction](../features/real-time-data-governance-system.md).
+
 ## High-Level Architecture
 
 ```

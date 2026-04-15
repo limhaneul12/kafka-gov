@@ -30,6 +30,7 @@ Learn about Kafka-Gov's capabilities:
 Understand how Kafka-Gov works:
 
 - **[Architecture Overview](./architecture/overview.md)** - System design and principles
+- **[Current System Analysis](./architecture/current-system-analysis.md)** - Evidence-backed review of the shipped runtime, legacy Kafka traces, and cleanup priorities
 
 ---
 

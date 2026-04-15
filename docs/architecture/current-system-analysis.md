@@ -219,8 +219,8 @@ PRD는 “shared Kafka/Schema adapter 생성 책임을 application 밖으로 이
 가장 정확한 설명은 다음입니다.
 
 > **Kafka-Gov는 현재 “schema governance 중심 control plane”이다.**
-> Kafka topic runtime은 제거되었고 topic은 naming-derived read-only hint로만 남아 있다. 
-> 그러나 Kafka broker/Schema Registry connection 관리와 Kafka-centric naming/UX 흔적은 여전히 남아 있다. 
+> Kafka topic runtime은 제거되었고 topic은 naming-derived read-only hint로만 남아 있다.
+> 그러나 Kafka broker/Schema Registry connection 관리와 Kafka-centric naming/UX 흔적은 여전히 남아 있다.
 > Product/Contract/Governance/Lineage는 다음 단계 아키텍처 방향을 보여주는 설계 골격이지만, 아직 shipped runtime은 아니다.
 
 ### 신규 팀이 당장 기억해야 할 3가지
