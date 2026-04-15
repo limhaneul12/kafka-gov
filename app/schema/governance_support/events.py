@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import TypeAlias
 
-from ..roles import UserRole
+from .roles import UserRole
 
 # Type Aliases
 EventId: TypeAlias = str

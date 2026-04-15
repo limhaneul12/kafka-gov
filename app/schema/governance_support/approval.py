@@ -6,7 +6,10 @@ from typing import Any
 
 from pydantic import AliasChoices, BaseModel, ConfigDict, Field, field_validator
 
-from app.shared.domain.preflight_policy import DomainPolicyPackEvaluation, DomainRiskLevel
+from app.schema.governance_support.preflight_policy import (
+    DomainPolicyPackEvaluation,
+    DomainRiskLevel,
+)
 
 
 class ApprovalOverride(BaseModel):

@@ -8,17 +8,17 @@ from datetime import datetime
 from app.infra.kafka.connection_manager import IConnectionManager
 from app.infra.kafka.schema_registry_adapter import ConfluentSchemaRegistryAdapter
 from app.schema.domain.policies.policy_pack import DefaultSchemaPolicyPackV1
-from app.shared.actor import merge_actor_metadata
-from app.shared.application.use_cases import CreateApprovalRequestUseCase
-from app.shared.approval import (
+from app.schema.governance_support.actor import merge_actor_metadata
+from app.schema.governance_support.approval import (
     ApprovalOverride,
     ApprovalRequiredError,
     assess_schema_batch_risk,
     ensure_approval,
 )
-from app.shared.constants import AuditAction, AuditStatus, AuditTarget
-from app.shared.domain.events import SchemaRegisteredEvent
-from app.shared.infrastructure.event_bus import get_event_bus
+from app.schema.governance_support.constants import AuditAction, AuditStatus, AuditTarget
+from app.schema.governance_support.event_bus import get_event_bus
+from app.schema.governance_support.events import SchemaRegisteredEvent
+from app.schema.governance_support.use_cases import CreateApprovalRequestUseCase
 
 from ....domain.models import (
     ChangeId,

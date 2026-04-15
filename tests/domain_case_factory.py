@@ -22,7 +22,11 @@ from app.schema.domain.models.types_enum import (
     DomainSubjectStrategy,
 )
 from app.schema.domain.models.value_objects import DomainSchemaSource
-from app.shared.approval import ApprovalOverride, assess_schema_batch_risk, ensure_approval
+from app.schema.governance_support.approval import (
+    ApprovalOverride,
+    assess_schema_batch_risk,
+    ensure_approval,
+)
 
 
 def _fixture_test_value(label: str) -> str:

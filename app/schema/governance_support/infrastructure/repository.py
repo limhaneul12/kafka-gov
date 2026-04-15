@@ -10,11 +10,19 @@ from sqlalchemy import desc, literal, select, union_all
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.sql.selectable import Select
 
+from app.schema.governance_support.constants import (
+    ACTION_MESSAGES,
+    ActivityType,
+    AuditAction,
+    AuditStatus,
+)
+from app.schema.governance_support.infrastructure.models import ApprovalRequestModel
+from app.schema.governance_support.models import ApprovalRequest, AuditActivity
+from app.schema.governance_support.repositories import (
+    IApprovalRequestRepository,
+    IAuditActivityRepository,
+)
 from app.schema.infrastructure.models import SchemaAuditLogModel
-from app.shared.constants import ACTION_MESSAGES, ActivityType, AuditAction, AuditStatus
-from app.shared.domain.models import ApprovalRequest, AuditActivity
-from app.shared.domain.repositories import IApprovalRequestRepository, IAuditActivityRepository
-from app.shared.infrastructure.models import ApprovalRequestModel
 
 logger = logging.getLogger(__name__)
 

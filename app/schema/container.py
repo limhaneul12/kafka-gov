@@ -23,6 +23,8 @@ from .domain.repositories.interfaces import (
     ISchemaMetadataRepository,
     ISchemaPolicyRepository,
 )
+from .governance_support.infrastructure.repository import SQLApprovalRequestRepository
+from .governance_support.use_cases import CreateApprovalRequestUseCase
 from .infrastructure.repository.audit_repository import MySQLSchemaAuditRepository
 from .infrastructure.repository.mysql_repository import MySQLSchemaMetadataRepository
 from .infrastructure.repository.policy_repository import MySQLSchemaPolicyRepository
@@ -46,6 +48,14 @@ class SchemaContainer(containers.DeclarativeContainer):
         MySQLSchemaPolicyRepository,
         session_factory=infrastructure.database_manager.provided.get_db_session,
     )
+    approval_request_repository = providers.Factory(
+        SQLApprovalRequestRepository,
+        session_factory=infrastructure.database_manager.provided.get_db_session,
+    )
+    create_approval_request_use_case = providers.Factory(
+        CreateApprovalRequestUseCase,
+        approval_repository=approval_request_repository,
+    )
 
     dry_run_use_case: providers.Provider[SchemaBatchDryRunUseCase] = providers.Factory(
         SchemaBatchDryRunUseCase,
@@ -60,7 +70,7 @@ class SchemaContainer(containers.DeclarativeContainer):
         metadata_repository=metadata_repository,
         audit_repository=audit_repository,
         policy_repository=policy_repository,
-        approval_request_use_case=infrastructure.create_approval_request_use_case,
+        approval_request_use_case=create_approval_request_use_case,
     )
     plan_use_case: providers.Provider[SchemaPlanUseCase] = providers.Factory(
         SchemaPlanUseCase,

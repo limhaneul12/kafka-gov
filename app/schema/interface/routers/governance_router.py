@@ -4,6 +4,7 @@ from dependency_injector.wiring import Provide, inject
 from fastapi import APIRouter, Depends, Query, Request, status
 
 from app.container import AppContainer
+from app.schema.governance_support.actor import actor_context_dict, actor_context_from_headers
 from app.schema.interface.adapters import safe_convert_plan_to_response
 from app.schema.interface.schemas import (
     DashboardResponse,
@@ -12,7 +13,6 @@ from app.schema.interface.schemas import (
     SchemaChangeRequest,
     SchemaHistoryResponse,
 )
-from app.shared.actor import actor_context_dict, actor_context_from_headers
 from app.shared.error_handlers import handle_api_errors, handle_server_errors
 
 router = APIRouter(prefix="/v1/schemas", tags=["schema-governance"])

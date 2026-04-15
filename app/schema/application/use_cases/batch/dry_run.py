@@ -5,8 +5,8 @@ from __future__ import annotations
 from app.infra.kafka.connection_manager import IConnectionManager
 from app.infra.kafka.schema_registry_adapter import ConfluentSchemaRegistryAdapter
 from app.schema.domain.policies.policy_pack import DefaultSchemaPolicyPackV1
-from app.shared.actor import merge_actor_metadata
-from app.shared.constants import AuditAction, AuditStatus, AuditTarget
+from app.schema.governance_support.actor import merge_actor_metadata
+from app.schema.governance_support.constants import AuditAction, AuditStatus, AuditTarget
 
 from ....domain.models import DomainSchemaBatch, DomainSchemaPlan
 from ....domain.repositories.interfaces import (

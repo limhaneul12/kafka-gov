@@ -7,7 +7,7 @@ import uuid
 
 from app.infra.kafka.connection_manager import IConnectionManager
 from app.infra.kafka.schema_registry_adapter import ConfluentSchemaRegistryAdapter
-from app.shared.actor import merge_actor_metadata
+from app.schema.governance_support.actor import merge_actor_metadata
 
 from ....domain.models import DomainSchemaDeleteImpact, SubjectName
 from ....domain.repositories.interfaces import (

@@ -12,8 +12,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.infra.kafka.connection_manager import IConnectionManager
 from app.infra.kafka.schema_registry_adapter import ConfluentSchemaRegistryAdapter
 from app.schema.application.services.catalog_sync import CatalogSyncService
-from app.shared.actor import merge_actor_metadata
-from app.shared.constants import AuditAction, AuditStatus, AuditTarget
+from app.schema.governance_support.actor import merge_actor_metadata
+from app.schema.governance_support.constants import AuditAction, AuditStatus, AuditTarget
 
 from ....domain.models import DomainSchemaArtifact
 from ....domain.repositories.interfaces import (

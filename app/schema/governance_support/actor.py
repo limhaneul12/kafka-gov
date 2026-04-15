@@ -1,15 +1,10 @@
 from __future__ import annotations
 
-import os
 from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any
 
-from app.shared.roles import DEFAULT_USER
-
-CLI_USER_ID_ENV = "KAFKA_GOV_USER_ID"
-CLI_USERNAME_ENV = "KAFKA_GOV_USERNAME"
-CLI_SOURCE_ENV = "KAFKA_GOV_ACTOR_SOURCE"
+from app.schema.governance_support.roles import DEFAULT_USER
 
 
 def _clean_actor_value(value: str | None) -> str | None:
@@ -72,21 +67,6 @@ def actor_context_from_headers(
             _get_header_value(headers, "X-Username", "X-Forwarded-User", "X-Actor")
         ),
         source=_clean_actor_value(_get_header_value(headers, "X-Actor-Source")) or default_source,
-    )
-
-
-def actor_context_from_cli(
-    *,
-    user_id: str | None = None,
-    username: str | None = None,
-    source: str | None = None,
-) -> ActorContext:
-    return ActorContext(
-        user_id=_clean_actor_value(user_id) or _clean_actor_value(os.getenv(CLI_USER_ID_ENV)),
-        username=_clean_actor_value(username) or _clean_actor_value(os.getenv(CLI_USERNAME_ENV)),
-        source=(
-            _clean_actor_value(source) or _clean_actor_value(os.getenv(CLI_SOURCE_ENV)) or "cli"
-        ),
     )
 
 

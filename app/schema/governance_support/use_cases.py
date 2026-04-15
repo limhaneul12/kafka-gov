@@ -5,8 +5,11 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from uuid import uuid4
 
-from app.shared.domain.models import ApprovalRequest, AuditActivity
-from app.shared.domain.repositories import IApprovalRequestRepository, IAuditActivityRepository
+from app.schema.governance_support.models import ApprovalRequest, AuditActivity
+from app.schema.governance_support.repositories import (
+    IApprovalRequestRepository,
+    IAuditActivityRepository,
+)
 
 
 class GetRecentActivitiesUseCase:

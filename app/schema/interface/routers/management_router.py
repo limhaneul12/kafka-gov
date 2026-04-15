@@ -19,6 +19,7 @@ from app.schema.domain.models import (
     DomainCompatibilityMode,
     DomainEnvironment,
 )
+from app.schema.governance_support.actor import actor_context_dict, actor_context_from_headers
 from app.schema.interface.schemas import (
     SchemaArtifact,
     SchemaDeleteImpactResponse,
@@ -28,7 +29,6 @@ from app.schema.interface.schemas import (
 from app.schema.interface.schemas.search import SchemaSearchItem, SchemaSearchResponse
 from app.schema.interface.types.enums import CompatibilityMode, Environment
 from app.schema.interface.types.type_hints import ChangeId
-from app.shared.actor import actor_context_dict, actor_context_from_headers
 from app.shared.error_handlers import handle_api_errors, handle_server_errors
 
 router = APIRouter(prefix="/v1/schemas", tags=["schema-management"])

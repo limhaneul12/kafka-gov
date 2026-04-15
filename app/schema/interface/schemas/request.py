@@ -16,7 +16,7 @@ from pydantic import (
     model_validator,
 )
 
-from app.shared.approval import ApprovalOverride
+from app.schema.governance_support.approval import ApprovalOverride
 
 from ..types.enums import (
     CompatibilityMode,
