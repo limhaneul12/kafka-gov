@@ -134,10 +134,10 @@ PRD는 “shared Kafka/Schema adapter 생성 책임을 application 밖으로 이
 
 `docs/features/real-time-data-governance-system.md`는 현재 repo를 **target-state PRD**라고 명시하며(`docs/features/real-time-data-governance-system.md:9-19`), 다음을 아직 runtime 밖으로 봅니다.
 
-- Product (`:174-177`, `202-210`)
-- Contract (`:176-178`, `211-218`)
-- Governance decision layer (`:220-227`)
-- Lineage (`:228-235`)
+- Product (`docs/features/real-time-data-governance-system.md:174-177`, `202-210`)
+- Contract (`docs/features/real-time-data-governance-system.md:176-178`, `211-218`)
+- Governance decision layer (`docs/features/real-time-data-governance-system.md:177-178`, `220-227`)
+- Lineage (`docs/features/real-time-data-governance-system.md:177-178`, `228-235`)
 
 코드도 이 설명과 일치합니다.
 
