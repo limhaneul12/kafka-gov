@@ -12,7 +12,6 @@ class AppContainer(containers.DeclarativeContainer):
         packages=[
             "app.schema.interface",
             "app.schema.interface.routers",
-            "app.shared.interface",
             "app.registry_connections.interface.routers",
         ]
     )
