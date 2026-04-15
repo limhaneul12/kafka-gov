@@ -13,6 +13,10 @@
 
 > 따라서 신규 팀 온보딩 시 이 시스템을 **“Kafka 운영툴”도 아니고 “완성된 데이터 거버넌스 플랫폼”도 아닌, 현재는 schema governance 중심으로 정리된 과도기 제품**으로 이해하는 것이 가장 정확합니다.
 
+### Background clarification
+
+주어진 배경 설명은 “Kafka 기능 대부분은 제거되었고 schema registry와 topic 기능만 남았다”에 가깝지만, **현재 코드 스냅샷(2026-04-15) 기준으로는 topic runtime보다 Kafka broker connection 관리가 더 많이 남아 있습니다.** 즉 실제 shipped surface는 **schema governance + Kafka/Schema Registry connection management**이며, topic은 active runtime 기능이 아니라 **read-only hint**로만 남아 있습니다.
+
 ---
 
 ## 1. 현재 실제로 동작하는 시스템 범위
