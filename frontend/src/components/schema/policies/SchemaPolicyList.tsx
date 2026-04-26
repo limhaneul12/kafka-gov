@@ -57,7 +57,7 @@ export default function SchemaPolicyList({
                                 </Badge>
                             </td>
                             <td className="px-6 py-4 capitalize">
-                                <Badge className="font-normal border-gray-200 text-gray-600 bg-gray-50 border">
+                                <Badge variant="outline" className="font-normal">
                                     {policy.target_environment}
                                 </Badge>
                             </td>

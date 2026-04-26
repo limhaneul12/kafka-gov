@@ -2,11 +2,14 @@ import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 
+import { useApiError } from "../../../hooks/useApiError";
 import { registryAPI } from "../../../services/api";
+import { confirmDestructiveAction } from "../../../utils/confirm";
 import type { SchemaRegistry } from "../Connections.types";
 
 export function useConnections() {
   const { t } = useTranslation();
+  const { handleError, handleSuccess } = useApiError();
   const [registries, setRegistries] = useState<SchemaRegistry[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -17,11 +20,11 @@ export function useConnections() {
       setRegistries(registriesRes.data);
     } catch (error) {
       console.error("Failed to load registry connections:", error);
-      toast.error(t("error.general"));
+      handleError(error, "Failed to load Schema Registry connections");
     } finally {
       setLoading(false);
     }
-  }, [t]);
+  }, [handleError]);
 
   useEffect(() => {
     void loadConnections();
@@ -31,9 +34,10 @@ export function useConnections() {
     try {
       await registryAPI.create(data);
       await loadConnections();
-      toast.success(t("common.success"));
+      handleSuccess(t("common.success"), "Schema Registry connection created successfully");
     } catch (error) {
       console.error("Failed to add registry connection:", error);
+      handleError(error, "Failed to add Schema Registry connection");
       throw error;
     }
   };
@@ -42,28 +46,30 @@ export function useConnections() {
     try {
       await registryAPI.update(id, data);
       await loadConnections();
-      toast.success(t("common.success"), {
-        description: "Schema Registry connection updated successfully",
-      });
+      handleSuccess(t("common.success"), "Schema Registry connection updated successfully");
     } catch (error) {
       console.error("Failed to update registry connection:", error);
-      toast.error(t("error.general"), {
-        description: "Failed to update Schema Registry connection",
-      });
+      handleError(error, "Failed to update Schema Registry connection");
       throw error;
     }
   };
 
   const deleteConnection = async (id: string, name: string) => {
-    if (!confirm(`Delete "${name}"?`)) return;
+    if (!confirmDestructiveAction({
+      itemType: "connection",
+      itemName: name,
+      consequence: "This cannot be undone.",
+    })) {
+      return;
+    }
 
     try {
       await registryAPI.delete(id);
       await loadConnections();
-      toast.success(t("common.success"));
+      handleSuccess(t("common.success"), `Schema Registry connection "${name}" deleted`);
     } catch (error) {
       console.error("Failed to delete registry connection:", error);
-      toast.error(t("error.general"));
+      handleError(error, "Failed to delete Schema Registry connection");
     }
   };
 
@@ -81,9 +87,7 @@ export function useConnections() {
       }
     } catch (error) {
       console.error("Failed to test registry connection:", error);
-      toast.error(t("error.network"), {
-        description: `"${name}" ${t("connection.test")} failed`,
-      });
+      handleError(error, `Failed to test "${name}"`);
     }
   };
 
@@ -91,14 +95,10 @@ export function useConnections() {
     try {
       await registryAPI.activate(id);
       await loadConnections();
-      toast.success(t("common.success"), {
-        description: "Schema Registry connection activated successfully",
-      });
+      handleSuccess(t("common.success"), "Schema Registry connection activated successfully");
     } catch (error) {
       console.error("Failed to activate registry connection:", error);
-      toast.error(t("error.general"), {
-        description: "Failed to activate Schema Registry connection",
-      });
+      handleError(error, "Failed to activate Schema Registry connection");
     }
   };
 

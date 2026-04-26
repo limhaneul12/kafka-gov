@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Database, X } from "lucide-react";
 
 import Button from "../ui/Button";
@@ -14,6 +14,15 @@ interface AddConnectionModalProps {
 
 type ConnectionFormData = Record<string, string>;
 
+function toConnectionFormData(initialData?: Record<string, unknown>): ConnectionFormData {
+  return Object.fromEntries(
+    Object.entries(initialData ?? {}).map(([key, value]) => [
+      key,
+      typeof value === "string" ? value : value == null ? "" : String(value),
+    ]),
+  );
+}
+
 export default function AddConnectionModal({
   isOpen,
   onClose,
@@ -22,15 +31,13 @@ export default function AddConnectionModal({
   editMode = false,
   initialData,
 }: AddConnectionModalProps) {
-  const initialFormData: ConnectionFormData = Object.fromEntries(
-    Object.entries(initialData ?? {}).map(([key, value]) => [key, typeof value === "string" ? value : value == null ? "" : String(value)]),
-  );
-  const [formData, setFormData] = useState<ConnectionFormData>(initialFormData);
+  const [formData, setFormData] = useState<ConnectionFormData>(() => toConnectionFormData(initialData));
   const [loading, setLoading] = useState(false);
 
-  if (editMode && initialData && Object.keys(formData).length === 0) {
-    setFormData(initialFormData);
-  }
+  useEffect(() => {
+    if (!isOpen) return;
+    setFormData(editMode ? toConnectionFormData(initialData) : {});
+  }, [editMode, initialData, isOpen]);
 
   if (!isOpen) return null;
 
@@ -46,7 +53,6 @@ export default function AddConnectionModal({
       handleClose();
     } catch (error) {
       console.error(`Failed to ${editMode ? "update" : "add"} connection:`, error);
-      alert(`Failed to ${editMode ? "update" : "add"} connection`);
     } finally {
       setLoading(false);
     }

@@ -1,9 +1,9 @@
 import { useState, useEffect, useCallback } from "react";
-import { toast } from "sonner";
 import { Plus, RefreshCw, Layers } from "lucide-react";
 
 import { Card, CardHeader, CardTitle, CardContent } from "../components/ui/Card";
 import Button from "../components/ui/Button";
+import { useApiError } from "../hooks/useApiError";
 import schemaApi from "../services/schemaApi";
 import type { SchemaPolicyFormInput, SchemaPolicyRecord } from "../types/schemaPolicy";
 
@@ -11,8 +11,11 @@ import type { SchemaPolicyFormInput, SchemaPolicyRecord } from "../types/schemaP
 import SchemaPolicyList from "../components/schema/policies/SchemaPolicyList";
 import SchemaPolicyDetailModal from "../components/schema/policies/SchemaPolicyDetailModal";
 import SchemaPolicyComposer from "../components/schema/policies/SchemaPolicyComposer";
+import { toastGovernanceError } from "../utils/schemaGovernance";
+import { confirmSchemaGovernanceAction } from "../utils/schemaGovernancePrompts";
 
 export default function SchemaPolicies() {
+  const { handleSuccess } = useApiError();
   const [policies, setPolicies] = useState<SchemaPolicyRecord[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -28,15 +31,15 @@ export default function SchemaPolicies() {
       setLoading(true);
       const data = await schemaApi.listPolicies();
       setPolicies(data);
-    } catch {
-      toast.error("Failed to load schema policies");
+    } catch (error) {
+      toastGovernanceError("Failed to load schema policies", error);
     } finally {
       setLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    fetchPolicies();
+    void fetchPolicies();
   }, [fetchPolicies]);
 
   // 2. Action Handlers
@@ -46,41 +49,36 @@ export default function SchemaPolicies() {
     try {
       const history = await schemaApi.getPolicyHistory(policy.policy_id);
       setPolicyHistory(history);
-    } catch {
-      toast.error("Failed to load policy history");
+    } catch (error) {
+      toastGovernanceError("Failed to load policy history", error);
     }
   };
 
   const handleActivate = async (policy: SchemaPolicyRecord) => {
     try {
       await schemaApi.updatePolicyStatus(policy.policy_id, policy.version, "active");
-      toast.success(`Policy ${policy.name} v${policy.version} is now ACTIVE`);
-      fetchPolicies();
-    } catch {
-      toast.error("Failed to activate policy");
+      handleSuccess("Policy activated", `${policy.name} v${policy.version} is now ACTIVE`);
+      await fetchPolicies();
+    } catch (error) {
+      toastGovernanceError("Failed to activate policy", error);
     }
   };
 
   const handleCreateSubmit = async (data: SchemaPolicyFormInput) => {
-    try {
-      await schemaApi.createPolicy(data);
-      toast.success("Policy created successfully (as DRAFT)");
-      fetchPolicies();
-    } catch {
-      toast.error("Failed to create policy");
-      throw new Error("Failed to create policy");
-    }
+    await schemaApi.createPolicy(data);
+    handleSuccess("Policy created", "Policy created successfully (as DRAFT)");
+    await fetchPolicies();
   };
 
   const handleRollback = async (version: number) => {
     if (!selectedPolicy) return;
     try {
       await schemaApi.updatePolicyStatus(selectedPolicy.policy_id, version, "active");
-      toast.success(`Success! Rolled back to v${version}`);
+      handleSuccess("Policy rolled back", `Rolled back to v${version}`);
       setIsDetailOpen(false);
-      fetchPolicies();
-    } catch {
-      toast.error("Failed to rollback version");
+      await fetchPolicies();
+    } catch (error) {
+      toastGovernanceError("Failed to rollback version", error);
     }
   };
 
@@ -141,14 +139,16 @@ export default function SchemaPolicies() {
             onViewHistory={handleViewDetail} // Detail modal has history sidebar
             onActivate={handleActivate}
             onDelete={async (policy) => {
-              if (window.confirm(`Are you sure you want to delete policy "${policy.name}"?`)) {
-                try {
-                  await schemaApi.deletePolicy(policy.policy_id);
-                  toast.success(`Policy ${policy.name} deleted`);
-                  fetchPolicies();
-                } catch {
-                  toast.error("Failed to delete policy");
-                }
+              if (!confirmSchemaGovernanceAction(`Are you sure you want to delete policy "${policy.name}"?`)) {
+                return;
+              }
+
+              try {
+                await schemaApi.deletePolicy(policy.policy_id);
+                handleSuccess("Policy deleted", `${policy.name} deleted`);
+                await fetchPolicies();
+              } catch (error) {
+                toastGovernanceError("Failed to delete policy", error);
               }
             }}
           />

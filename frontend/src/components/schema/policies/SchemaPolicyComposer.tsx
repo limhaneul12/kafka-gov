@@ -1,9 +1,12 @@
 import { useState } from "react";
+import { toast } from "sonner";
 import Button from "../../ui/Button";
 import Badge from "../../ui/Badge";
 import { X, Save, FileCode, Sparkles } from "lucide-react";
 import { GOVERNANCE_PRESETS } from "../../../constants/policyPresets";
+import { useApiError } from "../../../hooks/useApiError";
 import type { SchemaPolicyFormInput, SchemaPolicyRecord, SchemaPolicyType } from "../../../types/schemaPolicy";
+import { describeGovernanceError } from "../../../utils/schemaGovernance";
 
 interface SchemaPolicyComposerProps {
     isOpen: boolean;
@@ -13,11 +16,12 @@ interface SchemaPolicyComposerProps {
 }
 
 export default function SchemaPolicyComposer({
-    isOpen,
-    onClose,
-    onSubmit,
-    initialData,
+  isOpen,
+  onClose,
+  onSubmit,
+  initialData,
 }: SchemaPolicyComposerProps) {
+    const { handleError } = useApiError();
     const [formData, setFormData] = useState({
         name: initialData?.name || "",
         description: initialData?.description || "",
@@ -43,18 +47,27 @@ export default function SchemaPolicyComposer({
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+        let parsedContent: SchemaPolicyFormInput["content"];
+
+        try {
+            parsedContent = JSON.parse(formData.content);
+        } catch (error) {
+            toast.error("Policy content must be valid JSON", {
+                description: describeGovernanceError(error, "Check the JSON syntax and try again."),
+            });
+            return;
+        }
+
         try {
             setLoading(true);
-            const payload = {
+            await onSubmit({
                 ...formData,
-                content: JSON.parse(formData.content),
+                content: parsedContent,
                 created_by: "admin@example.com",
-            };
-            await onSubmit(payload);
+            });
             onClose();
-        } catch (err: unknown) {
-            const message = err instanceof Error ? err.message : "Unknown error";
-            alert("Invalid JSON format in policy content: " + message);
+        } catch (error) {
+            handleError(error, initialData ? "Failed to update schema policy" : "Failed to create schema policy");
         } finally {
             setLoading(false);
         }
