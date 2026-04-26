@@ -15,7 +15,12 @@ def test_full_system_shell_loads(page: Page) -> None:
         page.locator("aside").get_by_role("link", name="Schema Registry", exact=True)
     ).to_be_visible()
     expect(page.locator("aside").get_by_role("link", name="Topics", exact=True)).to_have_count(0)
-    expect(page.locator("aside").get_by_role("link", name="Policies", exact=True)).to_have_count(0)
+    expect(
+        page.locator("aside").get_by_role("link", name="Schema Policies", exact=True)
+    ).to_be_visible()
+    expect(
+        page.locator("aside").get_by_role("link", name="Approvals & Audit", exact=True)
+    ).to_be_visible()
     expect(page.locator("aside").get_by_role("link", name="Consumers", exact=True)).to_have_count(0)
 
 

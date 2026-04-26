@@ -21,7 +21,7 @@ services:
       dockerfile: Dockerfile
     user: "0:0"
     ports:
-      - "8001:8000"
+      - "${APP_HOST_PORT:-8001}:8000"
     command:
       - sh
       - -c
@@ -94,7 +94,7 @@ services:
         DOCS_AUTH_USER: ${DOCS_AUTH_USER:-admin}
         DOCS_AUTH_PASSWORD: ${DOCS_AUTH_PASSWORD:-changeme}
     ports:
-      - "90:80"
+      - "${NGINX_HOST_PORT:-90}:80"
     depends_on:
       app:
         condition: service_healthy

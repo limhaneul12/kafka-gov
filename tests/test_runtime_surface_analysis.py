@@ -4,21 +4,34 @@ from fastapi.routing import APIRoute
 
 from app.main import create_app
 
-
 SCHEMA_RUNTIME_PATHS = {
     "/api/v1/schemas/governance/dashboard",
     "/api/v1/schemas/history/{subject}",
+    "/api/v1/schemas/drift/{subject}",
+    "/api/v1/schemas/settings/{subject}",
+    "/api/v1/schemas/subjects/{subject}/versions",
+    "/api/v1/schemas/subjects/{subject}/compare",
+    "/api/v1/schemas/subjects/{subject}/versions/{version}",
+    "/api/v1/schemas/subjects/{subject}/versions/{version}/export",
+    "/api/v1/schemas/subjects/{subject}/export",
     "/api/v1/schemas/upload",
     "/api/v1/schemas/sync",
     "/api/v1/schemas/detail/{subject}",
     "/api/v1/schemas/search",
     "/api/v1/schemas/plan-change",
     "/api/v1/schemas/rollback/plan",
+    "/api/v1/schemas/rollback/execute",
     "/api/v1/schemas/delete/analyze",
     "/api/v1/schemas/delete/{subject}",
     "/api/v1/schemas/policies",
     "/api/v1/schemas/policies/{policy_id}",
     "/api/v1/schemas/policies/{policy_id}/history",
+    "/api/v1/approval-requests",
+    "/api/v1/approval-requests/{request_id}",
+    "/api/v1/approval-requests/{request_id}/approve",
+    "/api/v1/approval-requests/{request_id}/reject",
+    "/api/v1/audit/recent",
+    "/api/v1/audit/history",
     "/api/v1/schema-registries",
 }
 
@@ -27,8 +40,6 @@ REMOVED_PATHS = {
     "/api/v1/topics",
     "/api/v1/consumers",
     "/api/v1/ws",
-    "/api/v1/audit/recent",
-    "/api/v1/approval-requests",
     "/api/v1/clusters/brokers",
     "/api/v1/clusters/schema-registries",
     "/api/v1/products",
