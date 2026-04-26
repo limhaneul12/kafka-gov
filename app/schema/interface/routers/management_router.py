@@ -57,8 +57,8 @@ def _extract_schema_type_from_url(storage_url: str | None) -> str:
     "/upload",
     response_model=SchemaUploadResponse,
     status_code=status.HTTP_201_CREATED,
-    summary="스키마 번들 업로드 (멀티 레지스트리/스토리지)",
-    description="스키마 파일(.avsc/.proto/.json 및 zip 번들)을 업로드하여 사전 검증합니다.",
+    summary="스키마 파일 업로드 (멀티 레지스트리/스토리지)",
+    description="스키마 파일(.avsc/.proto/.json)을 업로드하여 사전 검증합니다.",
 )
 @inject
 @handle_api_errors(validation_error_message="Validation error")
@@ -66,16 +66,16 @@ async def upload_schemas(
     env: Annotated[Environment, Form(..., description="업로드 대상 환경")],
     change_id: Annotated[ChangeId, Form(..., description="변경 ID")],
     owner: Annotated[str, Form(..., description="소유 팀")],
+    compatibility_mode: Annotated[
+        CompatibilityMode,
+        Form(description="호환성 모드 (명시 필수)"),
+    ],
     files: Annotated[list[UploadFile], File(..., description="업로드할 스키마 파일 목록")],
     request: Request,
     registry_id: Annotated[
         str, Query(description="Schema Registry ID (기본값: default)")
     ] = "default",
     storage_id: Annotated[str | None, Query(description="Object Storage ID (optional)")] = None,
-    compatibility_mode: Annotated[
-        CompatibilityMode | None,
-        Form(description="호환성 모드 (기본값: BACKWARD)"),
-    ] = None,
     strategy_id: Annotated[
         str, Form(description="Subject naming strategy (기본값: gov:EnvPrefixed)")
     ] = "gov:EnvPrefixed",
@@ -89,9 +89,7 @@ async def upload_schemas(
         )
 
     # 호환성 모드 변환 (Interface Enum -> Domain Enum)
-    domain_compatibility = (
-        DomainCompatibilityMode(compatibility_mode.value) if compatibility_mode else None
-    )
+    domain_compatibility = DomainCompatibilityMode(compatibility_mode.value)
     actor, actor_context = _resolve_actor(request)
 
     result = await upload_use_case.execute(

@@ -40,6 +40,78 @@ from app.schema.infrastructure.models import (
 logger = logging.getLogger(__name__)
 
 
+def _normalize_owner(owner: str | None) -> str | None:
+    if not isinstance(owner, str):
+        return None
+    normalized = owner.strip()
+    if not normalized:
+        return None
+    if "placeholder" in normalized.lower():
+        return None
+    return normalized
+
+
+def _normalize_compatibility_mode_str(mode: str | None) -> str | None:
+    if not isinstance(mode, str):
+        return None
+    normalized = mode.strip()
+    if not normalized or "placeholder" in normalized.lower():
+        return None
+    try:
+        return DomainCompatibilityMode(normalized).value
+    except ValueError:
+        return None
+
+
+def _extract_compatibility_mode(
+    tags_payload: dict[str, Any] | None,
+) -> DomainCompatibilityMode | None:
+    normalized_mode = _normalize_compatibility_mode_str(
+        tags_payload.get("compatibility_mode") if tags_payload else None
+    )
+    if normalized_mode is not None:
+        return DomainCompatibilityMode(normalized_mode)
+    return None
+
+
+def _extract_tags(tags_payload: dict[str, Any] | None) -> list[str]:
+    if not tags_payload:
+        return []
+    raw_items = tags_payload.get("items")
+    if not isinstance(raw_items, list):
+        return []
+    return [item.strip() for item in raw_items if isinstance(item, str) and item.strip()]
+
+
+def _build_tags_payload(
+    existing_payload: dict[str, Any] | None,
+    tags: list[str] | None,
+    compatibility_mode: str | None,
+) -> dict[str, Any] | None:
+    payload: dict[str, Any] = dict(existing_payload or {})
+    existing_compatibility = _normalize_compatibility_mode_str(payload.get("compatibility_mode"))
+    if existing_compatibility is not None:
+        payload["compatibility_mode"] = existing_compatibility
+    else:
+        payload.pop("compatibility_mode", None)
+
+    if tags is not None:
+        payload["items"] = [item for item in tags if item]
+    elif "items" not in payload:
+        payload["items"] = []
+
+    if compatibility_mode is not None:
+        normalized_compatibility = _normalize_compatibility_mode_str(compatibility_mode)
+        if normalized_compatibility is not None:
+            payload["compatibility_mode"] = normalized_compatibility
+        else:
+            payload.pop("compatibility_mode", None)
+
+    if not payload.get("items") and not payload.get("compatibility_mode"):
+        return None
+    return payload
+
+
 class MySQLSchemaMetadataRepository(ISchemaMetadataRepository):
     """MySQL 기반 스키마 메타데이터 리포지토리 (Session Factory 패턴)
 
@@ -396,17 +468,7 @@ class MySQLSchemaMetadataRepository(ISchemaMetadataRepository):
                 owner_map: dict[str, str | None] = {}
 
                 for metadata in metadata_models:
-                    # 호환성 모드 추출
-                    if metadata.description and "Compatibility:" in metadata.description:
-                        parts = metadata.description.split("Compatibility:")
-                        if len(parts) > 1:
-                            mode_str = parts[1].strip()
-                            try:
-                                compat_map[metadata.subject] = DomainCompatibilityMode(mode_str)
-                            except ValueError:
-                                compat_map[metadata.subject] = None
-                    else:
-                        compat_map[metadata.subject] = None
+                    compat_map[metadata.subject] = _extract_compatibility_mode(metadata.tags)
 
                     # Owner 정보
                     owner_map[metadata.subject] = metadata.owner
@@ -457,6 +519,33 @@ class MySQLSchemaMetadataRepository(ISchemaMetadataRepository):
                 logger.error(f"Failed to delete artifacts for subject {subject}: {e}")
                 raise
 
+    async def delete_artifacts_newer_than(self, subject: str, version: int) -> None:
+        """Subject의 특정 버전보다 새로운 아티팩트 삭제"""
+        async with self.session_factory() as session:
+            try:
+                from sqlalchemy import delete
+
+                stmt = delete(SchemaArtifactModel).where(
+                    SchemaArtifactModel.subject == subject,
+                    SchemaArtifactModel.version > version,
+                )
+                result = await session.execute(stmt)
+                await session.flush()
+                logger.info(
+                    "Deleted %s artifact(s) newer than version %s for subject %s",
+                    result.rowcount,
+                    version,
+                    subject,
+                )
+            except Exception as e:
+                logger.error(
+                    "Failed to delete artifacts newer than version %s for subject %s: %s",
+                    version,
+                    subject,
+                    e,
+                )
+                raise
+
     async def save_schema_metadata(self, subject: str, metadata: dict[str, Any]) -> None:
         """스키마 메타데이터 저장 (호환성 모드 포함)"""
         async with self.session_factory() as session:
@@ -466,29 +555,54 @@ class MySQLSchemaMetadataRepository(ISchemaMetadataRepository):
                 result = await session.execute(stmt)
                 existing = result.scalar_one_or_none()
 
-                # description 생성 (호환성 모드 포함)
-                compatibility_mode = metadata.get("compatibility_mode", "BACKWARD")
-                description = f"Compatibility: {compatibility_mode}"
+                compatibility_mode = metadata.get("compatibility_mode")
+                compatibility_str = (
+                    compatibility_mode.value
+                    if isinstance(compatibility_mode, DomainCompatibilityMode)
+                    else compatibility_mode
+                    if isinstance(compatibility_mode, str)
+                    else None
+                )
+                compatibility_str = _normalize_compatibility_mode_str(compatibility_str)
+                tags = metadata.get("tags")
+                normalized_tags = (
+                    [item.strip() for item in tags if isinstance(item, str) and item.strip()]
+                    if isinstance(tags, list)
+                    else None
+                )
+                normalized_owner = _normalize_owner(metadata.get("owner"))
 
                 if existing:
                     # 업데이트
-                    existing.owner = metadata.get("owner", existing.owner)
+                    existing.owner = (
+                        normalized_owner
+                        if "owner" in metadata
+                        else _normalize_owner(existing.owner)
+                    )
+                    existing.doc = metadata.get("doc", existing.doc)
                     existing.updated_by = metadata.get("updated_by", existing.updated_by)
-                    existing.description = description
+                    existing.description = metadata.get("description", existing.description)
+                    existing.tags = _build_tags_payload(
+                        existing.tags,
+                        normalized_tags,
+                        compatibility_str,
+                    )
                 else:
                     # 새로 생성
                     metadata_model = SchemaMetadataModel(
                         subject=subject,
-                        owner=metadata.get("owner"),
+                        owner=normalized_owner,
+                        doc=metadata.get("doc"),
+                        tags=_build_tags_payload(None, normalized_tags, compatibility_str),
+                        description=metadata.get("description"),
                         created_by=metadata.get("created_by", "system"),
                         updated_by=metadata.get("updated_by", metadata.get("created_by", "system")),
-                        description=description,
                     )
                     session.add(metadata_model)
 
                 await session.flush()
                 logger.info(
-                    f"Schema metadata saved: {subject} (compatibility: {compatibility_mode})"
+                    f"Schema metadata saved: {subject} (compatibility: {compatibility_str})"
                 )
 
             except Exception as e:
@@ -518,7 +632,7 @@ class MySQLSchemaMetadataRepository(ISchemaMetadataRepository):
                     stmt = stmt.where(SchemaMetadataModel.subject.contains(query))
 
                 if owner:
-                    stmt = stmt.where(SchemaMetadataModel.owner == owner)
+                    stmt = stmt.where(SchemaMetadataModel.owner == _normalize_owner(owner))
 
                 # 전체 개수 조회
                 from sqlalchemy import func
@@ -560,18 +674,12 @@ class MySQLSchemaMetadataRepository(ISchemaMetadataRepository):
                     artifact = latest_artifacts_map.get(meta.subject)
 
                     # 호환성 모드 파싱
-                    compat_mode = None
-                    if meta.description and "Compatibility:" in meta.description:
-                        try:
-                            mode_str = meta.description.split("Compatibility:")[1].strip()
-                            compat_mode = DomainCompatibilityMode(mode_str)
-                        except ValueError:
-                            pass
+                    compat_mode = _extract_compatibility_mode(meta.tags)
 
                     domain_artifacts.append(
                         DomainSchemaArtifact(
                             subject=meta.subject,
-                            owner=meta.owner,
+                            owner=_normalize_owner(meta.owner),
                             compatibility_mode=compat_mode,
                             # 아티팩트 정보가 있으면 채우고, 없으면(메타만 존재) None/Default
                             version=artifact.version if artifact else None,
@@ -615,17 +723,9 @@ class MySQLSchemaMetadataRepository(ISchemaMetadataRepository):
                     return None
 
                 # 3. 호환성 모드 파싱
-                compat_mode = None
-                if (
-                    metadata_model
-                    and metadata_model.description
-                    and "Compatibility:" in metadata_model.description
-                ):
-                    try:
-                        mode_str = metadata_model.description.split("Compatibility:")[1].strip()
-                        compat_mode = DomainCompatibilityMode(mode_str)
-                    except ValueError:
-                        pass
+                compat_mode = _extract_compatibility_mode(
+                    metadata_model.tags if metadata_model is not None else None
+                )
 
                 return DomainSchemaArtifact(
                     subject=subject,
@@ -636,12 +736,42 @@ class MySQLSchemaMetadataRepository(ISchemaMetadataRepository):
                     if artifact_model
                     else None,
                     compatibility_mode=compat_mode,
-                    owner=metadata_model.owner if metadata_model else None,
+                    owner=_normalize_owner(metadata_model.owner) if metadata_model else None,
                     created_at=artifact_model.created_at if artifact_model else None,
                 )
 
             except Exception as e:
                 logger.error(f"Failed to get latest artifact for {subject}: {e}")
+                return None
+
+    async def get_schema_metadata(self, subject: str) -> dict[str, Any] | None:
+        async with self.session_factory() as session:
+            try:
+                stmt = select(SchemaMetadataModel).where(SchemaMetadataModel.subject == subject)
+                result = await session.execute(stmt)
+                metadata_model = result.scalar_one_or_none()
+                if metadata_model is None:
+                    return None
+
+                compat_mode = _extract_compatibility_mode(metadata_model.tags)
+                return {
+                    "subject": metadata_model.subject,
+                    "owner": _normalize_owner(metadata_model.owner),
+                    "doc": metadata_model.doc,
+                    "tags": _extract_tags(metadata_model.tags),
+                    "description": metadata_model.description,
+                    "compatibility_mode": compat_mode.value if compat_mode is not None else None,
+                    "created_by": metadata_model.created_by,
+                    "updated_by": metadata_model.updated_by,
+                    "created_at": metadata_model.created_at.isoformat()
+                    if metadata_model.created_at
+                    else None,
+                    "updated_at": metadata_model.updated_at.isoformat()
+                    if metadata_model.updated_at
+                    else None,
+                }
+            except Exception as e:
+                logger.error(f"Failed to get schema metadata for {subject}: {e}")
                 return None
 
     def _to_domain_schema_type(self, type_str: str | None) -> DomainSchemaType | None:

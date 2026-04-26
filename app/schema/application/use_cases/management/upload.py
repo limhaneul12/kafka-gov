@@ -5,10 +5,8 @@ from __future__ import annotations
 import hashlib
 import logging
 import uuid
-import zipfile
 from dataclasses import dataclass
 from datetime import datetime
-from io import BytesIO
 from pathlib import Path
 from typing import Any
 
@@ -176,7 +174,7 @@ class SchemaUploadUseCase:
         if not files:
             raise ValueError("No files provided")
 
-        supported_extensions = {".avsc", ".json", ".proto", ".zip"}
+        supported_extensions = (".avsc", ".json", ".proto")
         max_file_size = 10 * 1024 * 1024  # 10MB
 
         validated_files: list[dict[str, Any]] = []
@@ -219,45 +217,7 @@ class SchemaUploadUseCase:
         self, context: UploadContext, file_info: dict[str, Any]
     ) -> DomainSchemaArtifact | None:
         """개별 파일 처리 및 업로드"""
-        extension = file_info["extension"]
-
-        if extension == ".zip":
-            return await self._process_zip_file(context, file_info)
-
         return await self._process_schema_file(context, file_info)
-
-    async def _process_zip_file(
-        self, context: UploadContext, file_info: dict[str, Any]
-    ) -> DomainSchemaArtifact | None:
-        """압축 파일 처리"""
-        content = file_info["content"]
-        filename = file_info["filename"]
-
-        try:
-            with zipfile.ZipFile(BytesIO(content), "r") as zip_file:
-                file_list = zip_file.namelist()
-                if not file_list:
-                    raise ValueError(f"ZIP file {filename} is empty")
-
-                schema_files = [
-                    f for f in file_list if Path(f).suffix.lower() in {".avsc", ".json", ".proto"}
-                ]
-
-                if not schema_files:
-                    raise ValueError(f"No schema files found in ZIP: {filename}")
-
-                artifact = DomainSchemaArtifact(
-                    subject=f"bundle.{Path(filename).stem}",
-                    version=1,
-                    storage_url=None,
-                    checksum=self._calculate_checksum(content),
-                )
-
-                await self.metadata_repository.record_artifact(artifact, context.change_id)
-                return artifact
-
-        except zipfile.BadZipFile as e:
-            raise ValueError(f"Invalid ZIP file: {filename}") from e
 
     async def _process_schema_file(
         self, context: UploadContext, file_info: dict[str, Any]
@@ -285,10 +245,12 @@ class SchemaUploadUseCase:
         )
 
         # 2. Schema Registry 자동 등록
-        # 호환성 모드 결정 (파라미터 우선, 없으면 기본값)
+        # 호환성 모드는 반드시 명시적으로 전달되어야 함
         if context.compatibility_mode is None:
-            final_compatibility = DomainCompatibilityMode.BACKWARD
-        elif isinstance(context.compatibility_mode, str):
+            raise ValueError(
+                f"Compatibility mode must be explicitly provided for schema upload: {filename}"
+            )
+        if isinstance(context.compatibility_mode, str):
             # 문자열로 들어온 경우 enum으로 변환
             final_compatibility = DomainCompatibilityMode(context.compatibility_mode)
         else:
@@ -354,34 +316,9 @@ class SchemaUploadUseCase:
         except Exception as e:
             logger = logging.getLogger(__name__)
             logger.warning(f"Schema Registry registration failed for {subject_name}: {e}.")
-
-            artifact = DomainSchemaArtifact(
-                subject=subject_name,
-                version=1,
-                storage_url=None,
-                checksum=self._calculate_checksum(content),
-                schema_type=DomainSchemaType(schema_type),
-                compatibility_mode=final_compatibility,
-            )
-
-            # 메타데이터는 저장 (실패해도 호환성 모드 기록)
-            try:
-                compatibility_str_fallback = (
-                    final_compatibility.value
-                    if isinstance(final_compatibility, DomainCompatibilityMode)
-                    else final_compatibility
-                )
-                await self.metadata_repository.save_schema_metadata(
-                    subject=subject_name,
-                    metadata={
-                        "owner": context.owner,
-                        "created_by": context.actor,
-                        "updated_by": context.actor,
-                        "compatibility_mode": compatibility_str_fallback,
-                    },
-                )
-            except Exception as meta_error:
-                logger.warning(f"Failed to save metadata for {subject_name}: {meta_error}")
+            raise RuntimeError(
+                f"Schema Registry registration failed for {subject_name}: {e}"
+            ) from e
 
         await self.metadata_repository.record_artifact(artifact, context.change_id)
         return artifact
@@ -441,9 +378,13 @@ class SchemaUploadUseCase:
             occurred_at=datetime.now(),
             subject=spec.subject,
             version=version,
-            schema_type=spec.schema_type.value,
+            schema_type=spec.schema_type.value
+            if hasattr(spec.schema_type, "value")
+            else str(spec.schema_type),
             schema_id=0,  # Registry에서 조회 필요 시 추가
-            compatibility_mode=spec.compatibility.value,
+            compatibility_mode=spec.compatibility.value
+            if hasattr(spec.compatibility, "value")
+            else str(spec.compatibility),
             subject_strategy=DomainSubjectStrategy.SUBJECT_NAME.value,
             environment=env.value,
             actor=actor,

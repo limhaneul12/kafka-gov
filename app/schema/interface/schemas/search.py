@@ -37,7 +37,7 @@ class SchemaSearchResponse(BaseModel):
                         "version": 5,
                         "storage_url": "s3://bucket/schemas/order.payment.avsc",
                         "checksum": "a1b2c3d4",
-                        "compatibility_mode": "BACKWARD",
+                        "compatibility_mode": "FULL_TRANSITIVE",
                         "owner": "payment-team",
                     }
                 ],

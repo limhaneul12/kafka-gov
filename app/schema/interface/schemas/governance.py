@@ -48,7 +48,7 @@ class DashboardResponse(BaseModel):
                         "owner": "payment-team",
                         "version_count": 5,
                         "last_updated": "2024-03-20T10:00:00Z",
-                        "compatibility_mode": "BACKWARD",
+                        "compatibility_mode": "FULL_TRANSITIVE",
                         "lint_score": 0.95,
                         "has_doc": True,
                     }
@@ -103,3 +103,95 @@ class SchemaHistoryResponse(BaseModel):
 
     subject: str = Field(..., description="Subject 이름")
     history: list[SchemaHistoryItem] = Field(..., description="변경 이력 목록 (최신순)")
+
+
+class SchemaVersionReferenceResponse(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    name: str = Field(..., description="참조 이름")
+    subject: str = Field(..., description="참조 subject")
+    version: int = Field(..., description="참조 버전")
+
+
+class SchemaVersionSummaryResponse(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    version: int = Field(..., description="버전 번호")
+    schema_id: int = Field(..., description="Schema Registry schema id")
+    schema_type: str = Field(..., description="스키마 타입")
+    hash: str = Field(..., description="원본 스키마 해시")
+    canonical_hash: str | None = Field(None, description="정규화된 스키마 해시")
+    created_at: str | None = Field(None, description="생성 시간 (있을 때만)")
+    author: str | None = Field(None, description="감사 로그 기준 작성자")
+    commit_message: str | None = Field(None, description="변경 사유")
+
+
+class SchemaVersionListResponse(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    subject: str = Field(..., description="Subject 이름")
+    versions: list[SchemaVersionSummaryResponse] = Field(
+        default_factory=list,
+        description="버전 목록 (최신순)",
+    )
+
+
+class SchemaVersionDetailResponse(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    subject: str = Field(..., description="Subject 이름")
+    version: int = Field(..., description="버전 번호")
+    schema_id: int = Field(..., description="Schema Registry schema id")
+    schema_str: str = Field(..., description="정확한 버전의 스키마 정의")
+    schema_type: str = Field(..., description="스키마 타입")
+    hash: str = Field(..., description="원본 스키마 해시")
+    canonical_hash: str | None = Field(None, description="정규화된 스키마 해시")
+    references: list[SchemaVersionReferenceResponse] = Field(
+        default_factory=list,
+        description="참조 스키마 목록",
+    )
+    owner: str | None = Field(None, description="소유 팀")
+    compatibility_mode: CompatibilityMode | None = Field(None, description="호환성 모드")
+    created_at: str | None = Field(None, description="생성 시간 (있을 때만)")
+    author: str | None = Field(None, description="감사 로그 기준 작성자")
+    commit_message: str | None = Field(None, description="변경 사유")
+
+
+class SchemaVersionCompareResponse(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    subject: str = Field(..., description="Subject 이름")
+    from_version: int = Field(..., description="비교 기준 버전")
+    to_version: int = Field(..., description="비교 대상 버전")
+    changed: bool = Field(..., description="변경 여부")
+    diff_type: str = Field(..., description="diff 유형")
+    changes: list[str] = Field(default_factory=list, description="변경 요약")
+    schema_type: str = Field(..., description="스키마 타입")
+    compatibility_mode: CompatibilityMode | None = Field(None, description="호환성 모드")
+    from_schema: str | None = Field(None, description="비교 기준 스키마")
+    to_schema: str | None = Field(None, description="비교 대상 스키마")
+
+
+class SchemaDriftResponse(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    subject: str = Field(..., description="Subject 이름")
+    registry_latest_version: int = Field(..., description="라이브 registry 최신 버전")
+    registry_canonical_hash: str | None = Field(None, description="라이브 최신 canonical hash")
+    catalog_latest_version: int | None = Field(None, description="로컬 catalog 최신 버전")
+    catalog_canonical_hash: str | None = Field(None, description="로컬 catalog canonical hash")
+    observed_version: int | None = Field(None, description="관측된 사용 버전")
+    last_synced_at: str | None = Field(None, description="catalog 마지막 동기화 시각")
+    drift_flags: list[str] = Field(default_factory=list, description="drift 세부 플래그")
+    has_drift: bool = Field(..., description="drift 존재 여부")
+
+
+class SchemaSettingsResponse(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    subject: str
+    owner: str | None = None
+    doc: str | None = None
+    tags: list[str] = Field(default_factory=list)
+    description: str | None = None
+    compatibility_mode: CompatibilityMode | None = None

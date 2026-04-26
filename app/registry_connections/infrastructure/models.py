@@ -13,8 +13,9 @@ from app.shared.database import Base
 class SchemaRegistryModel(Base):
     __tablename__ = "schema_registries"
 
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    registry_id: Mapped[str] = mapped_column(String(100), unique=True, nullable=False, index=True)
+    registry_id: Mapped[str] = mapped_column(
+        String(100), primary_key=True, nullable=False, index=True
+    )
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     url: Mapped[str] = mapped_column(String(500), nullable=False)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)

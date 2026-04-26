@@ -366,11 +366,17 @@ class SchemaBatchApplyUseCase:
             occurred_at=datetime.now(),
             subject=spec.subject,
             version=version,
-            schema_type=spec.schema_type.value,
+            schema_type=spec.schema_type.value
+            if hasattr(spec.schema_type, "value")
+            else str(spec.schema_type),
             schema_id=schema_id,
-            compatibility_mode=spec.compatibility.value,
-            subject_strategy=batch.subject_strategy.value,
-            environment=batch.env.value,
+            compatibility_mode=spec.compatibility.value
+            if hasattr(spec.compatibility, "value")
+            else str(spec.compatibility),
+            subject_strategy=batch.subject_strategy.value
+            if hasattr(batch.subject_strategy, "value")
+            else str(batch.subject_strategy),
+            environment=batch.env.value if hasattr(batch.env, "value") else str(batch.env),
             actor=actor,
         )
 
