@@ -77,10 +77,10 @@ npm run dev
 
 ## Next Steps
 
-1. **Register Cluster**: UI → Connections → Add Cluster
+1. **Register Schema Registry**: UI → Connections → Add Schema Registry
 2. **Configure Schema Policy**: Schema Policies → New Policy
 3. **Upload Schemas**: Schemas → Upload Schema
-4. **Review History**: History → Inspect approvals, overrides, and audit entries
+4. **Review Schema History**: Schema Detail → History tab
 
 ---
 
@@ -102,12 +102,12 @@ docker ps | grep mysql
 # Check database credentials in .env
 ```
 
-### Kafka connection errors
+### Schema Registry connection errors
 ```bash
-# Test Kafka connectivity
-telnet localhost 9092
+# Test Schema Registry connectivity
+curl http://localhost:8081/subjects
 
-# Verify KAFKA_BOOTSTRAP_SERVERS in .env
+# Verify SCHEMA_REGISTRY_URL in .env
 ```
 
 For more help, review the deployment notes in [Deployment Guide](../operations/deployment.md).

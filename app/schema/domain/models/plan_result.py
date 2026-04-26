@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime
 
-from app.shared.domain.preflight_policy import DomainPolicyPackEvaluation
+from app.schema.governance_support.preflight_policy import DomainPolicyPackEvaluation
 
 from .policy import DomainPolicyViolation, DomainSchemaCompatibilityReport, DomainSchemaImpactRecord
 from .types_enum import (

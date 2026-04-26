@@ -46,7 +46,6 @@ class DomainSchemaImpactRecord:
     """스키마 영향도 정보 - Value Object"""
 
     subject: SubjectName
-    topics: tuple[str, ...] = ()
     status: str = "success"  # success, failure
     error_message: str | None = None
 
@@ -58,6 +57,5 @@ class DomainSchemaDeleteImpact:
     subject: SubjectName
     current_version: int | None
     total_versions: int
-    affected_topics: tuple[str, ...] = ()
     warnings: tuple[str, ...] = ()
     safe_to_delete: bool = False

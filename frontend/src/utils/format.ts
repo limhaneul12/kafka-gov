@@ -126,20 +126,3 @@ export function formatPercent(value: number | null | undefined, decimals = 1): s
   if (value === null || value === undefined) return '-';
   return `${value.toFixed(decimals)}%`;
 }
-
-/**
- * Topic 이름을 축약 (너무 길 경우)
- */
-export function truncateTopicName(name: string, maxLength = 50): string {
-  if (name.length <= maxLength) return name;
-  
-  const parts = name.split('.');
-  if (parts.length <= 2) {
-    return `${name.substring(0, maxLength - 3)}...`;
-  }
-  
-  // 처음과 끝 유지하고 중간 축약
-  const first = parts[0];
-  const last = parts[parts.length - 1];
-  return `${first}...${last}`;
-}

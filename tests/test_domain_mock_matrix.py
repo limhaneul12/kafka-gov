@@ -41,5 +41,5 @@ def test_domain_mock_matrix(case: dict[str, Any]) -> None:
 
 def test_domain_case_matrix_contains_all_domains() -> None:
     matrix = build_domain_case_matrix()
-    assert set(matrix.keys()) == {"cluster", "schema", "shared"}
+    assert set(matrix.keys()) == {"registry_connections", "schema", "shared"}
     assert all(len(cases) >= 2 for cases in matrix.values())

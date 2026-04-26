@@ -168,11 +168,11 @@ class SchemaRule:
 ```python
 # ❌ Absolutely forbidden
 def process():
-    from app.shared.domain.events import DomainEvent  # No imports inside functions
+    from app.schema.governance_support.events import DomainEvent  # No imports inside functions
     ...
 
 # ✅ Correct way
-from app.shared.domain.events import DomainEvent
+from app.schema.governance_support.events import DomainEvent
 
 def process():
     ...

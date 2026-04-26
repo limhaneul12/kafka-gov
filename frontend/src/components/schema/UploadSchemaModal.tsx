@@ -21,13 +21,14 @@ export default function UploadSchemaModal({
   const [environment, setEnvironment] = useState("dev");
   const [changeId, setChangeId] = useState("");
   const [owner, setOwner] = useState("");
+  const [compatibilityMode, setCompatibilityMode] = useState("");
   const [strategyId, setStrategyId] = useState("gov:EnvPrefixed");
 
   if (!isOpen) return null;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!file || !changeId || !owner) {
+    if (!file || !changeId || !owner || !compatibilityMode) {
       alert("Please fill all required fields");
       return;
     }
@@ -39,6 +40,7 @@ export default function UploadSchemaModal({
       formData.append("env", environment);
       formData.append("change_id", changeId);
       formData.append("owner", owner);
+      formData.append("compatibility_mode", compatibilityMode);
       // registry_id는 Query 파라미터로 전달 (FormData에 포함하지 않음)
       formData.append("strategy_id", strategyId);
       
@@ -57,6 +59,7 @@ export default function UploadSchemaModal({
     setEnvironment("dev");
     setChangeId("");
     setOwner("");
+    setCompatibilityMode("");
     setStrategyId("gov:EnvPrefixed");
     setDragActive(false);
     onClose();
@@ -97,7 +100,7 @@ export default function UploadSchemaModal({
               <div>
                 <h2 className="text-2xl font-bold text-gray-900">Upload Schema</h2>
                 <p className="mt-1 text-sm text-gray-600">
-                  Avro 스키마 파일을 업로드합니다
+                  스키마 파일을 업로드합니다
                 </p>
               </div>
               <button
@@ -161,6 +164,26 @@ export default function UploadSchemaModal({
                   />
                 </div>
                 <div>
+                  <label htmlFor="schema-upload-compatibility" className="block text-sm font-medium text-gray-700 mb-2">
+                    Compatibility *
+                  </label>
+                  <select
+                    id="schema-upload-compatibility"
+                    value={compatibilityMode}
+                    onChange={(e) => setCompatibilityMode(e.target.value)}
+                    required
+                    className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  >
+                    <option value="">Select compatibility explicitly</option>
+                    {['NONE', 'BACKWARD', 'BACKWARD_TRANSITIVE', 'FORWARD', 'FORWARD_TRANSITIVE', 'FULL', 'FULL_TRANSITIVE'].map((mode) => (
+                      <option key={mode} value={mode}>{mode}</option>
+                    ))}
+                  </select>
+                  <p className="mt-1 text-xs text-amber-700">
+                    No hidden default is applied. Choose the compatibility mode explicitly.
+                  </p>
+                </div>
+                <div>
                   <label htmlFor="schema-upload-owner" className="block text-sm font-medium text-gray-700 mb-2">
                     Owner/Team *
                   </label>
@@ -184,7 +207,7 @@ export default function UploadSchemaModal({
                   type="file"
                   id="file-upload"
                   className="hidden"
-                  accept=".avsc,.json"
+                  accept=".avsc,.json,.proto"
                   onChange={handleFileChange}
                 />
 
@@ -234,7 +257,7 @@ export default function UploadSchemaModal({
                         <span className="text-sm text-gray-600"> or drag and drop</span>
                       </div>
                       <p className="text-xs text-gray-500">
-                        Avro schema (.avsc, .json) up to 10MB
+                        Schema file (.avsc, .json, .proto) up to 10MB
                       </p>
                     </div>
                   </label>
@@ -244,11 +267,11 @@ export default function UploadSchemaModal({
               {/* Info */}
               <div className="rounded-lg bg-blue-50 p-4">
                 <h4 className="text-sm font-medium text-blue-900 mb-2">
-                  Subject Naming Strategy
+                  Upload Rules
                 </h4>
                 <ul className="space-y-1 text-xs text-blue-800">
                   <li>• <strong>Env Prefixed:</strong> 환경과 파일명을 결합해 subject를 만듭니다 (예: dev.orders).</li>
-                  <li>• Known topic names in the detail screen are derived from this env-prefixed pattern.</li>
+                  <li>• <strong>Compatibility:</strong> 기본값 없이 명시적으로 선택해야 업로드됩니다.</li>
                 </ul>
               </div>
             </div>

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
     BookOpen,
@@ -17,11 +17,22 @@ import { Button } from '../../components/common/Button';
 import { Badge } from '../../components/common/Badge';
 import { useSchemaDetail } from '../../hooks/schema/useSchemaDetail';
 import { toast } from 'sonner';
-import { schemasAPI, clustersAPI } from '../../services/api';
-import type { SchemaRegistry } from '../../types';
-import type { KnownTopicNamesResponse, SchemaHistoryResponse } from '../../types/schema';
+import { schemasAPI } from '../../services/api';
+import type {
+    SchemaDriftResponse,
+    SchemaHistoryResponse,
+    SchemaVersionCompareResponse,
+    SchemaVersionDetailResponse,
+} from '../../types/schema';
 import { promptApprovalOverride } from '../../utils/approvalOverride';
+import { downloadText } from '../../utils/download';
+import { extractErrorStatus } from '../../utils/error';
 import { formatDistanceToNow } from 'date-fns';
+import {
+    describeGovernanceError,
+    requireActiveRegistry,
+} from '../../utils/schemaGovernance';
+import { confirmSchemaGovernanceAction } from '../../utils/schemaGovernancePrompts';
 
 interface SubjectViolation {
     rule: string;
@@ -37,6 +48,9 @@ interface SubjectDetailData {
     schema_type: string;
     compatibility_mode: string;
     owner: string | null;
+    doc?: string | null;
+    tags?: string[];
+    description?: string | null;
     updated_at: string;
     violations: SubjectViolation[];
     policy_score: number;
@@ -54,6 +68,7 @@ interface SchemaPlanItem {
     diff: SchemaPlanDiff;
     current_schema: string | null;
     schema: string | null;
+    schema_definition?: string | null;
 }
 
 interface SchemaCompatibilityIssue {
@@ -72,7 +87,6 @@ interface SchemaCompatibilityReport {
 interface SchemaImpactRecord {
     status: string;
     error_message?: string | null;
-    topics: string[];
 }
 
 interface SchemaPlanResult {
@@ -96,41 +110,31 @@ interface SchemaBatchApplyRequest {
     items: SchemaApplyItemRequest[];
 }
 
-interface AxiosLikeError {
-    response?: {
-        status?: number;
-        data?: {
-            detail?: string;
-        };
-    };
-    message?: string;
+interface RollbackExecutePayload {
+    subject: string;
+    version: number;
+    reason?: string;
+    approvalOverride: ReturnType<typeof promptApprovalOverride>;
 }
 
-const readErrorDetail = (error: unknown, fallback: string): string => {
-    if (typeof error !== 'object' || error === null) {
+interface SchemaSettingsPayload {
+    owner?: string | null;
+    doc?: string | null;
+    tags?: string[];
+    description?: string | null;
+    compatibilityMode?: string | null;
+}
+
+const extractDownloadFilename = (
+    headers: Record<string, string | undefined> | undefined,
+    fallback: string,
+): string => {
+    const disposition = headers?.['content-disposition'] || headers?.['Content-Disposition'];
+    if (!disposition) {
         return fallback;
     }
-    const parsed = error as AxiosLikeError;
-    if (typeof parsed.response?.data?.detail === 'string' && parsed.response.data.detail.length > 0) {
-        return parsed.response.data.detail;
-    }
-    if (typeof parsed.message === 'string' && parsed.message.length > 0) {
-        return parsed.message;
-    }
-    return fallback;
-};
-
-const readErrorStatus = (error: unknown): number | undefined => {
-    if (typeof error !== 'object' || error === null) {
-        return undefined;
-    }
-    return (error as AxiosLikeError).response?.status;
-};
-
-const resolveActiveRegistry = async (): Promise<SchemaRegistry | null> => {
-    const registriesRes = await clustersAPI.listRegistries();
-    const registries = registriesRes.data as SchemaRegistry[];
-    return registries.find((registry) => registry.is_active) ?? registries[0] ?? null;
+    const match = disposition.match(/filename="?([^";]+)"?/i);
+    return match?.[1] || fallback;
 };
 
 // --- Tab Navigation ---
@@ -145,7 +149,6 @@ const Tabs = ({
     const tabs = [
         { id: 'overview', label: 'Overview' },
         { id: 'history', label: 'History' },
-        { id: 'knownTopics', label: 'Known Topic Names' },
     ];
 
     return (
@@ -309,13 +312,11 @@ const JsonDiffHelper = ({ oldStr, newStr }: { oldStr: string | null, newStr: str
 const PlanResultView = ({
     item,
     report,
-    impact,
     onApply,
     onCancel,
 }: {
     item: SchemaPlanItem;
     report: SchemaCompatibilityReport;
-    impact: SchemaImpactRecord;
     onApply: () => Promise<void>;
     onCancel: () => void;
 }) => {
@@ -404,43 +405,6 @@ const PlanResultView = ({
                     </div>
                 )}
 
-                <div className="border border-[#d0d7de] rounded-lg overflow-hidden bg-white shadow-sm">
-                    <div className="px-4 py-2 bg-[#f6f8fa] border-b border-[#d0d7de] flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                            <GitPullRequest className="w-4 h-4 text-[#57606a]" />
-                            <span className="font-semibold text-[#24292f] text-xs">Known Topic Names</span>
-                        </div>
-                        {impact.status !== 'failure' && (
-                            <span className="text-[9px] text-[#1a7f37] font-bold uppercase tracking-widest flex items-center gap-1">
-                                <CheckCircle2 className="w-3 h-3" /> Read Only
-                            </span>
-                        )}
-                    </div>
-
-                    {impact.status === 'failure' ? (
-                        <div className="p-4 bg-[#fff5f5] flex items-center gap-3">
-                            <AlertCircle className="w-4 h-4 text-[#cf222e]" />
-                            <div className="text-xs text-[#cf222e]">
-                                <p className="font-bold">Topic-name hint lookup failed</p>
-                                <p className="opacity-80">{impact.error_message || 'An unexpected error occurred while loading naming-derived hints.'}</p>
-                            </div>
-                        </div>
-                    ) : (
-                        <div className="p-4 space-y-4">
-                            <div className="rounded-lg border border-[#d0d7de] bg-[#f6f8fa] p-3 text-[11px] text-[#57606a]">
-                                Derived from schema-to-topic naming patterns and shown for context only. These names are not authoritative topic associations.
-                            </div>
-                            <div>
-                                <h5 className="text-[10px] font-bold text-[#57606a] uppercase tracking-wider mb-2">Known topic names</h5>
-                                <div className="flex flex-wrap gap-1.5">
-                                    {impact.topics.length > 0 ? impact.topics.map((t: string) => (
-                                        <Badge key={t} variant="outline" className="bg-[#fff8eb] border-[#d4a72c]/30 text-[#9a6700] text-[10px] font-mono px-1.5 py-0">{t}</Badge>
-                                    )) : <span className="text-[11px] text-[#57606a] italic">No topic names were derived from the current naming pattern.</span>}
-                                </div>
-                            </div>
-                        </div>
-                    )}
-                </div>
             </div>
 
             <div className="flex justify-end gap-2 pt-4 border-t border-[#d0d7de]">
@@ -473,15 +437,55 @@ export default function SchemaDetail() {
     // Edit & Plan States
     const [isEditing, setIsEditing] = useState(false);
     const [editedSchema, setEditedSchema] = useState('');
-    const [compatibility, setCompatibility] = useState('BACKWARD');
+    const [compatibility, setCompatibility] = useState('');
     const [planResult, setPlanResult] = useState<SchemaPlanResult | null>(null);
     const [isPlanning, setIsPlanning] = useState(false);
+    const [versionPreview, setVersionPreview] = useState<SchemaVersionDetailResponse | null>(null);
+    const [isPreviewLoading, setIsPreviewLoading] = useState(false);
+    const [versionComparison, setVersionComparison] = useState<SchemaVersionCompareResponse | null>(null);
+    const [isComparisonLoading, setIsComparisonLoading] = useState(false);
+    const [rollbackTargetVersion, setRollbackTargetVersion] = useState<number | null>(null);
+    const [isEditingSettings, setIsEditingSettings] = useState(false);
+    const [settingsOwner, setSettingsOwner] = useState('');
+    const [settingsDoc, setSettingsDoc] = useState('');
+    const [settingsDescription, setSettingsDescription] = useState('');
+    const [settingsTags, setSettingsTags] = useState('');
+    const [settingsCompatibility, setSettingsCompatibility] = useState('');
 
-    const { detailData, historyData, topicHintsData, loading, reload } = useSchemaDetail(subject, activeTab);
+    const { detailData, historyData, driftData, loading, reload } = useSchemaDetail(subject, activeTab);
     const typedDetailData = detailData as SubjectDetailData | null;
     const typedHistoryData = historyData as SchemaHistoryResponse | null;
-    const typedTopicHintsData = topicHintsData as KnownTopicNamesResponse | null;
-    const knownTopicNames = [...(typedTopicHintsData?.topic_names ?? [])].sort((left, right) => left.localeCompare(right));
+    const typedDriftData = driftData as SchemaDriftResponse | null;
+    const previewSchemaText = useMemo(() => {
+        if (!versionPreview?.schema_str) {
+            return '';
+        }
+        try {
+            return JSON.stringify(JSON.parse(versionPreview.schema_str), null, 2);
+        } catch {
+            return versionPreview.schema_str;
+        }
+    }, [versionPreview]);
+    const comparisonFromSchema = useMemo(() => {
+        if (!versionComparison?.from_schema) {
+            return '';
+        }
+        try {
+            return JSON.stringify(JSON.parse(versionComparison.from_schema), null, 2);
+        } catch {
+            return versionComparison.from_schema;
+        }
+    }, [versionComparison]);
+    const comparisonToSchema = useMemo(() => {
+        if (!versionComparison?.to_schema) {
+            return '';
+        }
+        try {
+            return JSON.stringify(JSON.parse(versionComparison.to_schema), null, 2);
+        } catch {
+            return versionComparison.to_schema;
+        }
+    }, [versionComparison]);
 
     // Initial value setup for edit
     const startEditing = () => {
@@ -495,20 +499,34 @@ export default function SchemaDetail() {
                 // Not JSON, keep as is
             }
             setEditedSchema(schema);
-            setCompatibility(typedDetailData.compatibility_mode || 'BACKWARD');
+            setCompatibility(typedDetailData.compatibility_mode || '');
             setIsEditing(true);
+            setRollbackTargetVersion(null);
             setActiveTab('overview');
         }
     };
 
+    const startEditingSettings = () => {
+        if (!typedDetailData) return;
+        setSettingsOwner(typedDetailData.owner || '');
+        setSettingsDoc(typedDetailData.doc || '');
+        setSettingsDescription(typedDetailData.description || '');
+        setSettingsTags((typedDetailData.tags || []).join(', '));
+        setSettingsCompatibility(typedDetailData.compatibility_mode || '');
+        setIsEditingSettings(true);
+    };
+
     const handlePlan = async () => {
         if (!subject) return;
+        if (!compatibility) {
+            toast.error('Select compatibility explicitly before planning a schema change');
+            return;
+        }
         try {
             setIsPlanning(true);
-            const activeRegistry = await resolveActiveRegistry();
+            const activeRegistry = await requireActiveRegistry();
 
             if (!activeRegistry) {
-                toast.error('No Active Schema Registry found');
                 return;
             }
 
@@ -518,9 +536,10 @@ export default function SchemaDetail() {
                 compatibility
             });
             setPlanResult(res.data as SchemaPlanResult);
+            setRollbackTargetVersion(null);
             toast.success('Change plan generated');
         } catch (error) {
-            toast.error(readErrorDetail(error, 'Planning failed'));
+            toast.error(describeGovernanceError(error, 'Planning failed'));
         } finally {
             setIsPlanning(false);
         }
@@ -529,9 +548,34 @@ export default function SchemaDetail() {
     const handleApply = async () => {
         if (!planResult || !subject) return;
         try {
-            const activeRegistry = await resolveActiveRegistry();
+            const activeRegistry = await requireActiveRegistry();
             if (!activeRegistry) {
-                toast.error('No Active Schema Registry found');
+                return;
+            }
+
+            const approvalOverride = promptApprovalOverride(
+                rollbackTargetVersion !== null
+                    ? `schema rollback for ${subject} to v${rollbackTargetVersion}`
+                    : `schema apply for ${subject}`,
+            );
+            if (!approvalOverride) {
+                toast.error('Approval evidence is required for this schema change');
+                return;
+            }
+
+            if (rollbackTargetVersion !== null) {
+                const rollbackPayload: RollbackExecutePayload = {
+                    subject,
+                    version: rollbackTargetVersion,
+                    reason: `Rollback to v${rollbackTargetVersion}`,
+                    approvalOverride,
+                };
+                await schemasAPI.rollbackExecute(activeRegistry.registry_id, rollbackPayload);
+                toast.success(`Schema rollback executed from v${rollbackTargetVersion}`);
+                setIsEditing(false);
+                setPlanResult(null);
+                setRollbackTargetVersion(null);
+                reload();
                 return;
             }
 
@@ -539,36 +583,31 @@ export default function SchemaDetail() {
             const batchRequest: SchemaBatchApplyRequest = {
                 env: subject.split('.')[0] || 'dev',
                 change_id: planResult.change_id,
-                approvalOverride: promptApprovalOverride(`schema apply for ${subject}`),
+                approvalOverride,
                 items: planResult.plan.map((item) => ({
                     subject: item.subject,
                     type: item.diff.schema_type || 'AVRO',
-                    compatibility: planResult.compatibility.find((report) => report.subject === item.subject)?.mode,
+                    compatibility: planResult.compatibility.find((report) => report.subject === item.subject)?.mode ?? compatibility,
                     schema: editedSchema,
                 }))
             };
-
-            if (!batchRequest.approvalOverride) {
-                toast.error('Approval evidence is required for this schema change');
-                return;
-            }
 
             await schemasAPI.apply(activeRegistry.registry_id, batchRequest);
             toast.success('Schema successfully updated to next version');
             setIsEditing(false);
             setPlanResult(null);
+            setRollbackTargetVersion(null);
             reload(); // Refresh data
         } catch (error) {
-            toast.error(readErrorDetail(error, 'Apply failed'));
+            toast.error(describeGovernanceError(error, 'Apply failed'));
         }
     };
 
     const handleRollback = async (version: number) => {
-        if (!subject || !window.confirm(`Rollback to v${version}?`)) return;
+        if (!subject || !confirmSchemaGovernanceAction(`Rollback to v${version}?`)) return;
         try {
-            const activeRegistry = await resolveActiveRegistry();
+            const activeRegistry = await requireActiveRegistry();
             if (!activeRegistry) {
-                toast.error('No Active Schema Registry found');
                 return;
             }
 
@@ -580,9 +619,14 @@ export default function SchemaDetail() {
 
             // For now, let's just use the planResult flow but specifically for rollback
             setPlanResult(plan);
+            setRollbackTargetVersion(version);
             // In rollback case, we need the schema from the plan
             // The plan result for rollback contains the old schema content
-            let oldSchema = plan.plan[0].schema;
+            let oldSchema = plan.plan[0]?.schema ?? plan.plan[0]?.schema_definition;
+            if (!oldSchema) {
+                toast.error('Rollback plan did not include schema content');
+                return;
+            }
             if (oldSchema) {
                 try {
                     oldSchema = JSON.stringify(JSON.parse(oldSchema), null, 2);
@@ -595,19 +639,18 @@ export default function SchemaDetail() {
             setActiveTab('overview');
             setIsEditing(true);
         } catch (error) {
-            toast.error(readErrorDetail(error, 'Rollback plan failed'));
+            toast.error(describeGovernanceError(error, 'Rollback plan failed'));
         }
     };
 
     const handleDelete = async () => {
-        if (!subject || !window.confirm(`Are you sure you want to delete subject "${subject}"? This will remove all versions.`)) return;
+        if (!subject || !confirmSchemaGovernanceAction(`Are you sure you want to delete subject "${subject}"? This will remove all versions.`)) return;
 
         try {
             setIsDeleting(true);
-            const activeRegistry = await resolveActiveRegistry();
+            const activeRegistry = await requireActiveRegistry();
 
             if (!activeRegistry) {
-                toast.error('No Active Schema Registry found');
                 return;
             }
 
@@ -615,8 +658,8 @@ export default function SchemaDetail() {
             toast.success('Subject deleted successfully');
             navigate('/schemas');
         } catch (error) {
-            const errorMsg = readErrorDetail(error, 'Delete failed');
-            const errorStatus = readErrorStatus(error);
+            const errorMsg = describeGovernanceError(error, 'Delete failed');
+            const errorStatus = extractErrorStatus(error);
 
             // Check if it's a safety violation that can be forced
             if (errorStatus === 400 && errorMsg.includes('안전하지 않습니다')) {
@@ -631,15 +674,117 @@ export default function SchemaDetail() {
         }
     };
 
+    const handleSaveSettings = async () => {
+        if (!subject) return;
+        try {
+            const activeRegistry = await requireActiveRegistry();
+            if (!activeRegistry) {
+                return;
+            }
+            const payload: SchemaSettingsPayload = {
+                owner: settingsOwner || null,
+                doc: settingsDoc || null,
+                description: settingsDescription || null,
+                tags: settingsTags
+                    .split(',')
+                    .map((item) => item.trim())
+                    .filter(Boolean),
+                compatibilityMode: settingsCompatibility || null,
+            };
+            await schemasAPI.updateSettings(activeRegistry.registry_id, subject, payload);
+            toast.success('Schema settings updated');
+            setIsEditingSettings(false);
+            reload();
+        } catch (error) {
+            toast.error(describeGovernanceError(error, 'Schema settings update failed'));
+        }
+    };
+
+    const handleDownloadLatest = async () => {
+        if (!subject) return;
+        try {
+            const activeRegistry = await requireActiveRegistry();
+            if (!activeRegistry) {
+                return;
+            }
+            const response = await schemasAPI.exportLatest(activeRegistry.registry_id, subject);
+            const filename = extractDownloadFilename(
+                response.headers as Record<string, string | undefined> | undefined,
+                `${subject}.schema`,
+            );
+            downloadText(typeof response.data === 'string' ? response.data : String(response.data), filename);
+            toast.success('Latest schema downloaded');
+        } catch (error) {
+            toast.error(describeGovernanceError(error, 'Latest schema export failed'));
+        }
+    };
+
+    const handleDownloadVersion = async (version: number) => {
+        if (!subject) return;
+        try {
+            const activeRegistry = await requireActiveRegistry();
+            if (!activeRegistry) {
+                return;
+            }
+            const response = await schemasAPI.exportVersion(activeRegistry.registry_id, subject, version);
+            const filename = extractDownloadFilename(
+                response.headers as Record<string, string | undefined> | undefined,
+                `${subject}.v${version}.schema`,
+            );
+            downloadText(typeof response.data === 'string' ? response.data : String(response.data), filename);
+            toast.success(`Downloaded v${version}`);
+        } catch (error) {
+            toast.error(describeGovernanceError(error, 'Schema version export failed'));
+        }
+    };
+
+    const handlePreviewVersion = async (version: number) => {
+        if (!subject) return;
+        try {
+            setIsPreviewLoading(true);
+            const activeRegistry = await requireActiveRegistry();
+            if (!activeRegistry) {
+                return;
+            }
+            const response = await schemasAPI.getVersion(activeRegistry.registry_id, subject, version);
+            setVersionPreview(response.data as SchemaVersionDetailResponse);
+        } catch (error) {
+            toast.error(describeGovernanceError(error, 'Schema version preview failed'));
+        } finally {
+            setIsPreviewLoading(false);
+        }
+    };
+
+    const handleCompareVersion = async (fromVersion: number, toVersion: number) => {
+        if (!subject) return;
+        try {
+            setIsComparisonLoading(true);
+            const activeRegistry = await requireActiveRegistry();
+            if (!activeRegistry) {
+                return;
+            }
+            const response = await schemasAPI.compareVersions(
+                activeRegistry.registry_id,
+                subject,
+                fromVersion,
+                toVersion,
+            );
+            setVersionComparison(response.data as SchemaVersionCompareResponse);
+        } catch (error) {
+            toast.error(describeGovernanceError(error, 'Schema version compare failed'));
+        } finally {
+            setIsComparisonLoading(false);
+        }
+    };
+
     const handleConfirmForceDelete = async () => {
         if (!subject) return;
 
         try {
             setIsDeleting(true);
-            const activeRegistry = await resolveActiveRegistry();
+            const activeRegistry = await requireActiveRegistry();
 
             if (!activeRegistry) {
-                toast.error('No Active Schema Registry found');
                 return;
             }
 
@@ -650,7 +795,7 @@ export default function SchemaDetail() {
             navigate('/schemas');
         } catch (error) {
             console.error('Force delete failed', error);
-            toast.error(readErrorDetail(error, 'Force delete failed'));
+            toast.error(describeGovernanceError(error, 'Force delete failed'));
         } finally {
             setIsDeleting(false);
         }
@@ -701,6 +846,22 @@ export default function SchemaDetail() {
                                 <Button
                                     variant="secondary"
                                     size="sm"
+                                    onClick={handleDownloadLatest}
+                                    className="bg-white border-[#d0d7de] text-[#24292f] hover:bg-[#f3f4f6]"
+                                >
+                                    Download Latest
+                                </Button>
+                                <Button
+                                    variant="secondary"
+                                    size="sm"
+                                    onClick={startEditingSettings}
+                                    className="bg-white border-[#d0d7de] text-[#24292f] hover:bg-[#f3f4f6]"
+                                >
+                                    Edit Metadata
+                                </Button>
+                                <Button
+                                    variant="secondary"
+                                    size="sm"
                                     onClick={startEditing}
                                     icon={Edit3}
                                     className="bg-[#f6f8fa] border-[#d0d7de] text-[#24292f] hover:bg-[#f3f4f6]"
@@ -722,7 +883,7 @@ export default function SchemaDetail() {
                             <Button
                                 variant="ghost"
                                 size="sm"
-                                onClick={() => { setIsEditing(false); setPlanResult(null); }}
+                                onClick={() => { setIsEditing(false); setPlanResult(null); setRollbackTargetVersion(null); }}
                                 icon={X}
                                 className="text-[#57606a] hover:bg-[#f6f8fa]"
                             >
@@ -789,6 +950,74 @@ export default function SchemaDetail() {
                                                     </div>
                                                 )}
 
+                                                {typedDriftData && (
+                                                    <div className={`mt-2 mb-6 p-4 rounded-xl space-y-3 border ${typedDriftData.has_drift ? 'bg-amber-50 border-amber-200' : 'bg-emerald-50 border-emerald-200'}`}>
+                                                        <div className={`flex items-center gap-2 ${typedDriftData.has_drift ? 'text-amber-700' : 'text-emerald-700'}`}>
+                                                            <AlertTriangle className="w-4 h-4" />
+                                                            <h4 className="text-xs font-bold uppercase tracking-wider">
+                                                                Drift Status {typedDriftData.has_drift ? '(Detected)' : '(In Sync)'}
+                                                            </h4>
+                                                        </div>
+                                                        <div className="text-xs text-[#57606a] flex flex-wrap gap-3">
+                                                            <span>Registry latest: <span className="font-semibold text-[#24292f]">v{typedDriftData.registry_latest_version}</span></span>
+                                                            {typedDriftData.catalog_latest_version !== null && (
+                                                                <span>Catalog latest: <span className="font-semibold text-[#24292f]">v{typedDriftData.catalog_latest_version}</span></span>
+                                                            )}
+                                                            {typedDriftData.observed_version !== null && (
+                                                                <span>Observed usage: <span className="font-semibold text-[#24292f]">v{typedDriftData.observed_version}</span></span>
+                                                            )}
+                                                        </div>
+                                                        {typedDriftData.drift_flags.length > 0 ? (
+                                                            <ul className="space-y-1 text-xs text-[#7c5c00]">
+                                                                {typedDriftData.drift_flags.map((flag) => (
+                                                                    <li key={flag}>• {flag}</li>
+                                                                ))}
+                                                            </ul>
+                                                        ) : (
+                                                            <p className="text-xs text-emerald-700">Registry and catalog snapshots are currently aligned.</p>
+                                                        )}
+                                                    </div>
+                                                )}
+
+                                                <div className="mt-2 mb-6 p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-3">
+                                                    <div className="flex items-center gap-2 text-slate-700">
+                                                        <CheckCircle2 className="w-4 h-4" />
+                                                        <h4 className="text-xs font-bold uppercase tracking-wider">Metadata</h4>
+                                                    </div>
+                                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs text-[#57606a]">
+                                                        <div>
+                                                            <div className="font-semibold text-[#24292f]">Owner</div>
+                                                            <div>{typedDetailData.owner || 'Not set'}</div>
+                                                        </div>
+                                                        <div>
+                                                            <div className="font-semibold text-[#24292f]">Compatibility</div>
+                                                            <div>{typedDetailData.compatibility_mode || 'NONE'}</div>
+                                                        </div>
+                                                        <div>
+                                                            <div className="font-semibold text-[#24292f]">Documentation</div>
+                                                            <div>{typedDetailData.doc || 'Not set'}</div>
+                                                        </div>
+                                                        <div>
+                                                            <div className="font-semibold text-[#24292f]">Description</div>
+                                                            <div>{typedDetailData.description || 'Not set'}</div>
+                                                        </div>
+                                                        <div className="md:col-span-2">
+                                                            <div className="font-semibold text-[#24292f]">Tags</div>
+                                                            <div className="flex flex-wrap gap-2 mt-1">
+                                                                {(typedDetailData.tags || []).length > 0 ? (
+                                                                    (typedDetailData.tags || []).map((tag) => (
+                                                                        <Badge key={tag} variant="outline" className="text-[10px] font-mono">
+                                                                            {tag}
+                                                                        </Badge>
+                                                                    ))
+                                                                ) : (
+                                                                    <span>No tags</span>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+
                                                 <OverviewCode schemaStr={typedDetailData.schema_str} />
                                             </>
                                         ) : (
@@ -804,10 +1033,12 @@ export default function SchemaDetail() {
                                                                     onChange={(e) => setCompatibility(e.target.value)}
                                                                     className="text-xs border border-[#d0d7de] rounded-md bg-[#f6f8fa] px-2 py-1 outline-none focus:ring-2 focus:ring-[#0969da]/30 transition-all font-semibold text-[#24292f]"
                                                                 >
+                                                                    <option value="">Select compatibility</option>
                                                                     {['NONE', 'BACKWARD', 'BACKWARD_TRANSITIVE', 'FORWARD', 'FORWARD_TRANSITIVE', 'FULL', 'FULL_TRANSITIVE'].map(m => (
                                                                         <option key={m} value={m}>{m}</option>
                                                                     ))}
                                                                 </select>
+                                                                <span className="text-[10px] text-amber-700">No hidden default</span>
                                                             </div>
                                                         </div>
                                                         <textarea
@@ -850,7 +1081,6 @@ export default function SchemaDetail() {
                                                     <PlanResultView
                                                         item={planResult.plan[0]}
                                                         report={planResult.compatibility[0]}
-                                                        impact={planResult.impacts[0]}
                                                         onApply={handleApply}
                                                         onCancel={() => setPlanResult(null)}
                                                     />
@@ -902,6 +1132,32 @@ export default function SchemaDetail() {
                                                         </div>
                                                     </div>
                                                     <div className="flex items-center gap-2">
+                                                        <Button
+                                                            variant="secondary"
+                                                            size="sm"
+                                                            onClick={() => handlePreviewVersion(item.version)}
+                                                            className="h-8 text-[11px] px-3 border-[#d0d7de] text-[#24292f] hover:bg-[#f6f8fa]"
+                                                        >
+                                                            Preview
+                                                        </Button>
+                                                        <Button
+                                                            variant="secondary"
+                                                            size="sm"
+                                                            onClick={() => handleDownloadVersion(item.version)}
+                                                            className="h-8 text-[11px] px-3 border-[#d0d7de] text-[#24292f] hover:bg-[#f6f8fa]"
+                                                        >
+                                                            Download
+                                                        </Button>
+                                                        {idx > 0 && typedHistoryData.history[0] && (
+                                                            <Button
+                                                                variant="secondary"
+                                                                size="sm"
+                                                                onClick={() => handleCompareVersion(item.version, typedHistoryData.history[0].version)}
+                                                                className="h-8 text-[11px] px-3 border-[#d0d7de] text-[#24292f] hover:bg-[#f6f8fa]"
+                                                            >
+                                                                Compare to Latest
+                                                            </Button>
+                                                        )}
                                                         {idx > 0 && !isEditing && (
                                                             <Button
                                                                 variant="outline"
@@ -923,35 +1179,6 @@ export default function SchemaDetail() {
                                     </div>
                                 )}
 
-                                {activeTab === 'knownTopics' && (
-                                    <div className="space-y-4">
-                                        <div className="space-y-2">
-                                            <h3 className="text-sm font-semibold text-[#24292f]">Known Topic Names</h3>
-                                            <p className="text-xs text-[#57606a]">
-                                                Derived from schema-to-topic naming patterns and shown as read-only hints. These names are not authoritative topic associations.
-                                            </p>
-                                        </div>
-                                        <div className="rounded-lg border border-[#d0d7de] bg-[#f6f8fa] p-4">
-                                            {knownTopicNames.length > 0 ? (
-                                                <div className="flex flex-wrap gap-2">
-                                                    {knownTopicNames.map((topicName) => (
-                                                        <Badge
-                                                            key={topicName}
-                                                            variant="outline"
-                                                            className="bg-[#fff8eb] border-[#d4a72c]/30 text-[#9a6700] text-[11px] font-mono px-2 py-1"
-                                                        >
-                                                            {topicName}
-                                                        </Badge>
-                                                    ))}
-                                                </div>
-                                            ) : (
-                                                <p className="text-sm text-[#57606a] italic">
-                                                    No topic names were derived from the current schema naming pattern.
-                                                </p>
-                                            )}
-                                        </div>
-                                    </div>
-                                )}
                             </>
                         )}
                     </div>
@@ -997,6 +1224,165 @@ export default function SchemaDetail() {
                             >
                                 {isDeleting ? 'Deleting...' : 'Yes, Force Delete'}
                             </Button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {isEditingSettings && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+                    <div className="bg-white rounded-xl shadow-xl max-w-2xl w-full overflow-hidden border border-[#d0d7de]">
+                        <div className="px-6 py-4 border-b border-[#d0d7de] flex items-center justify-between">
+                            <h3 className="text-lg font-bold text-[#24292f]">Edit Schema Metadata</h3>
+                            <Button variant="ghost" size="sm" onClick={() => setIsEditingSettings(false)}>
+                                Close
+                            </Button>
+                        </div>
+                        <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <label htmlFor="schema-settings-owner" className="text-sm text-[#24292f]">
+                                <div className="mb-1 font-semibold">Owner</div>
+                                <input id="schema-settings-owner" value={settingsOwner} onChange={(e) => setSettingsOwner(e.target.value)} className="w-full border border-[#d0d7de] rounded-md px-3 py-2" />
+                            </label>
+                            <label htmlFor="schema-settings-compatibility" className="text-sm text-[#24292f]">
+                                <div className="mb-1 font-semibold">Compatibility</div>
+                                <select id="schema-settings-compatibility" value={settingsCompatibility} onChange={(e) => setSettingsCompatibility(e.target.value)} className="w-full border border-[#d0d7de] rounded-md px-3 py-2 bg-white">
+                                    <option value="">Leave unset</option>
+                                    {['NONE', 'BACKWARD', 'BACKWARD_TRANSITIVE', 'FORWARD', 'FORWARD_TRANSITIVE', 'FULL', 'FULL_TRANSITIVE'].map(m => (
+                                        <option key={m} value={m}>{m}</option>
+                                    ))}
+                                </select>
+                                <p className="mt-1 text-xs text-amber-700">No implicit compatibility default is applied.</p>
+                            </label>
+                            <label htmlFor="schema-settings-doc" className="text-sm text-[#24292f] md:col-span-2">
+                                <div className="mb-1 font-semibold">Documentation URL / Notes</div>
+                                <input id="schema-settings-doc" value={settingsDoc} onChange={(e) => setSettingsDoc(e.target.value)} className="w-full border border-[#d0d7de] rounded-md px-3 py-2" />
+                            </label>
+                            <label htmlFor="schema-settings-description" className="text-sm text-[#24292f] md:col-span-2">
+                                <div className="mb-1 font-semibold">Description</div>
+                                <textarea id="schema-settings-description" value={settingsDescription} onChange={(e) => setSettingsDescription(e.target.value)} className="w-full border border-[#d0d7de] rounded-md px-3 py-2 min-h-[100px]" />
+                            </label>
+                            <label htmlFor="schema-settings-tags" className="text-sm text-[#24292f] md:col-span-2">
+                                <div className="mb-1 font-semibold">Tags (comma separated)</div>
+                                <input id="schema-settings-tags" value={settingsTags} onChange={(e) => setSettingsTags(e.target.value)} className="w-full border border-[#d0d7de] rounded-md px-3 py-2" />
+                            </label>
+                        </div>
+                        <div className="px-6 py-4 border-t border-[#d0d7de] flex justify-end gap-3">
+                            <Button variant="ghost" onClick={() => setIsEditingSettings(false)}>Cancel</Button>
+                            <Button variant="primary" onClick={handleSaveSettings}>Save Metadata</Button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {(versionPreview || isPreviewLoading) && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+                    <div className="bg-white rounded-xl shadow-xl max-w-5xl w-full overflow-hidden border border-[#d0d7de]">
+                        <div className="px-6 py-4 border-b border-[#d0d7de] flex items-center justify-between">
+                            <div>
+                                <h3 className="text-lg font-bold text-[#24292f]">
+                                    {isPreviewLoading ? 'Loading version preview…' : `${subject} v${versionPreview?.version}`}
+                                </h3>
+                                {versionPreview && (
+                                    <p className="text-xs text-[#57606a] mt-1">
+                                        {versionPreview.schema_type} · schema id {versionPreview.schema_id}
+                                        {versionPreview.author ? ` · ${versionPreview.author}` : ''}
+                                    </p>
+                                )}
+                            </div>
+                            <div className="flex items-center gap-2">
+                                {versionPreview && (
+                                    <Button
+                                        variant="secondary"
+                                        size="sm"
+                                        onClick={() => handleDownloadVersion(versionPreview.version)}
+                                    >
+                                        Download
+                                    </Button>
+                                )}
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => setVersionPreview(null)}
+                                >
+                                    Close
+                                </Button>
+                            </div>
+                        </div>
+                        <div className="p-6">
+                            {isPreviewLoading ? (
+                                <div className="flex justify-center py-20">
+                                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#0969da]" />
+                                </div>
+                            ) : versionPreview ? (
+                                <div className="space-y-4">
+                                    <div className="flex flex-wrap gap-2 text-xs text-[#57606a]">
+                                        <Badge variant="outline" className="text-[10px] font-mono">v{versionPreview.version}</Badge>
+                                        {versionPreview.compatibility_mode && (
+                                            <Badge variant="outline" className="text-[10px] font-mono">
+                                                {versionPreview.compatibility_mode}
+                                            </Badge>
+                                        )}
+                                        {versionPreview.owner && <span>Owner: <span className="font-semibold text-[#24292f]">{versionPreview.owner}</span></span>}
+                                    </div>
+                                    <OverviewCode schemaStr={previewSchemaText} />
+                                </div>
+                            ) : null}
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {(versionComparison || isComparisonLoading) && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+                    <div className="bg-white rounded-xl shadow-xl max-w-6xl w-full overflow-hidden border border-[#d0d7de]">
+                        <div className="px-6 py-4 border-b border-[#d0d7de] flex items-center justify-between">
+                            <div>
+                                <h3 className="text-lg font-bold text-[#24292f]">
+                                    {isComparisonLoading
+                                        ? 'Loading comparison…'
+                                        : `${subject} comparison v${versionComparison?.from_version} → v${versionComparison?.to_version}`}
+                                </h3>
+                                {versionComparison && (
+                                    <p className="text-xs text-[#57606a] mt-1">
+                                        {versionComparison.schema_type}
+                                        {versionComparison.compatibility_mode ? ` · ${versionComparison.compatibility_mode}` : ''}
+                                    </p>
+                                )}
+                            </div>
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => setVersionComparison(null)}
+                            >
+                                Close
+                            </Button>
+                        </div>
+                        <div className="p-6">
+                            {isComparisonLoading ? (
+                                <div className="flex justify-center py-20">
+                                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#0969da]" />
+                                </div>
+                            ) : versionComparison ? (
+                                <div className="space-y-4">
+                                    <div className="flex flex-wrap items-center gap-2 text-xs text-[#57606a]">
+                                        <Badge variant="outline" className="text-[10px] font-mono">
+                                            {versionComparison.changed ? 'Changed' : 'No Change'}
+                                        </Badge>
+                                        <Badge variant="outline" className="text-[10px] font-mono">
+                                            {versionComparison.diff_type}
+                                        </Badge>
+                                    </div>
+                                    <div className="bg-[#f6f8fa] border border-[#d0d7de] rounded-lg p-4">
+                                        <h4 className="text-sm font-semibold text-[#24292f] mb-2">Change Summary</h4>
+                                        <ul className="space-y-1 text-sm text-[#57606a]">
+                                            {versionComparison.changes.map((change) => (
+                                                <li key={change}>• {change}</li>
+                                            ))}
+                                        </ul>
+                                    </div>
+                                    <JsonDiffHelper oldStr={comparisonFromSchema} newStr={comparisonToSchema} />
+                                </div>
+                            ) : null}
                         </div>
                     </div>
                 </div>

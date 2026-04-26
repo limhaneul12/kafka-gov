@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from app.shared.application.use_cases import (
+from app.schema.governance_support.use_cases import (
     ApproveApprovalRequestUseCase,
     CreateApprovalRequestUseCase,
     GetApprovalRequestUseCase,
@@ -13,7 +13,7 @@ from app.shared.application.use_cases import (
     RejectApprovalRequestUseCase,
 )
 from app.shared.database import DatabaseManager
-from app.shared.infrastructure.repository import (
+from app.schema.governance_support.infrastructure.repository import (
     MySQLAuditActivityRepository,
     SQLApprovalRequestRepository,
 )

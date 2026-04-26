@@ -4,10 +4,10 @@ from logging.config import fileConfig
 from alembic import context
 from sqlalchemy.ext.asyncio import create_async_engine
 
-import app.cluster.infrastructure.models as cluster_models
+import app.registry_connections.infrastructure.models as cluster_models
 import app.schema.infrastructure.catalog_models as schema_catalog_models
 import app.schema.infrastructure.models as schema_models
-import app.shared.infrastructure.models as shared_models
+import app.schema.governance_support.infrastructure.models as shared_models
 from app.shared.database import Base
 from app.shared.settings import settings
 

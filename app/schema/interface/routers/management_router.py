@@ -18,8 +18,8 @@ from app.container import AppContainer
 from app.schema.domain.models import (
     DomainCompatibilityMode,
     DomainEnvironment,
-    DomainSubjectStrategy,
 )
+from app.schema.governance_support.actor import actor_context_dict, actor_context_from_headers
 from app.schema.interface.schemas import (
     SchemaArtifact,
     SchemaDeleteImpactResponse,
@@ -29,7 +29,6 @@ from app.schema.interface.schemas import (
 from app.schema.interface.schemas.search import SchemaSearchItem, SchemaSearchResponse
 from app.schema.interface.types.enums import CompatibilityMode, Environment
 from app.schema.interface.types.type_hints import ChangeId
-from app.shared.actor import actor_context_dict, actor_context_from_headers
 from app.shared.error_handlers import handle_api_errors, handle_server_errors
 
 router = APIRouter(prefix="/v1/schemas", tags=["schema-management"])
@@ -58,8 +57,8 @@ def _extract_schema_type_from_url(storage_url: str | None) -> str:
     "/upload",
     response_model=SchemaUploadResponse,
     status_code=status.HTTP_201_CREATED,
-    summary="스키마 번들 업로드 (멀티 레지스트리/스토리지)",
-    description="스키마 파일(.avsc/.proto/.json 및 zip 번들)을 업로드하여 사전 검증합니다.",
+    summary="스키마 파일 업로드 (멀티 레지스트리/스토리지)",
+    description="스키마 파일(.avsc/.proto/.json)을 업로드하여 사전 검증합니다.",
 )
 @inject
 @handle_api_errors(validation_error_message="Validation error")
@@ -67,16 +66,16 @@ async def upload_schemas(
     env: Annotated[Environment, Form(..., description="업로드 대상 환경")],
     change_id: Annotated[ChangeId, Form(..., description="변경 ID")],
     owner: Annotated[str, Form(..., description="소유 팀")],
+    compatibility_mode: Annotated[
+        CompatibilityMode,
+        Form(description="호환성 모드 (명시 필수)"),
+    ],
     files: Annotated[list[UploadFile], File(..., description="업로드할 스키마 파일 목록")],
     request: Request,
     registry_id: Annotated[
         str, Query(description="Schema Registry ID (기본값: default)")
     ] = "default",
     storage_id: Annotated[str | None, Query(description="Object Storage ID (optional)")] = None,
-    compatibility_mode: Annotated[
-        CompatibilityMode | None,
-        Form(description="호환성 모드 (기본값: BACKWARD)"),
-    ] = None,
     strategy_id: Annotated[
         str, Form(description="Subject naming strategy (기본값: gov:EnvPrefixed)")
     ] = "gov:EnvPrefixed",
@@ -90,9 +89,7 @@ async def upload_schemas(
         )
 
     # 호환성 모드 변환 (Interface Enum -> Domain Enum)
-    domain_compatibility = (
-        DomainCompatibilityMode(compatibility_mode.value) if compatibility_mode else None
-    )
+    domain_compatibility = DomainCompatibilityMode(compatibility_mode.value)
     actor, actor_context = _resolve_actor(request)
 
     result = await upload_use_case.execute(
@@ -129,7 +126,7 @@ async def upload_schemas(
     response_model=SchemaDeleteImpactResponse,
     status_code=status.HTTP_200_OK,
     summary="스키마 삭제 사전 점검 (멀티 레지스트리)",
-    description="스키마 삭제 전 버전/환경 경고와 naming-derived topic-name hints를 점검합니다. 실제 삭제는 수행하지 않습니다.",
+    description="스키마 삭제 전 버전/환경 경고를 점검합니다. 실제 삭제는 수행하지 않습니다.",
 )
 @inject
 @handle_api_errors(validation_error_message="Validation error")
@@ -137,17 +134,14 @@ async def analyze_schema_delete_impact(
     subject: str,
     request: Request,
     registry_id: str = Query(..., description="Schema Registry ID"),
-    strategy: str = "TopicNameStrategy",
     delete_use_case=Depends(Provide[AppContainer.schema_container.delete_use_case]),
 ) -> SchemaDeleteImpactResponse:
     """스키마 삭제 영향도 분석"""
     # 영향도 분석 수행
-    strategy_enum = DomainSubjectStrategy(strategy)
     actor, actor_context = _resolve_actor(request)
     impact = await delete_use_case.analyze(
         registry_id=registry_id,
         subject=subject,
-        strategy=strategy_enum,
         actor=actor,
         actor_context=actor_context,
     )
@@ -157,7 +151,6 @@ async def analyze_schema_delete_impact(
         subject=impact.subject,
         current_version=impact.current_version,
         total_versions=impact.total_versions,
-        affected_topics=list(impact.affected_topics),
         warnings=list(impact.warnings),
         safe_to_delete=impact.safe_to_delete,
     )
@@ -168,7 +161,7 @@ async def analyze_schema_delete_impact(
     response_model=SchemaDeleteImpactResponse,
     status_code=status.HTTP_200_OK,
     summary="스키마 삭제 (멀티 레지스트리)",
-    description="스키마를 삭제합니다. 버전/환경 경고가 있으면 실패하며, naming-derived topic-name hints는 참고용으로만 반환합니다.",
+    description="스키마를 삭제합니다. 버전/환경 경고가 있으면 실패합니다.",
 )
 @inject
 @handle_api_errors(
@@ -179,18 +172,15 @@ async def delete_schema(
     subject: str,
     request: Request,
     registry_id: str = Query(..., description="Schema Registry ID"),
-    strategy: str = "TopicNameStrategy",
     force: bool = False,
     delete_use_case=Depends(Provide[AppContainer.schema_container.delete_use_case]),
 ) -> SchemaDeleteImpactResponse:
     """스키마 삭제"""
     # 삭제 실행
-    strategy_enum = DomainSubjectStrategy(strategy)
     actor, actor_context = _resolve_actor(request)
     impact = await delete_use_case.delete(
         registry_id=registry_id,
         subject=subject,
-        strategy=strategy_enum,
         actor=actor,
         force=force,
         actor_context=actor_context,
@@ -201,7 +191,6 @@ async def delete_schema(
         subject=impact.subject,
         current_version=impact.current_version,
         total_versions=impact.total_versions,
-        affected_topics=list(impact.affected_topics),
         warnings=list(impact.warnings),
         safe_to_delete=impact.safe_to_delete,
     )

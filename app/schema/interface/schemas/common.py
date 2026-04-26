@@ -4,7 +4,15 @@ from __future__ import annotations
 
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field, StrictBool, StrictStr, field_validator
+from pydantic import (
+    AliasChoices,
+    BaseModel,
+    ConfigDict,
+    Field,
+    StrictBool,
+    StrictStr,
+    field_validator,
+)
 
 from ..types.enums import CompatibilityMode, SchemaSourceType
 from ..types.type_hints import (
@@ -199,13 +207,12 @@ class SchemaImpactRecord(BaseModel):
         json_schema_extra={
             "example": {
                 "subject": "prod.orders.created-value",
-                "topics": ["prod.orders.created"],
+                "status": "success",
             }
         },
     )
 
     subject: SubjectName
-    topics: list[StrictStr] = Field(default_factory=list, max_length=50)
     status: StrictStr = Field(default="success")
     error_message: StrictStr | None = Field(default=None)
 
@@ -223,7 +230,7 @@ class SchemaPlanItem(BaseModel):
                 "current_version": 6,
                 "target_version": 7,
                 "diff": {"fields": {"email": "added with default ''"}},
-                "schema_definition": {"type": "record", "name": "Order", "fields": []},
+                "schema": {"type": "record", "name": "Order", "fields": []},
             }
         },
     )
@@ -233,7 +240,11 @@ class SchemaPlanItem(BaseModel):
     current_version: SchemaVersion | None = None
     target_version: SchemaVersion | None = None
     diff: dict[str, Any] = Field(default_factory=dict)
-    schema_definition: SchemaDefinition | None = None
+    schema_definition: SchemaDefinition | None = Field(
+        default=None,
+        validation_alias=AliasChoices("schema_definition", "schema"),
+        serialization_alias="schema",
+    )
     current_schema: SchemaDefinition | None = None
     reason: StrictStr | None = Field(default=None, description="변경 사유")
 
@@ -273,7 +284,7 @@ class SchemaArtifactResponse(SchemaArtifact):
                 "storage_url": "https://minio.local/schemas/prod/orders/7/schema.avsc",
                 "checksum": "5b2c3a9f",
                 "owner": "team-order",
-                "compatibility_mode": "BACKWARD",
+                "compatibility_mode": "FULL_TRANSITIVE",
             }
         },
     )

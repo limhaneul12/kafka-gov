@@ -1,37 +1,39 @@
-import { forwardRef, type ButtonHTMLAttributes } from "react";
+import { forwardRef, type ButtonHTMLAttributes, type ElementType } from "react";
 import { cn } from "../../utils/cn";
 
-interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
-  variant?: "primary" | "secondary" | "danger" | "ghost";
+export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
+  variant?: "primary" | "secondary" | "outline" | "ghost" | "danger" | "success";
   size?: "sm" | "md" | "lg";
+  icon?: ElementType;
 }
 
 const Button = forwardRef<HTMLButtonElement, ButtonProps>(
-  ({ className, variant = "primary", size = "md", children, ...props }, ref) => {
+  ({ className, variant = "primary", size = "md", icon: Icon, children, ...props }, ref) => {
     return (
       <button
         ref={ref}
         className={cn(
-          "inline-flex items-center justify-center gap-2 rounded-lg font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed",
+          "inline-flex items-center justify-center gap-2 rounded-lg font-medium transition-all focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:cursor-not-allowed disabled:opacity-50",
           {
-            "bg-blue-600 text-white hover:bg-blue-700 focus:ring-blue-500":
-              variant === "primary",
-            "bg-gray-200 text-gray-900 hover:bg-gray-300 focus:ring-gray-500":
+            "bg-[#0969da] text-white shadow-sm hover:bg-[#0861cc]": variant === "primary",
+            "border border-[#d0d7de] bg-[#f6f8fa] text-[#24292f] shadow-sm hover:bg-[#f3f4f6]":
               variant === "secondary",
-            "bg-red-600 text-white hover:bg-red-700 focus:ring-red-500":
-              variant === "danger",
-            "bg-transparent hover:bg-gray-100 focus:ring-gray-500":
-              variant === "ghost",
+            "border border-[#d0d7de] text-[#0969da] hover:bg-[#f6f8fa]":
+              variant === "outline",
+            "text-slate-500 hover:bg-slate-100 hover:text-slate-900": variant === "ghost",
+            "bg-[#cf222e] text-white shadow-sm hover:bg-[#a40e26]": variant === "danger",
+            "bg-[#1a7f37] text-white shadow-sm hover:bg-[#11632c]": variant === "success",
           },
           {
-            "px-3 py-1.5 text-sm": size === "sm",
+            "px-3 py-1.5 text-xs": size === "sm",
             "px-4 py-2 text-sm": size === "md",
             "px-6 py-3 text-base": size === "lg",
           },
-          className
+          className,
         )}
         {...props}
       >
+        {Icon && <Icon className={cn("h-4 w-4", size === "lg" && "h-5 w-5")} />}
         {children}
       </button>
     );

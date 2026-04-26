@@ -87,7 +87,7 @@ class AppSettings(BaseSettings):
     model_config = model_config_module("APP_")
 
     # 애플리케이션 기본 설정
-    app_name: str = Field(default="Kafka Governance", description="애플리케이션 이름")
+    app_name: str = Field(default="Data Governance", description="애플리케이션 이름")
     app_version: str = Field(default="1.0.0", description="애플리케이션 버전")
     debug: bool = Field(default=False, description="디버그 모드")
     environment: str = Field(
@@ -118,17 +118,6 @@ class AppSettings(BaseSettings):
 
     # 데이터베이스 설정 (유일한 하위 설정)
     database: DatabaseSettings = Field(default_factory=DatabaseSettings)
-
-    @property
-    def redis_url(self) -> str:
-        explicit_url = os.getenv("REDIS_URL")
-        if explicit_url:
-            return explicit_url
-
-        host = os.getenv("REDIS_HOST", "redis")
-        port = os.getenv("REDIS_PORT", "6379")
-        db = os.getenv("REDIS_DB", "0")
-        return f"redis://{host}:{port}/{db}"
 
     @property
     def is_production(self) -> bool:

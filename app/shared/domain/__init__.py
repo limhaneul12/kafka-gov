@@ -1,11 +1,5 @@
-"""Shared Domain 패키지"""
+"""공통 도메인 패키지.
 
-from .models import ApprovalRequest, AuditActivity
-from .repositories import IApprovalRequestRepository, IAuditActivityRepository
-
-__all__ = [
-    "ApprovalRequest",
-    "AuditActivity",
-    "IApprovalRequestRepository",
-    "IAuditActivityRepository",
-]
+현재는 truly shared policy/event primitives만 유지하며,
+schema-governance support 모델은 `app.schema.governance_support`로 이동했다.
+"""

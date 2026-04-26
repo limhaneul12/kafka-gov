@@ -87,7 +87,7 @@ class PlanSchemaChangeUseCase:
         batch = DomainSchemaBatch(
             change_id=change_id,
             env=env,
-            subject_strategy=DomainSubjectStrategy.TOPIC_NAME,
+            subject_strategy=DomainSubjectStrategy.SUBJECT_NAME,
             specs=(spec,),
         )
 

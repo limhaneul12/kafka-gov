@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import socket
 import subprocess
 import time
 from collections.abc import Generator
@@ -13,9 +14,9 @@ from playwright.sync_api import Browser, Page, sync_playwright
 
 ROOT_DIR = Path(__file__).resolve().parents[1]
 FRONTEND_DIR = ROOT_DIR / "frontend"
+KAFKA_COMPOSE_PROJECT = "kafka-gov-kafka-e2e"
+APP_COMPOSE_PROJECT = "kafka-gov-app-e2e"
 
-LOCAL_BACKEND_URL = "http://127.0.0.1:8000"
-LOCAL_FRONTEND_URL = "http://127.0.0.1:3000"
 CONTAINER_BACKEND_URL = "http://127.0.0.1:8001"
 CONTAINER_FRONTEND_URL = "http://127.0.0.1:90"
 
@@ -45,6 +46,100 @@ def _stop_process(process: subprocess.Popen[str]) -> None:
         _ = process.wait(timeout=5)
 
 
+def _run_command(
+    command: list[str],
+    cwd: Path | None = None,
+    env: dict[str, str] | None = None,
+) -> None:
+    result = subprocess.run(
+        command,
+        cwd=cwd or ROOT_DIR,
+        env=env,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    if result.returncode != 0:
+        raise RuntimeError(
+            f"Command failed ({' '.join(command)}):\nSTDOUT:\n{result.stdout}\nSTDERR:\n{result.stderr}"
+        )
+
+
+def _pick_available_port(preferred_port: int) -> int:
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+        sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        if sock.connect_ex(("127.0.0.1", preferred_port)) != 0:
+            return preferred_port
+
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+        sock.bind(("127.0.0.1", 0))
+        return int(sock.getsockname()[1])
+
+
+def _compose_up(env: dict[str, str]) -> None:
+    _compose_down()
+    _ = subprocess.run(
+        ["docker", "network", "create", "kafka-network"],
+        cwd=ROOT_DIR,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    _run_command(
+        [
+            "docker",
+            "compose",
+            "-p",
+            KAFKA_COMPOSE_PROJECT,
+            "-f",
+            "kafka-compose.yml",
+            "up",
+            "-d",
+        ],
+        env=env,
+    )
+    _run_command(
+        [
+            "docker",
+            "compose",
+            "-p",
+            APP_COMPOSE_PROJECT,
+            "-f",
+            "docker-compose.yml",
+            "up",
+            "-d",
+            "--build",
+        ],
+        env=env,
+    )
+
+
+def _compose_down() -> None:
+    _ = subprocess.run(
+        ["docker", "compose", "-p", APP_COMPOSE_PROJECT, "-f", "docker-compose.yml", "down", "-v"],
+        cwd=ROOT_DIR,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    _ = subprocess.run(
+        [
+            "docker",
+            "compose",
+            "-p",
+            KAFKA_COMPOSE_PROJECT,
+            "-f",
+            "kafka-compose.yml",
+            "down",
+            "-v",
+        ],
+        cwd=ROOT_DIR,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+
 def pytest_addoption(parser: pytest.Parser) -> None:
     parser.addoption(
         "--run-e2e",
@@ -56,8 +151,8 @@ def pytest_addoption(parser: pytest.Parser) -> None:
         "--e2e-target",
         action="store",
         default="local",
-        choices=["local", "container"],
-        help="e2e target mode: local subprocesses or existing containers",
+        choices=["local", "container", "compose"],
+        help="e2e target mode: local subprocesses, existing containers, or auto-managed compose",
     )
 
 
@@ -71,9 +166,32 @@ def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item
             item.add_marker(skip_e2e)
 
 
+def pytest_configure(config: pytest.Config) -> None:
+    if config.getoption("--run-e2e"):
+        setattr(config.option, "no_cov", True)
+
+
 @pytest.fixture(scope="session")
 def e2e_urls(pytestconfig: pytest.Config) -> Generator[dict[str, str], None, None]:
     target = str(pytestconfig.getoption("--e2e-target"))
+
+    if target == "compose":
+        backend_port = _pick_available_port(8001)
+        frontend_port = _pick_available_port(90)
+        backend_url = f"http://127.0.0.1:{backend_port}"
+        frontend_url = f"http://127.0.0.1:{frontend_port}"
+        compose_env = os.environ.copy()
+        compose_env["APP_HOST_PORT"] = str(backend_port)
+        compose_env["NGINX_HOST_PORT"] = str(frontend_port)
+
+        _compose_up(compose_env)
+        try:
+            _wait_http_ready(f"{backend_url}/health", timeout_sec=240.0)
+            _wait_http_ready(f"{frontend_url}/health", timeout_sec=240.0)
+            yield {"backend_url": backend_url, "frontend_url": frontend_url}
+        finally:
+            _compose_down()
+        return
 
     if target == "container":
         backend_url = os.getenv("E2E_BACKEND_URL", CONTAINER_BACKEND_URL)
@@ -84,8 +202,10 @@ def e2e_urls(pytestconfig: pytest.Config) -> Generator[dict[str, str], None, Non
         yield {"backend_url": backend_url, "frontend_url": frontend_url}
         return
 
-    backend_url = LOCAL_BACKEND_URL
-    frontend_url = LOCAL_FRONTEND_URL
+    backend_port = _pick_available_port(8000)
+    frontend_port = _pick_available_port(3000)
+    backend_url = f"http://127.0.0.1:{backend_port}"
+    frontend_url = f"http://127.0.0.1:{frontend_port}"
 
     env_backend = os.environ.copy()
     env_backend["PYTHONUNBUFFERED"] = "1"
@@ -99,7 +219,7 @@ def e2e_urls(pytestconfig: pytest.Config) -> Generator[dict[str, str], None, Non
             "--host",
             "127.0.0.1",
             "--port",
-            "8000",
+            str(backend_port),
         ],
         cwd=ROOT_DIR,
         env=env_backend,
@@ -112,7 +232,7 @@ def e2e_urls(pytestconfig: pytest.Config) -> Generator[dict[str, str], None, Non
     env_front["CI"] = "true"
 
     frontend_process = subprocess.Popen(
-        ["npm", "run", "dev", "--", "--host", "127.0.0.1", "--port", "3000"],
+        ["npm", "run", "dev", "--", "--host", "127.0.0.1", "--port", str(frontend_port)],
         cwd=FRONTEND_DIR,
         env=env_front,
         stdout=subprocess.DEVNULL,

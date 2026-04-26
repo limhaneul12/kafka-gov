@@ -45,6 +45,7 @@ class GetSubjectDetailUseCase:
 
         info = describe_res[subject]
         artifact = await self.metadata_repository.get_latest_artifact(subject)
+        metadata = await self.metadata_repository.get_schema_metadata(subject)
 
         # Policy 검증 수행
         env_str = subject.split(".")[0] if "." in subject else "dev"
@@ -58,14 +59,21 @@ class GetSubjectDetailUseCase:
         violations = []
         policy_score = 1.0
         if info.schema:
+            artifact_compatibility = (
+                artifact.compatibility_mode
+                if artifact and artifact.compatibility_mode
+                else DomainCompatibilityMode.NONE
+            )
             spec_mock = DomainSchemaSpec(
                 subject=subject,
                 schema=info.schema,
                 schema_type=DomainSchemaType(info.schema_type)
                 if info.schema_type
                 else DomainSchemaType.AVRO,
-                compatibility=DomainCompatibilityMode(
-                    artifact.compatibility_mode if artifact else "NONE"
+                compatibility=(
+                    artifact_compatibility
+                    if isinstance(artifact_compatibility, DomainCompatibilityMode)
+                    else DomainCompatibilityMode(artifact_compatibility)
                 ),
             )
             violations = policy_engine.evaluate(spec_mock, env=env_str)
@@ -84,7 +92,11 @@ class GetSubjectDetailUseCase:
             )
             if artifact and artifact.compatibility_mode
             else "NONE",
-            owner=artifact.owner if artifact else None,
+            owner=(metadata.get("owner") if metadata else None)
+            or (artifact.owner if artifact else None),
+            doc=metadata.get("doc") if metadata else None,
+            tags=metadata.get("tags") if metadata else [],
+            description=metadata.get("description") if metadata else None,
             updated_at=datetime.now().isoformat(),
             violations=[
                 {"rule": v.rule, "message": v.message, "severity": v.severity} for v in violations

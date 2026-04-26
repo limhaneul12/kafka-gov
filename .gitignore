@@ -214,3 +214,4 @@ alembic.ini
 cluster.md
 promt/
 .sisyphus/
+.omx/

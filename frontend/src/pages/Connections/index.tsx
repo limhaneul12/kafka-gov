@@ -1,27 +1,21 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Plus } from "lucide-react";
+
+import AddConnectionModal from "../../components/connection/AddConnectionModal";
 import { Card } from "../../components/ui/Card";
 import Button from "../../components/ui/Button";
 import Loading from "../../components/ui/Loading";
-import AddConnectionModal from "../../components/connection/AddConnectionModal";
-import { useConnections } from "./hooks/useConnections";
-import { KafkaClusterList } from "./components/KafkaClusterList";
 import { SchemaRegistryList } from "./components/SchemaRegistryList";
-import type { ConnectionType } from "./Connections.types";
-
-type TabType = "kafka" | "registry";
+import { useConnections } from "./hooks/useConnections";
 
 export default function Connections() {
   const { t } = useTranslation();
-  const [activeTab, setActiveTab] = useState<TabType>("kafka");
   const [showAddModal, setShowAddModal] = useState(false);
-  const [addType, setAddType] = useState<ConnectionType>("kafka");
   const [editMode, setEditMode] = useState(false);
   const [editData, setEditData] = useState<Record<string, unknown> | undefined>();
 
   const {
-    clusters,
     registries,
     loading,
     addConnection,
@@ -31,24 +25,11 @@ export default function Connections() {
     activateConnection,
   } = useConnections();
 
-  const handleAddClick = (type: ConnectionType) => {
-    setAddType(type);
-    setEditMode(false);
-    setEditData(undefined);
-    setShowAddModal(true);
-  };
-
-  const handleEdit = (type: ConnectionType, data: unknown) => {
-    setAddType(type);
+  const handleEdit = (data: unknown) => {
     setEditMode(true);
     setEditData(data as Record<string, unknown>);
     setShowAddModal(true);
   };
-
-  const tabs = [
-    { id: "kafka" as TabType, label: t("connection.broker"), count: clusters.length },
-    { id: "registry" as TabType, label: t("connection.registry"), count: registries.length },
-  ];
 
   if (loading) {
     return (
@@ -60,72 +41,30 @@ export default function Connections() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold text-gray-900">{t("connection.list")}</h1>
-          <p className="mt-2 text-gray-600">
-            {t("connection.description")}
-          </p>
+          <p className="mt-2 text-gray-600">Schema Registry connections used by the schema governance workflow.</p>
         </div>
       </div>
 
-      {/* Tabs */}
-      <div className="border-b border-gray-200">
-        <nav className="flex gap-8">
-          {tabs.map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              className={`pb-4 px-1 border-b-2 font-medium text-sm transition-colors ${
-                activeTab === tab.id
-                  ? "border-blue-600 text-blue-600"
-                  : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
-              }`}
-            >
-              {tab.label}
-              <span className="ml-2 px-2 py-0.5 rounded-full text-xs bg-gray-100">
-                {tab.count}
-              </span>
-            </button>
-          ))}
-        </nav>
-      </div>
-
-      {/* Add Button */}
       <div className="flex justify-end">
-        <Button onClick={() => handleAddClick(activeTab)}>
+        <Button onClick={() => setShowAddModal(true)}>
           <Plus className="h-4 w-4" />
           {t("connection.add")}
         </Button>
       </div>
 
-      {/* Content */}
       <Card className="p-6">
-        {activeTab === "kafka" && (
-          <KafkaClusterList
-            clusters={clusters}
-            onEdit={(cluster) => handleEdit("kafka", cluster)}
-            onDelete={(id, name) => deleteConnection("kafka", id, name)}
-            onTest={(id, name) => testConnection("kafka", id, name)}
-            onActivate={(id) => activateConnection("kafka", id)}
-          />
-        )}
-
-        {activeTab === "registry" && (
-          <SchemaRegistryList
-            registries={registries}
-            onEdit={(registry) => handleEdit("registry", registry)}
-            onDelete={(id, name) => deleteConnection("registry", id, name)}
-            onTest={(id, name) => testConnection("registry", id, name)}
-            onActivate={(id) => activateConnection("registry", id)}
-          />
-        )}
-
-        {/* Kafka Connect 탭 및 목록은 기능 제거로 인해 더 이상 표시하지 않습니다. */}
+        <SchemaRegistryList
+          registries={registries}
+          onEdit={handleEdit}
+          onDelete={(id, name) => deleteConnection(id, name)}
+          onTest={(id, name) => testConnection(id, name)}
+          onActivate={(id) => activateConnection(id)}
+        />
       </Card>
 
-      {/* Add/Edit Modal */}
       <AddConnectionModal
         isOpen={showAddModal}
         onClose={() => {
@@ -135,7 +74,6 @@ export default function Connections() {
         }}
         onSubmit={addConnection}
         onUpdate={updateConnection}
-        defaultType={addType}
         editMode={editMode}
         initialData={editData}
       />

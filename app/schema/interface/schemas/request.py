@@ -16,7 +16,7 @@ from pydantic import (
     model_validator,
 )
 
-from app.shared.approval import ApprovalOverride
+from app.schema.governance_support.approval import ApprovalOverride
 
 from ..types.enums import (
     CompatibilityMode,
@@ -127,7 +127,7 @@ class SchemaBatchRequest(BaseModel):
                 "kind": "SchemaBatch",
                 "env": "prod",
                 "change_id": "2025-09-25_001",
-                "subjectStrategy": "TopicNameStrategy",
+                "subjectStrategy": "SubjectNameStrategy",
                 "items": [
                     {
                         "subject": "prod.orders.created-value",
@@ -148,7 +148,7 @@ class SchemaBatchRequest(BaseModel):
     env: Environment
     change_id: ChangeId
     subject_strategy: SubjectStrategy = Field(
-        default=SubjectStrategy.TOPIC_NAME,
+        default=SubjectStrategy.SUBJECT_NAME,
         validation_alias=AliasChoices("subjectStrategy", "subject_strategy"),
         serialization_alias="subjectStrategy",
     )
@@ -188,9 +188,8 @@ class SchemaBatchRequest(BaseModel):
 
     @model_validator(mode="after")
     def validate_env_consistency(self) -> SchemaBatchRequest:
-        """환경 접두사 및 호환성 기본값 적용"""
+        """환경 접두사 및 호환성 명시 여부 검증"""
         prefix = self.env.value
-        adjusted_items: list[SchemaBatchItem] = []
 
         for item in self.items:
             subject_env = item.subject.split(".")[0]
@@ -201,16 +200,11 @@ class SchemaBatchRequest(BaseModel):
                 )
 
             if item.compatibility is None:
-                default_mode = (
-                    CompatibilityMode.FULL
-                    if self.env is Environment.PROD
-                    else CompatibilityMode.BACKWARD
+                raise ValueError(
+                    f"compatibility must be explicitly provided for subject '{item.subject}'"
                 )
-                adjusted_items.append(item.model_copy(update={"compatibility": default_mode}))
-            else:
-                adjusted_items.append(item)
 
-        return self.model_copy(update={"items": adjusted_items})
+        return self
 
 
 class SchemaChangeRequest(BaseModel):
@@ -218,7 +212,7 @@ class SchemaChangeRequest(BaseModel):
 
     subject: str
     new_schema: str
-    compatibility: CompatibilityMode = CompatibilityMode.BACKWARD
+    compatibility: CompatibilityMode
     reason: ReasonText | None = Field(
         default=None,
         validation_alias=AliasChoices("reason", "business_purpose", "businessPurpose"),
@@ -235,4 +229,28 @@ class RollbackRequest(BaseModel):
         default=None,
         validation_alias=AliasChoices("reason", "business_purpose", "businessPurpose"),
         serialization_alias="reason",
+    )
+
+
+class RollbackExecuteRequest(RollbackRequest):
+    """스키마 롤백 실행 요청"""
+
+    approval_override: ApprovalOverride | None = Field(
+        default=None,
+        validation_alias=AliasChoices("approvalOverride", "approval_override"),
+        serialization_alias="approvalOverride",
+    )
+
+
+class SchemaSettingsUpdateRequest(BaseModel):
+    """스키마 메타데이터/호환성 설정 업데이트 요청"""
+
+    owner: str | None = None
+    doc: str | None = None
+    tags: list[str] | None = None
+    description: str | None = None
+    compatibility_mode: CompatibilityMode | None = Field(
+        default=None,
+        validation_alias=AliasChoices("compatibilityMode", "compatibility_mode"),
+        serialization_alias="compatibilityMode",
     )

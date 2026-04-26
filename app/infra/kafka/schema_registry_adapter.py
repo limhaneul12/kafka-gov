@@ -7,6 +7,7 @@ from typing import Any, NoReturn, cast
 
 import orjson
 from confluent_kafka.schema_registry import AsyncSchemaRegistryClient, Schema, ServerConfig
+from confluent_kafka.schema_registry.common.schema_registry_client import ConfigCompatibilityLevel
 from confluent_kafka.schema_registry.error import SchemaRegistryError
 
 from app.schema.domain.models import (
@@ -45,27 +46,7 @@ class ConfluentSchemaRegistryAdapter(ISchemaRegistryRepository):
                 continue
 
             try:
-                latest_version = await self.client.get_latest_version(subject)
-
-                if latest_version and latest_version.schema:
-                    schema_str = latest_version.schema.schema_str or ""
-
-                    result[subject] = SchemaVersionInfo(
-                        version=latest_version.version,
-                        schema_id=latest_version.schema_id,
-                        schema=schema_str,
-                        schema_type=latest_version.schema.schema_type,
-                        references=[
-                            Reference(
-                                name=ref.name,
-                                subject=ref.subject,
-                                version=ref.version,
-                            )
-                            for ref in (getattr(latest_version, "references", None) or [])
-                        ],
-                        hash=self._calculate_schema_hash(schema_str),
-                        canonical_hash=self._canonicalize_and_hash(schema_str),
-                    )
+                result[subject] = await self._get_latest_schema_version_info(subject)
             except SchemaRegistryError as e:
                 logger.warning(
                     "schema_fetch_failed",
@@ -187,10 +168,8 @@ class ConfluentSchemaRegistryAdapter(ISchemaRegistryRepository):
                 schema=schema_obj,
                 normalize_schemas=True,
             )
-
-            latest_version = await self.client.get_latest_version(spec.subject)
-
-            if latest_version and latest_version.version is not None:
+            latest_version = await self._get_latest_schema_version_info(spec.subject)
+            if latest_version.version is not None:
                 logger.info(
                     f"Schema registered: {spec.subject} v{latest_version.version} (ID: {schema_id})"
                 )
@@ -207,6 +186,15 @@ class ConfluentSchemaRegistryAdapter(ISchemaRegistryRepository):
             logger.info(f"Subject deleted: {subject} ({len(deleted_versions)} versions)")
         except SchemaRegistryError as exc:
             self._raise_schema_registry_runtime_error("Delete subject", exc, subject)
+
+    async def delete_version(self, subject: SubjectName, version: int) -> None:
+        try:
+            deleted_version = await self.client.delete_version(subject, version)
+            logger.info(f"Schema version deleted: {subject} v{deleted_version}")
+        except SchemaRegistryError as exc:
+            self._raise_schema_registry_runtime_error(
+                "Delete schema version", exc, f"{subject} v{version}"
+            )
 
     async def list_all_subjects(self) -> list[SubjectName]:
         try:
@@ -229,23 +217,26 @@ class ConfluentSchemaRegistryAdapter(ISchemaRegistryRepository):
         schema_version = await self.client.get_version(subject, version)
 
         if schema_version and schema_version.schema:
+            schema_str = schema_version.schema.schema_str or ""
             return SchemaVersionInfo(
                 version=schema_version.version,
                 schema_id=schema_version.schema_id,
-                schema=schema_version.schema.schema_str,
+                schema=schema_str,
                 schema_type=schema_version.schema.schema_type,
                 references=[
                     Reference(name=ref.name, subject=ref.subject, version=ref.version)
                     for ref in (getattr(schema_version, "references", None) or [])
                 ],
-                hash=self._calculate_schema_hash(schema_version.schema.schema_str or ""),
+                hash=self._calculate_schema_hash(schema_str),
+                canonical_hash=self._canonicalize_and_hash(schema_str),
             )
 
         raise RuntimeError(f"Schema not found for {subject} version {version}")
 
     async def set_compatibility_mode(self, subject: SubjectName, mode: str) -> None:
         try:
-            config = ServerConfig(compatibility=cast(Any, mode))
+            compatibility_level = ConfigCompatibilityLevel(mode)
+            config = ServerConfig(compatibility=cast(Any, compatibility_level))
             await self.client.set_config(subject_name=subject, config=config)
             logger.info(f"Compatibility mode set: {subject} -> {mode}")
         except SchemaRegistryError as exc:
@@ -295,6 +286,30 @@ class ConfluentSchemaRegistryAdapter(ISchemaRegistryRepository):
             schema_str = schema_str.encode("ascii", "backslashreplace").decode("ascii")
 
         return schema_str
+
+    async def _get_latest_schema_version_info(self, subject: SubjectName) -> SchemaVersionInfo:
+        versions = await self.client.get_versions(subject)
+        if not versions:
+            raise RuntimeError(f"Schema not found for {subject}")
+
+        latest_version = max(versions)
+        schema_version = await self.client.get_version(subject, latest_version)
+        if not schema_version or not schema_version.schema:
+            raise RuntimeError(f"Schema not found for {subject} version {latest_version}")
+
+        schema_str = schema_version.schema.schema_str or ""
+        return SchemaVersionInfo(
+            version=schema_version.version,
+            schema_id=schema_version.schema_id,
+            schema=schema_str,
+            schema_type=schema_version.schema.schema_type,
+            references=[
+                Reference(name=ref.name, subject=ref.subject, version=ref.version)
+                for ref in (getattr(schema_version, "references", None) or [])
+            ],
+            hash=self._calculate_schema_hash(schema_str),
+            canonical_hash=self._canonicalize_and_hash(schema_str),
+        )
 
     def _raise_schema_registry_runtime_error(
         self,

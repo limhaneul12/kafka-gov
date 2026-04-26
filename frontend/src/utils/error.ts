@@ -2,12 +2,17 @@
  * API 에러 처리 유틸리티
  */
 
+export const DEFAULT_UNKNOWN_ERROR_MESSAGE = '알 수 없는 오류가 발생했습니다.';
+
 /**
  * Axios 에러에서 상세 메시지 추출
  */
-export function extractErrorMessage(error: unknown): string {
+export function extractErrorMessage(
+  error: unknown,
+  fallback = '알 수 없는 오류가 발생했습니다.',
+): string {
   // 기본 에러 메시지
-  let errorMessage = '알 수 없는 오류가 발생했습니다.';
+  let errorMessage = fallback;
 
   // Axios 에러 응답 파싱
   if (error && typeof error === 'object' && 'response' in error) {
@@ -60,6 +65,17 @@ export function isHttpError(error: unknown, statusCode: number): boolean {
     return axiosError.response?.status === statusCode;
   }
   return false;
+}
+
+/**
+ * Axios 에러에서 HTTP 상태 코드 추출
+ */
+export function extractErrorStatus(error: unknown): number | undefined {
+  if (error && typeof error === 'object' && 'response' in error) {
+    const axiosError = error as { response?: { status?: number } };
+    return axiosError.response?.status;
+  }
+  return undefined;
 }
 
 /**

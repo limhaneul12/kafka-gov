@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom';
 import { Badge } from '../../components/common/Badge';
 import { SearchBar } from '../../components/schema/SearchBar';
 import { useSchemaList } from '../../hooks/schema/useSchemaList';
-import type { SchemaRegistry } from '../../types';
 import type { SchemaArtifactResponse } from '../../types/schema';
 import { formatDistanceToNow } from 'date-fns';
 
@@ -63,8 +62,9 @@ const SchemaItem = ({ schema, onClick }: { schema: SchemaArtifactResponse; onCli
 import { Plus, RefreshCw, BookOpen, GitCommit, ChevronRight, Database } from 'lucide-react';
 import { Button } from '../../components/common/Button';
 import UploadSchemaModal from '../../components/schema/UploadSchemaModal';
-import { clustersAPI, schemasAPI } from '../../services/api';
+import { schemasAPI } from '../../services/api';
 import { toast } from 'sonner';
+import { requireActiveRegistry, resolveActiveRegistry, toastGovernanceError } from '../../utils/schemaGovernance';
 
 // ... inside SchemaList ...
 
@@ -75,25 +75,29 @@ export default function SchemaList() {
     const [activeRegistryId, setActiveRegistryId] = useState<string | null>(null);
 
     useEffect(() => {
-        fetchSchemas();
-        // Get active registry for upload/sync
-        clustersAPI.listRegistries().then(res => {
-            const active = res.data.find((registry: SchemaRegistry) => registry.is_active) || res.data[0];
-            if (active) setActiveRegistryId(active.registry_id);
-        });
+        void fetchSchemas();
+
+        const loadActiveRegistry = async () => {
+            const activeRegistry = await resolveActiveRegistry();
+            setActiveRegistryId(activeRegistry?.registry_id ?? null);
+        };
+
+        void loadActiveRegistry();
     }, [fetchSchemas]);
 
     const handleSync = async () => {
-        if (!activeRegistryId) {
-            toast.error('No active Schema Registry found');
+        const activeRegistry = await requireActiveRegistry();
+
+        if (!activeRegistry) {
             return;
         }
+
         try {
-            await schemasAPI.sync(activeRegistryId);
+            await schemasAPI.sync(activeRegistry.registry_id);
             toast.success('Sync successful');
-            fetchSchemas();
-        } catch {
-            toast.error('Sync failed');
+            await fetchSchemas();
+        } catch (error) {
+            toastGovernanceError('Sync failed', error);
         }
     };
 
@@ -101,9 +105,9 @@ export default function SchemaList() {
         try {
             await schemasAPI.upload(regId, formData);
             toast.success('Upload successful');
-            fetchSchemas();
+            await fetchSchemas();
         } catch (error: unknown) {
-            toast.error('Upload failed');
+            toastGovernanceError('Upload failed', error);
             throw error;
         }
     };
@@ -115,11 +119,11 @@ export default function SchemaList() {
                     <div>
                         <div className="flex items-center gap-2 mb-2 text-[#57606a]">
                             <Database className="w-5 h-5" />
-                            <span className="text-sm font-semibold uppercase tracking-wide">Registry Explorer</span>
+                            <span className="text-sm font-semibold uppercase tracking-wide">Schema Registry</span>
                         </div>
                         <h1 className="text-2xl font-bold text-[#24292f]">Schema Subjects</h1>
                         <p className="text-sm text-[#57606a] mt-1">
-                            Manage and version your Kafka message schemas across all clusters.
+                            Manage and version your registered schemas from the active Schema Registry.
                         </p>
                     </div>
                     <div className="flex gap-2">

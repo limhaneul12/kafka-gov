@@ -36,9 +36,9 @@ class DomainCompatibilityMode(str, Enum):
 class DomainSubjectStrategy(str, Enum):
     """스키마 주제 전략"""
 
-    TOPIC_NAME = "TopicNameStrategy"
+    SUBJECT_NAME = "SubjectNameStrategy"
     RECORD_NAME = "RecordNameStrategy"
-    TOPIC_RECORD_NAME = "TopicRecordNameStrategy"
+    SUBJECT_RECORD_NAME = "SubjectRecordNameStrategy"
 
 
 class DomainSchemaSourceType(str, Enum):

@@ -12,8 +12,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.infra.kafka.connection_manager import IConnectionManager
 from app.infra.kafka.schema_registry_adapter import ConfluentSchemaRegistryAdapter
 from app.schema.application.services.catalog_sync import CatalogSyncService
-from app.shared.actor import merge_actor_metadata
-from app.shared.constants import AuditAction, AuditStatus, AuditTarget
+from app.schema.governance_support.actor import merge_actor_metadata
+from app.schema.governance_support.constants import AuditAction, AuditStatus, AuditTarget
 
 from ....domain.models import DomainSchemaArtifact
 from ....domain.repositories.interfaces import (
@@ -99,12 +99,10 @@ class SchemaSyncUseCase:
                 try:
                     await self.metadata_repository.record_artifact(artifact, change_id)
 
-                    # 메타데이터 자동 생성 (목록에 나타나도록)
+                    # placeholder owner/compatibility는 주입하지 않고 동기화 행만 남긴다.
                     await self.metadata_repository.save_schema_metadata(
                         subject,
                         {
-                            "owner": "team",
-                            "compatibility_mode": "BACKWARD",
                             "created_by": actor,
                             "updated_by": actor,
                         },

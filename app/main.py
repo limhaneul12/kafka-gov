@@ -1,4 +1,4 @@
-"""Kafka Governance API 메인 애플리케이션"""
+"""Data Governance API main application."""
 
 from __future__ import annotations
 
@@ -10,19 +10,16 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import ORJSONResponse
 
-from .cluster.interface.router import router as cluster_router
 from .container import AppContainer
+from .registry_connections.interface.router import router as registry_connection_router
 from .schema.interface.router import router as schema_router
 from .schema.interface.routers.policy_router import router as schema_policy_router
 from .shared.error_handlers import format_validation_error
-from .shared.interface.router import router as shared_router
 from .shared.logging_config import configure_structlog, get_logger
 from .shared.middleware import RequestLoggingMiddleware
 from .shared.settings import settings
 
-# structlog 초기화 (애플리케이션 최상단에서 1회만)
 configure_structlog()
-
 logger = get_logger(__name__)
 
 
@@ -45,21 +42,19 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         )
         raise
     finally:
-        # Resource 종료
         container.shutdown_resources()
         logger.info("app_shutdown_completed")
 
 
 def create_app() -> FastAPI:
-    # 환경별 API 문서 설정 (프로덕션에서는 비활성화)
     docs_url = None if settings.is_production else "/swagger"
     redoc_url = None if settings.is_production else "/redoc"
     openapi_url = None if settings.is_production else "/openapi.json"
 
     app = FastAPI(
         default_response_class=ORJSONResponse,
-        title="Kafka Governance API",
-        description="Schema Registry, connection management, and governance API",
+        title="Data Governance API",
+        description="Schema Registry connections and schema governance API",
         version="0.1.0",
         docs_url=docs_url,
         redoc_url=redoc_url,
@@ -78,7 +73,6 @@ def create_app() -> FastAPI:
         },
     )
 
-    # CORS - 환경별 설정
     cors_origins = settings.parsed_cors_origins
     logger.info(
         "cors_configured",
@@ -86,9 +80,7 @@ def create_app() -> FastAPI:
         environment=settings.environment,
     )
 
-    # Request Logging Middleware (trace_id 전파)
     app.add_middleware(RequestLoggingMiddleware)  # type: ignore[arg-type]
-
     app.add_middleware(
         CORSMiddleware,  # type: ignore[arg-type]
         allow_origins=cors_origins,
@@ -98,30 +90,21 @@ def create_app() -> FastAPI:
         expose_headers=["X-Request-ID"],
     )
 
-    # ✅ 컨테이너 인스턴스 생성 & 보관
     container = AppContainer()
     app.state.container = container
-
-    # (선택) 하위 컨테이너 인스턴스를 접근 용도로 보관하고 싶다면 호출해서 저장
     app.state.infrastructure_container = container.infrastructure_container()
-    app.state.cluster_container = container.cluster_container()
+    app.state.registry_container = container.registry_container()
     app.state.schema_container = container.schema_container()
 
-    # ✅ (중요) 와이어링 - wiring_config가 있으면 생략 가능하지만,
-    # 명시적으로 호출하면 import 타이밍 이슈를 줄일 수 있음
     container.wire(
         packages=[
-            # 라우터/핸들러 패키지들
-            "app.cluster.interface",
+            "app.registry_connections.interface",
             "app.schema.interface",
             "app.schema.interface.routers",
-            "app.shared.interface",
         ]
     )
 
-    # 라우터 등록
-    app.include_router(shared_router, prefix="/api")
-    app.include_router(cluster_router, prefix="/api")  # Cluster API
+    app.include_router(registry_connection_router, prefix="/api")
     app.include_router(schema_router, prefix="/api")
     app.include_router(schema_policy_router, prefix="/api")
 
@@ -130,7 +113,7 @@ def create_app() -> FastAPI:
     @app.get("/api/v1")
     @app.get("/api/v1/")
     async def api_info() -> dict[str, str]:
-        return {"message": "Kafka Governance API", "version": "1.0.0"}
+        return {"message": "Data Governance API", "version": "1.0.0"}
 
     @app.get("/health")
     async def health_check() -> dict[str, str]:
@@ -138,25 +121,16 @@ def create_app() -> FastAPI:
 
     @app.exception_handler(RequestValidationError)
     async def validation_exception_handler(request: Request, exc: RequestValidationError):
-        """Pydantic validation 에러를 사용자 친화적인 메시지로 변환"""
-        # 구조화된 로깅 (trace_id는 middleware에서 자동 추가됨)
         logger.error(
             "validation_error",
             error_count=len(exc.errors()),
             errors=exc.errors(),
         )
-
-        # 사용자 친화적인 메시지로 변환
         friendly_message = format_validation_error(exc)  # type: ignore[arg-type]
-
-        return ORJSONResponse(
-            status_code=422,
-            content={"detail": friendly_message},
-        )
+        return ORJSONResponse(status_code=422, content={"detail": friendly_message})
 
     @app.exception_handler(HTTPException)
     async def http_exception_handler(request: Request, exc: HTTPException):
-        """HTTPException 핸들러 - 5xx 에러인 경우 상세 메시지 마스킹"""
         if exc.status_code >= 500:
             logger.error(
                 "internal_server_error",
@@ -170,14 +144,10 @@ def create_app() -> FastAPI:
                     "detail": "An unexpected server error occurred. Please contact the administrator."
                 },
             )
-        return ORJSONResponse(
-            status_code=exc.status_code,
-            content={"detail": exc.detail},
-        )
+        return ORJSONResponse(status_code=exc.status_code, content={"detail": exc.detail})
 
     @app.exception_handler(Exception)
     async def global_exception_handler(request: Request, exc: Exception):
-        """Unhandled Exception 핸들러 - 상세 로깅 후 사용자에게는 일반 메시지 반환"""
         logger.error(
             "unhandled_exception",
             error_type=exc.__class__.__name__,

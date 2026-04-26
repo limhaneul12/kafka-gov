@@ -11,7 +11,7 @@ app/
 |- main.py        # FastAPI app factory and lifespan
 |- container.py   # top-level DI wiring
 |- shared/        # settings, middleware, infra glue
-|- cluster/       # connection management
+|- registry_connections/  # schema registry connection management
 `- schema/        # schema registry and policy workflows
 ```
 
@@ -21,14 +21,14 @@ app/
 |------|----------|-------|
 | FastAPI startup | `app/main.py` | routers, lifespan, exception handlers |
 | DI wiring | `app/container.py` | only composition root should wire broadly |
-| Shared runtime config | `app/shared/settings.py` | DB/env precedence and Redis/cache config |
+| Shared runtime config | `app/shared/settings.py` | DB/env precedence and runtime config |
 | Shared infra | `app/shared/` | middleware, logging, database, common utilities |
 | Schema details | `app/schema/README.md` | schema governance and registry flows |
 
 ## CONVENTIONS
 
 - Keep dependency direction one-way: `interface -> application -> domain <- infrastructure`.
-- Use absolute imports inside backend modules (`app.schema...`, `app.cluster...`, `app.shared...`).
+- Use absolute imports inside backend modules (`app.schema...`, `app.registry_connections...`, `app.shared...`).
 - Keep Python typing in native 3.12 style (`list[str]`, `str | None`) rather than legacy `typing` aliases.
 - Put environment/bootstrap concerns in `app/shared/settings.py`; do not scatter env parsing across modules.
 - Treat module READMEs as feature docs and this file as workflow guidance.

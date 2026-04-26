@@ -30,10 +30,10 @@ from app.schema.domain.repositories.interfaces import (
     ISchemaMetadataRepository,
 )
 from app.schema.domain.services import SchemaPlannerService
-from app.shared.application.use_cases import CreateApprovalRequestUseCase
-from app.shared.approval import ApprovalRequiredError
+from app.schema.governance_support.use_cases import CreateApprovalRequestUseCase
+from app.schema.governance_support.approval import ApprovalRequiredError
 from app.shared.database import DatabaseManager
-from app.shared.infrastructure.repository import SQLApprovalRequestRepository
+from app.schema.governance_support.infrastructure.repository import SQLApprovalRequestRepository
 
 
 class _SchemaAuditRepository:
@@ -88,7 +88,7 @@ def _schema_batch() -> DomainSchemaBatch:
     return DomainSchemaBatch(
         change_id="chg-schema-approval-auto-001",
         env=SchemaEnvironment.STG,
-        subject_strategy=DomainSubjectStrategy.TOPIC_NAME,
+        subject_strategy=DomainSubjectStrategy.SUBJECT_NAME,
         specs=(spec,),
     )
 

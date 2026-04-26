@@ -1,3 +1,8 @@
+import {
+  promptForOptionalGovernanceInput,
+  promptForRequiredGovernanceInput,
+} from "./schemaGovernancePrompts";
+
 export interface ApprovalOverridePayload {
   reason: string;
   approver: string;
@@ -5,19 +10,21 @@ export interface ApprovalOverridePayload {
 }
 
 export function promptApprovalOverride(changeLabel: string): ApprovalOverridePayload | null {
-  const reason = window.prompt(`High-risk ${changeLabel}. Enter override reason:`)?.trim();
+  const reason = promptForRequiredGovernanceInput(
+    `High-risk ${changeLabel}. Enter override reason:`,
+  );
   if (!reason) {
     return null;
   }
 
-  const approver = window.prompt(`Enter approver for ${changeLabel}:`)?.trim();
+  const approver = promptForRequiredGovernanceInput(`Enter approver for ${changeLabel}:`);
   if (!approver) {
     return null;
   }
 
-  const expiresAtInput = window.prompt(
-    "Enter expiration as ISO 8601 (leave blank for 24 hours from now):"
-  )?.trim();
+  const expiresAtInput = promptForOptionalGovernanceInput(
+    "Enter expiration as ISO 8601 (leave blank for 24 hours from now):",
+  );
 
   let expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
   if (expiresAtInput) {

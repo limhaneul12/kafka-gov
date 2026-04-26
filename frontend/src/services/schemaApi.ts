@@ -1,7 +1,9 @@
 import axios from 'axios';
 import {
+    type ApprovalRequestResponse,
+    type AuditActivityResponse,
     type DashboardResponse,
-    type KnownTopicNamesResponse,
+    type SchemaDriftResponse,
     type SchemaHistoryResponse,
     type SchemaSearchParams,
     type SchemaSearchResponse,
@@ -9,11 +11,9 @@ import {
 import type { SchemaPolicyStatus } from '../types/schemaPolicy';
 import type { SchemaPolicyFormInput, SchemaPolicyRecord } from '../types/schemaPolicy';
 
-// Vite Proxy 설정으로 가정 (/api -> Backend)
 const BASE_URL = '/api/v1/schemas';
 
 const schemaApi = {
-    // 거버넌스 대시보드
     getDashboardStats: async (registryId: string): Promise<DashboardResponse> => {
         const response = await axios.get<DashboardResponse>(`${BASE_URL}/governance/dashboard`, {
             params: { registry_id: registryId },
@@ -21,7 +21,6 @@ const schemaApi = {
         return response.data;
     },
 
-    // 스키마 단건 상세 조회
     getDetail: async (subject: string, registryId: string): Promise<unknown> => {
         const response = await axios.get(`${BASE_URL}/detail/${encodeURIComponent(subject)}`, {
             params: { registry_id: registryId },
@@ -29,7 +28,6 @@ const schemaApi = {
         return response.data;
     },
 
-    // 스키마 검색
     searchSchemas: async (params: SchemaSearchParams): Promise<SchemaSearchResponse> => {
         const response = await axios.get<SchemaSearchResponse>(`${BASE_URL}/search`, {
             params,
@@ -37,7 +35,6 @@ const schemaApi = {
         return response.data;
     },
 
-    // 스키마 이력 조회
     getHistory: async (subject: string, registryId: string = 'default'): Promise<SchemaHistoryResponse> => {
         const response = await axios.get<SchemaHistoryResponse>(`${BASE_URL}/history/${encodeURIComponent(subject)}`, {
             params: { registry_id: registryId },
@@ -45,14 +42,71 @@ const schemaApi = {
         return response.data;
     },
 
-    getKnownTopicNames: async (subject: string, registryId: string = 'default'): Promise<KnownTopicNamesResponse> => {
-        const response = await axios.get<KnownTopicNamesResponse>(`${BASE_URL}/known-topics/${encodeURIComponent(subject)}`, {
+    getDrift: async (subject: string, registryId: string = 'default'): Promise<SchemaDriftResponse> => {
+        const response = await axios.get<SchemaDriftResponse>(`${BASE_URL}/drift/${encodeURIComponent(subject)}`, {
             params: { registry_id: registryId },
         });
         return response.data;
     },
 
-    // --- 정책 관리 (Policy Management) ---
+    listApprovalRequests: async (params?: {
+        status?: string;
+        resource_type?: string;
+        requested_by?: string;
+        limit?: number;
+    }): Promise<ApprovalRequestResponse[]> => {
+        const response = await axios.get<ApprovalRequestResponse[]>(`/api/v1/approval-requests`, { params });
+        return response.data;
+    },
+
+    getApprovalRequest: async (requestId: string): Promise<ApprovalRequestResponse> => {
+        const response = await axios.get<ApprovalRequestResponse>(`/api/v1/approval-requests/${requestId}`);
+        return response.data;
+    },
+
+    approveApprovalRequest: async (
+        requestId: string,
+        payload: { approver: string; decision_reason?: string },
+    ): Promise<ApprovalRequestResponse> => {
+        const response = await axios.post<ApprovalRequestResponse>(
+            `/api/v1/approval-requests/${requestId}/approve`,
+            payload,
+        );
+        return response.data;
+    },
+
+    rejectApprovalRequest: async (
+        requestId: string,
+        payload: { approver: string; decision_reason?: string },
+    ): Promise<ApprovalRequestResponse> => {
+        const response = await axios.post<ApprovalRequestResponse>(
+            `/api/v1/approval-requests/${requestId}/reject`,
+            payload,
+        );
+        return response.data;
+    },
+
+    getRecentAuditActivities: async (limit = 20): Promise<AuditActivityResponse[]> => {
+        const response = await axios.get<AuditActivityResponse[]>(`/api/v1/audit/recent`, {
+            params: { limit },
+        });
+        return response.data;
+    },
+
+    getAuditHistory: async (params?: {
+        from_date?: string;
+        to_date?: string;
+        activity_type?: string;
+        action?: string;
+        actor?: string;
+        limit?: number;
+    }): Promise<AuditActivityResponse[]> => {
+        const response = await axios.get<AuditActivityResponse[]>(`/api/v1/audit/history`, {
+            params,
+        });
+        return response.data;
+    },
+
     listPolicies: async (params?: { env?: string; policy_type?: string }): Promise<SchemaPolicyRecord[]> => {
         const response = await axios.get<SchemaPolicyRecord[]>(`/api/v1/schemas/policies`, { params });
         return response.data;

@@ -38,9 +38,87 @@ export interface SchemaHistoryResponse {
     history: SchemaHistoryItem[];
 }
 
-export interface KnownTopicNamesResponse {
+export interface SchemaVersionReferenceResponse {
+    name: string;
     subject: string;
-    topic_names: string[];
+    version: number;
+}
+
+export interface SchemaVersionSummaryResponse {
+    version: number;
+    schema_id: number;
+    schema_type: string;
+    hash: string;
+    canonical_hash: string | null;
+    created_at: string | null;
+    author: string | null;
+    commit_message: string | null;
+}
+
+export interface SchemaVersionListResponse {
+    subject: string;
+    versions: SchemaVersionSummaryResponse[];
+}
+
+export interface SchemaVersionDetailResponse extends SchemaVersionSummaryResponse {
+    subject: string;
+    schema_str: string;
+    references: SchemaVersionReferenceResponse[];
+    owner: string | null;
+    compatibility_mode: string | null;
+}
+
+export interface SchemaVersionCompareResponse {
+    subject: string;
+    from_version: number;
+    to_version: number;
+    changed: boolean;
+    diff_type: string;
+    changes: string[];
+    schema_type: string;
+    compatibility_mode: string | null;
+    from_schema: string | null;
+    to_schema: string | null;
+}
+
+export interface SchemaDriftResponse {
+    subject: string;
+    registry_latest_version: number;
+    registry_canonical_hash: string | null;
+    catalog_latest_version: number | null;
+    catalog_canonical_hash: string | null;
+    observed_version: number | null;
+    last_synced_at: string | null;
+    drift_flags: string[];
+    has_drift: boolean;
+}
+
+export interface ApprovalRequestResponse {
+    request_id: string;
+    resource_type: string;
+    resource_name: string;
+    change_type: string;
+    change_ref: string | null;
+    summary: string;
+    justification: string;
+    requested_by: string;
+    status: string;
+    approver: string | null;
+    decision_reason: string | null;
+    metadata: Record<string, unknown> | null;
+    requested_at: string;
+    decided_at: string | null;
+}
+
+export interface AuditActivityResponse {
+    activity_type: string;
+    action: string;
+    target: string;
+    message: string;
+    actor: string;
+    team: string | null;
+    timestamp: string;
+    metadata: Record<string, unknown> | null;
 }
 
 export interface SchemaArtifactResponse {

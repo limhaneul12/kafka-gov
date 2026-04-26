@@ -1,4 +1,4 @@
-"""Schema Interface Schemas - Export Module"""
+"""Schema interface schemas."""
 
 from .common import (
     PolicyViolation,
@@ -14,12 +14,26 @@ from .common import (
 from .governance import (
     DashboardResponse,
     GovernanceScore,
-    KnownTopicNamesResponse,
+    SchemaDriftResponse,
     SchemaHistoryItem,
     SchemaHistoryResponse,
+    SchemaSettingsResponse,
+    SchemaVersionCompareResponse,
+    SchemaVersionDetailResponse,
+    SchemaVersionListResponse,
+    SchemaVersionReferenceResponse,
+    SchemaVersionSummaryResponse,
     SubjectStat,
 )
-from .request import RollbackRequest, SchemaBatchItem, SchemaBatchRequest, SchemaChangeRequest
+from .operations import ApprovalDecisionRequest, ApprovalRequestResponse, AuditActivityResponse
+from .request import (
+    RollbackExecuteRequest,
+    RollbackRequest,
+    SchemaBatchItem,
+    SchemaBatchRequest,
+    SchemaChangeRequest,
+    SchemaSettingsUpdateRequest,
+)
 from .response import (
     SchemaBatchApplyResponse,
     SchemaBatchDryRunResponse,
@@ -31,13 +45,15 @@ from .response import (
 from .search import SchemaSearchResponse
 
 __all__ = [
+    "ApprovalDecisionRequest",
+    "ApprovalRequestResponse",
+    "AuditActivityResponse",
     "DashboardResponse",
     "GovernanceScore",
-    "KnownTopicNamesResponse",
     "PolicyViolation",
+    "RollbackExecuteRequest",
     "RollbackRequest",
     "SchemaArtifact",
-    "SchemaArtifactResponse",
     "SchemaBatchApplyResponse",
     "SchemaBatchDryRunResponse",
     "SchemaBatchItem",
@@ -46,6 +62,7 @@ __all__ = [
     "SchemaCompatibilityIssue",
     "SchemaCompatibilityReport",
     "SchemaDeleteImpactResponse",
+    "SchemaDriftResponse",
     "SchemaHistoryItem",
     "SchemaHistoryResponse",
     "SchemaImpactRecord",
@@ -53,9 +70,16 @@ __all__ = [
     "SchemaPlanItem",
     "SchemaReference",
     "SchemaSearchResponse",
+    "SchemaSettingsResponse",
+    "SchemaSettingsUpdateRequest",
     "SchemaSource",
     "SchemaSyncCatalogMetrics",
     "SchemaSyncResponse",
     "SchemaUploadResponse",
+    "SchemaVersionCompareResponse",
+    "SchemaVersionDetailResponse",
+    "SchemaVersionListResponse",
+    "SchemaVersionReferenceResponse",
+    "SchemaVersionSummaryResponse",
     "SubjectStat",
 ]

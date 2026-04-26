@@ -1,9 +1,8 @@
 import type { ElementType } from 'react';
-import { Database, History, Languages, LayoutDashboard, Link as LinkIcon, ShieldCheck } from 'lucide-react';
+import { ClipboardCheck, Database, Languages, Link as LinkIcon, Radar, ShieldCheck } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { NavLink, Outlet } from 'react-router-dom';
 
-// ... inside Sidebar ...
 const Sidebar = () => {
   const { i18n } = useTranslation();
   const toggleLanguage = () => {
@@ -16,27 +15,21 @@ const Sidebar = () => {
         <div className="bg-indigo-600 p-2 rounded-lg">
           <Database className="w-6 h-6 text-white" />
         </div>
-        <span className="font-bold text-xl text-slate-800 tracking-tight">Kafka Gov</span>
+        <span className="font-bold text-xl text-slate-800 tracking-tight">Data Gov</span>
       </div>
 
       <nav className="flex-1 p-4 space-y-6">
-          <div className="space-y-1">
-            <NavItem to="/schemas" icon={Database} label="Schema Registry" />
-          </div>
-
         <div className="space-y-4">
           <div className="px-4 flex items-center gap-2 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-            Governance
+            Schema Governance
           </div>
           <div className="space-y-1">
-            <NavItem to="/governance/dashboard" icon={LayoutDashboard} label="Dashboard" />
-            <NavItem to="/history" icon={History} label="History" />
+            <NavItem to="/schemas" icon={Database} label="Schemas" />
+            <NavItem to="/schemas/drift" icon={Radar} label="Drift Monitor" />
             <NavItem to="/schemas/policies" icon={ShieldCheck} label="Schema Policies" />
+            <NavItem to="/schemas/operations" icon={ClipboardCheck} label="Approvals & Audit" />
+            <NavItem to="/connections" icon={LinkIcon} label="Schema Registry" />
           </div>
-        </div>
-
-        <div className="space-y-1 pt-4 border-t border-slate-100">
-          <NavItem to="/connections" icon={LinkIcon} label="Connections" />
         </div>
       </nav>
 
@@ -49,15 +42,6 @@ const Sidebar = () => {
           <Languages className="w-5 h-5" />
           {i18n.language === 'ko' ? 'English' : '한국어'}
         </button>
-        <div className="flex items-center gap-3 px-4 py-2">
-          <div className="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center font-bold text-slate-500 text-xs">
-            AD
-          </div>
-          <div>
-            <p className="text-sm font-medium text-slate-700">Admin User</p>
-            <p className="text-xs text-slate-400">admin@example.com</p>
-          </div>
-        </div>
       </div>
     </aside>
   );

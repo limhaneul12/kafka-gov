@@ -7,8 +7,8 @@ from typing import Any
 from app.schema.domain.models import DomainSchemaBatch, DomainSchemaPlan
 from app.schema.domain.models.policy import DomainPolicyViolation
 from app.schema.domain.models.types_enum import DomainEnvironment
-from app.shared.domain.policy_types import DomainResourceType
-from app.shared.domain.preflight_policy import (
+from app.schema.governance_support.policy_types import DomainResourceType
+from app.schema.governance_support.preflight_policy import (
     DomainPolicyDecision,
     DomainPolicyPackEvaluation,
     DomainPolicyRuleResult,

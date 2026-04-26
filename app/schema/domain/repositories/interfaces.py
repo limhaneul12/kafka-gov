@@ -16,6 +16,7 @@ from ..models import (
     DomainSchemaSpec,
     DomainSchemaUploadResult,
     Reference,
+    SchemaVersionInfo,
     SubjectName,
 )
 from ..models.policy_management import DomainSchemaPolicy, SchemaPolicyStatus, SchemaPolicyType
@@ -45,12 +46,24 @@ class ISchemaRegistryRepository(ABC):
         """Subject 삭제"""
 
     @abstractmethod
+    async def delete_version(self, subject: SubjectName, version: int) -> None:
+        """Subject의 특정 버전 삭제"""
+
+    @abstractmethod
     async def list_all_subjects(self) -> list[SubjectName]:
         """Schema Registry의 모든 Subject 목록 조회"""
 
     @abstractmethod
     async def set_compatibility_mode(self, subject: SubjectName, mode: str) -> None:
         """Subject의 호환성 모드 설정"""
+
+    @abstractmethod
+    async def get_schema_versions(self, subject: SubjectName) -> list[int]:
+        """Subject의 전체 버전 목록 조회"""
+
+    @abstractmethod
+    async def get_schema_by_version(self, subject: SubjectName, version: int) -> SchemaVersionInfo:
+        """Subject의 특정 버전 상세 조회"""
 
 
 class ISchemaMetadataRepository(ABC):
@@ -85,6 +98,10 @@ class ISchemaMetadataRepository(ABC):
         """Subject별 아티팩트 삭제"""
 
     @abstractmethod
+    async def delete_artifacts_newer_than(self, subject: SubjectName, version: int) -> None:
+        """Subject의 특정 버전보다 새로운 아티팩트 삭제"""
+
+    @abstractmethod
     async def save_schema_metadata(self, subject: SubjectName, metadata: dict[str, Any]) -> None:
         """스키마 메타데이터 저장"""
 
@@ -105,6 +122,10 @@ class ISchemaMetadataRepository(ABC):
     @abstractmethod
     async def get_latest_artifact(self, subject: SubjectName) -> DomainSchemaArtifact | None:
         """Subject의 최신 아티팩트 조회"""
+
+    @abstractmethod
+    async def get_schema_metadata(self, subject: SubjectName) -> dict[str, Any] | None:
+        """Subject의 메타데이터 조회"""
 
 
 class ISchemaAuditRepository(ABC):

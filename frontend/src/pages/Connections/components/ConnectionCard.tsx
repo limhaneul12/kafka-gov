@@ -59,27 +59,39 @@ export function ConnectionCard({
               {t("connection.activate")}
             </Button>
           )}
-          <button
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
             onClick={onTest}
-            className="p-2 text-gray-400 hover:text-blue-600 rounded transition-colors"
+            className="p-2 text-gray-400 hover:text-blue-600"
             title={t("connection.test")}
+            aria-label={t("connection.test")}
           >
             <TestTube className="h-4 w-4" />
-          </button>
-          <button
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
             onClick={onEdit}
-            className="p-2 text-gray-400 hover:text-blue-600 rounded transition-colors"
+            className="p-2 text-gray-400 hover:text-blue-600"
             title={t("connection.edit")}
+            aria-label={t("connection.edit")}
           >
             <Edit className="h-4 w-4" />
-          </button>
-          <button
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
             onClick={onDelete}
-            className="p-2 text-gray-400 hover:text-red-600 rounded transition-colors"
+            className="p-2 text-gray-400 hover:text-red-600"
             title={t("connection.delete")}
+            aria-label={t("connection.delete")}
           >
             <Trash2 className="h-4 w-4" />
-          </button>
+          </Button>
         </div>
       </div>
 
