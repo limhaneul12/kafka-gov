@@ -1,13 +1,14 @@
 import { useEffect, useState } from 'react';
 
-import { registryAPI } from '../../services/api';
 import schemaApi from '../../services/schemaApi';
-import type { SchemaRegistry } from '../../types';
-import type { SchemaHistoryResponse } from '../../types/schema';
+import type { SchemaDriftResponse, SchemaHistoryResponse } from '../../types/schema';
+import { NO_ACTIVE_SCHEMA_REGISTRY_MESSAGE, resolveActiveRegistry, toastGovernanceError } from '../../utils/schemaGovernance';
+import { toast } from 'sonner';
 
 export function useSchemaDetail(subject: string | undefined, activeTab: string) {
     const [detailData, setDetailData] = useState<unknown>(null);
     const [historyData, setHistoryData] = useState<SchemaHistoryResponse | null>(null);
+    const [driftData, setDriftData] = useState<SchemaDriftResponse | null>(null);
     const [loading, setLoading] = useState(false);
 
     useEffect(() => {
@@ -19,24 +20,31 @@ export function useSchemaDetail(subject: string | undefined, activeTab: string) 
 
             setLoading(true);
             try {
-                const registriesRes = await registryAPI.list();
-                const registries = registriesRes.data as SchemaRegistry[] | undefined;
-                const activeRegistry = registries?.find((registry) => registry.is_active) ?? registries?.[0];
+                const activeRegistry = await resolveActiveRegistry();
 
                 if (!activeRegistry) {
                     console.error('No Schema Registry found');
+                    toast.error(NO_ACTIVE_SCHEMA_REGISTRY_MESSAGE);
                     return;
                 }
 
                 if (activeTab === 'overview') {
-                    const res = await schemaApi.getDetail(subject, activeRegistry.registry_id);
-                    setDetailData(res);
+                    const [detail, drift] = await Promise.all([
+                        schemaApi.getDetail(subject, activeRegistry.registry_id),
+                        schemaApi.getDrift(subject, activeRegistry.registry_id),
+                    ]);
+                    setDetailData(detail);
+                    setDriftData(drift);
                 } else if (activeTab === 'history') {
                     const res = await schemaApi.getHistory(subject, activeRegistry.registry_id);
                     setHistoryData(res);
                 }
             } catch (e) {
                 console.error('Failed to load detail data', e);
+                toastGovernanceError(
+                    activeTab === 'history' ? 'Failed to load schema history' : 'Failed to load schema overview',
+                    e,
+                );
             } finally {
                 setLoading(false);
             }
@@ -48,7 +56,8 @@ export function useSchemaDetail(subject: string | undefined, activeTab: string) 
     const reload = () => {
         setDetailData(null);
         setHistoryData(null);
+        setDriftData(null);
     };
 
-    return { detailData, historyData, loading, reload };
+    return { detailData, historyData, driftData, loading, reload };
 }

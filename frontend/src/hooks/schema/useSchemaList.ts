@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react';
 import schemaApi from '../../services/schemaApi';
 import type { SchemaArtifactResponse } from '../../types/schema';
+import { toastGovernanceError } from '../../utils/schemaGovernance';
 
 export function useSchemaList() {
     const [schemas, setSchemas] = useState<SchemaArtifactResponse[]>([]);
@@ -15,7 +16,7 @@ export function useSchemaList() {
             setTotal(res.total);
         } catch (error) {
             console.error('Search failed', error);
-            // TODO: Handle error state (toast notification, etc.)
+            toastGovernanceError('Schema search failed', error);
         } finally {
             setLoading(false);
         }

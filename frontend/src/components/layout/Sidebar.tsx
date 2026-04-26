@@ -1,5 +1,5 @@
 import type { ElementType } from 'react';
-import { Database, Languages, Link as LinkIcon, ShieldCheck } from 'lucide-react';
+import { ClipboardCheck, Database, Languages, Link as LinkIcon, Radar, ShieldCheck } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { NavLink, Outlet } from 'react-router-dom';
 
@@ -25,7 +25,9 @@ const Sidebar = () => {
           </div>
           <div className="space-y-1">
             <NavItem to="/schemas" icon={Database} label="Schemas" />
+            <NavItem to="/schemas/drift" icon={Radar} label="Drift Monitor" />
             <NavItem to="/schemas/policies" icon={ShieldCheck} label="Schema Policies" />
+            <NavItem to="/schemas/operations" icon={ClipboardCheck} label="Approvals & Audit" />
             <NavItem to="/connections" icon={LinkIcon} label="Schema Registry" />
           </div>
         </div>

@@ -3,6 +3,8 @@ import { Toaster } from 'sonner';
 
 import Layout from './components/layout/Sidebar';
 import Connections from './pages/Connections/index';
+import SchemaDrift from './pages/SchemaDrift';
+import SchemaOperations from './pages/SchemaOperations';
 import SchemaPolicies from './pages/SchemaPolicies';
 import SchemaDetail from './pages/schemas/SchemaDetail';
 import SchemaList from './pages/schemas/SchemaList';
@@ -15,8 +17,10 @@ function App() {
         <Route element={<Layout />}>
           <Route path="/" element={<Navigate to="/schemas" replace />} />
           <Route path="/schemas" element={<SchemaList />} />
+          <Route path="/schemas/drift" element={<SchemaDrift />} />
           <Route path="/schemas/:subject" element={<SchemaDetail />} />
           <Route path="/schemas/policies" element={<SchemaPolicies />} />
+          <Route path="/schemas/operations" element={<SchemaOperations />} />
           <Route path="/connections" element={<Connections />} />
           <Route path="*" element={<Navigate to="/schemas" replace />} />
         </Route>

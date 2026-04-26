@@ -1,5 +1,10 @@
 import axios from "axios";
 import type { SchemaRegistry } from "../types";
+import type {
+  SchemaVersionCompareResponse,
+  SchemaVersionDetailResponse,
+  SchemaVersionListResponse,
+} from "../types/schema";
 
 const api = axios.create({
   baseURL: "/api/",
@@ -85,6 +90,43 @@ export const schemasAPI = {
   ) => api.post(`/v1/schemas/plan-change?registry_id=${registryId}`, data),
   planRollback: (registryId: string, data: { subject: string; version: number }) =>
     api.post(`/v1/schemas/rollback/plan?registry_id=${registryId}`, data),
+  rollbackExecute: (registryId: string, data: object) =>
+    api.post(`/v1/schemas/rollback/execute?registry_id=${registryId}`, data),
+  updateSettings: (registryId: string, subject: string, data: object) =>
+    api.patch(`/v1/schemas/settings/${encodeURIComponent(subject)}?registry_id=${registryId}`, data),
+  listVersions: (registryId: string, subject: string) =>
+    api.get<SchemaVersionListResponse>(
+      `/v1/schemas/subjects/${encodeURIComponent(subject)}/versions?registry_id=${registryId}`,
+    ),
+  compareVersions: (
+    registryId: string,
+    subject: string,
+    fromVersion: number,
+    toVersion: number,
+  ) =>
+    api.get<SchemaVersionCompareResponse>(
+      `/v1/schemas/subjects/${encodeURIComponent(subject)}/compare`,
+      {
+        params: {
+          registry_id: registryId,
+          from_version: fromVersion,
+          to_version: toVersion,
+        },
+      },
+    ),
+  getVersion: (registryId: string, subject: string, version: number) =>
+    api.get<SchemaVersionDetailResponse>(
+      `/v1/schemas/subjects/${encodeURIComponent(subject)}/versions/${version}?registry_id=${registryId}`,
+    ),
+  exportVersion: (registryId: string, subject: string, version: number) =>
+    api.get(
+      `/v1/schemas/subjects/${encodeURIComponent(subject)}/versions/${version}/export?registry_id=${registryId}`,
+      { responseType: "text" },
+    ),
+  exportLatest: (registryId: string, subject: string) =>
+    api.get(`/v1/schemas/subjects/${encodeURIComponent(subject)}/export?registry_id=${registryId}`, {
+      responseType: "text",
+    }),
 };
 
 export const registryAPI = {
